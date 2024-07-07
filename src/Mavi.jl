@@ -61,14 +61,15 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     System{T}(state, space_cfg, dynamic_cfg, int_cfg, diffs, forces, dists, num_p)
 end
 
-function forces!(system::System{T}) where {T}
-    """
-    Calculates the total force acting on all particles
+"""
+Calculates the total force acting on all particles
 
-    ko: coupling constant
-    ro: oscillation center
-    ra: maximum distance for which the potential is nonzero
-    """
+ko: coupling constant
+ro: oscillation center
+ra: maximum distance for which the potential is nonzero
+"""
+function forces!(system::System{T}) where {T}
+
     # Aliases
     state = system.state
     ko = system.dynamic_cfg.ko
@@ -101,15 +102,14 @@ function forces!(system::System{T}) where {T}
     end
 end
 
+"""
+Advances one time step using Velocity-Verlet
 
+ko: coupling constant
+ro: oscillation center
+ra: maximum distance for which the potential is nonzero
+"""
 function step!(system::System{T}) where {T}
-    """
-    Advances one time step using Velocity-Verlet
-    
-    ko: coupling constant
-    ro: oscillation center
-    ra: maximum distance for which the potential is nonzero
-    """
 
     # Aliases
     state = system.state
