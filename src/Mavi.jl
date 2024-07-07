@@ -144,5 +144,6 @@ function step!(system::System{T}) where {T}
     state.vy .+= dt*(system.forces[2,:] + old_forces[2,:])/2
 end
 
+include("visualization.jl")
 
 end
