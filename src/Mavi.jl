@@ -5,7 +5,7 @@ include("configs.jl")
 using .Configs
 
 "Particles state (positions and velocities)"
-@kwdef struct State{T}
+@kwdef mutable struct State{T}
     x::Vector{T}
     y::Vector{T}
     vx::Vector{T}
@@ -18,7 +18,7 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T}
+mutable struct System{T}
     state::State{T}
     space_cfg::SpaceCfg
     dynamic_cfg::DynamicCfg
@@ -71,7 +71,10 @@ function forces!(system::System{T}) where {T}
     """
     # Aliases
     state = system.state
-    ko, ro, ra = system.dynamic_cfg
+    ko = system.dynamic_cfg.ko
+    ro = system.dynamic_cfg.ro
+    ra = system.dynamic_cfg.ra
+    N = system.num_p
     # Initialize forces as zero
     system.forces .= 0.0
     for i in 1:N
@@ -110,9 +113,12 @@ function step!(system::System{T}) where {T}
 
     # Aliases
     state = system.state
-    N = length(state.x)
+    N = system.num_p
     dt = system.int_cfg.dt # integration timestep
-    ko, ro, ra = system.dynamic_cfg # truncated harmonic potential constants
+    # Truncated harmonic potential constants
+    ko = system.dynamic_cfg.ko
+    ro = system.dynamic_cfg.ro
+    ra = system.dynamic_cfg.ra
     forces = system.forces
     diffs = system.diffs
     dists = system.dists
@@ -123,15 +129,15 @@ function step!(system::System{T}) where {T}
 
     # Update positions
     term = dt^2/2 # quadratic term on accelerated movement
-    state.x += state.vx*dt + forces.x*term # uniformly accelerated movement
-    state.y += state.vy*dt + forces.y*term
+    state.x += state.vx*dt + forces[1,:]*term # uniformly accelerated movement
+    state.y += state.vy*dt + forces[2,:]*term
 
     # Calculate new forces
     forces!(system)
 
     # Update velocities
-    state.vx += dt*(system.forces[1] + old_forces[1])/2 # mean over old and new forces
-    state.vy += dt*(system.forces[2] + old_forces[2])/2
+    state.vx += dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
+    state.vy += dt*(system.forces[2,:] + old_forces[2,:])/2
 end
 
 
