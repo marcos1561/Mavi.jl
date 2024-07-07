@@ -61,4 +61,6 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     System{T}(state, space_cfg, dynamic_cfg, int_cfg, diffs, forces, dists, num_p)
 end
 
+include("visualization.jl")
+
 end
