@@ -5,7 +5,7 @@ include("configs.jl")
 using .Configs
 
 "Particles state (positions and velocities)"
-@kwdef mutable struct State{T}
+@kwdef struct State{T}
     x::Vector{T}
     y::Vector{T}
     vx::Vector{T}
@@ -18,7 +18,7 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-mutable struct System{T}
+struct System{T}
     state::State{T}
     space_cfg::SpaceCfg
     dynamic_cfg::DynamicCfg
@@ -62,14 +62,14 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
 end
 
 """
-Calculates the total force acting on all particles
+Calculates the total force acting on all particles.
+Also updates the distance between particles.
 
 ko: coupling constant
 ro: oscillation center
 ra: maximum distance for which the potential is nonzero
 """
 function forces!(system::System{T}) where {T}
-
     # Aliases
     state = system.state
     ko = system.dynamic_cfg.ko
@@ -94,6 +94,12 @@ function forces!(system::System{T}) where {T}
                 fy_ij = 0.0
             end
             # Update values
+            system.diffs[1,i,j] = x_ij
+            system.diffs[1,j,i] = -x_ij
+            system.diffs[2,i,j] = y_ij
+            system.diffs[2,j,i] = -y_ij
+            system.dists[i,j] = r_ij
+            system.dists[j,i] = r_ij
             system.forces[1,i] += fx_ij
             system.forces[1,j] -= fx_ij
             system.forces[2,i] += fy_ij
@@ -120,8 +126,6 @@ function step!(system::System{T}) where {T}
     ro = system.dynamic_cfg.ro
     ra = system.dynamic_cfg.ra
     forces = system.forces
-    diffs = system.diffs
-    dists = system.dists
 
     # Calculate present forces
     forces!(system)
@@ -129,15 +133,15 @@ function step!(system::System{T}) where {T}
 
     # Update positions
     term = dt^2/2 # quadratic term on accelerated movement
-    state.x += state.vx*dt + forces[1,:]*term # uniformly accelerated movement
-    state.y += state.vy*dt + forces[2,:]*term
+    state.x .+= state.vx*dt + forces[1,:]*term # uniformly accelerated movement
+    state.y .+= state.vy*dt + forces[2,:]*term
 
     # Calculate new forces
     forces!(system)
 
     # Update velocities
-    state.vx += dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
-    state.vy += dt*(system.forces[2,:] + old_forces[2,:])/2
+    state.vx .+= dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
+    state.vy .+= dt*(system.forces[2,:] + old_forces[2,:])/2
 end
 
 
