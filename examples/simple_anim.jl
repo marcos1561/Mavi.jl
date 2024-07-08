@@ -3,7 +3,8 @@ Creates a system with two particles and animate it using
 a step function with constant velocity and rigid walls. 
 """
 
-using Mavi: Mavi, Configs, Visualization
+using Mavi: Mavi, Visualization
+using Mavi.Configs
 
 anim_cfg = Visualization.AnimationCfg(
     fps = 60,    
