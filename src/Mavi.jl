@@ -64,7 +64,7 @@ function check_inside(state::State{T}, space_cfg::RectangleCfg) where {T}
 end
 function check_inside(state::State{T}, space_cfg::CircleCfg) where {T}
     r2 = state.x.^2 + state.y.^2
-    if all(r -> r <= space_cfg.radius, r2)
+    if all(r -> r <= space_cfg.radius^2, r2)
         return true
     else
         return false
