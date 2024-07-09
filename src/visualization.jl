@@ -3,10 +3,12 @@ module Visualization
 
 using GLMakie, Printf
 using Mavi: State, System
+using Mavi.Configs
 
 @kwdef struct AnimationCfg
     fps::Int=30
     num_steps_per_frame::Int
+    circle_radius::Float64=-1
     circle_rel::Int = 20
 end
 
@@ -22,6 +24,18 @@ function get_circle(radius, resolution=20)
     end
 
     return circle
+end
+
+function drawn_borders(ax, space_cfg::RectangleCfg)
+    l, h = space_cfg.length, space_cfg.height
+    lines!(ax, [0, l], [0, 0], color=:black)
+    lines!(ax, [0, l], [h, h], color=:black)
+    lines!(ax, [0, 0], [0, h], color=:black)
+    lines!(ax, [l, l], [0, h], color=:black)
+end
+
+function drawn_borders(ax, space_cfg::CircleCfg)
+    arc!(ax, Point2f(0), space_cfg.radius, -π, π, color=:black)
 end
 
 function update_circles!(circle_points, circle_base, state::State{T}) where {T}
@@ -44,15 +58,16 @@ function animate(system::System{T}, step!, cfg::AnimationCfg) where {T}
     fig, ax = scatter(pos_obs...)
     ax.aspect = 1
     
-    # Borders
-    l, h = system.space_cfg.length, system.space_cfg.height
-    lines!(ax, [0, l], [0, 0], color=:black)
-    lines!(ax, [0, l], [h, h], color=:black)
-    lines!(ax, [0, 0], [0, h], color=:black)
-    lines!(ax, [l, l], [0, h], color=:black)
+    drawn_borders(ax, system.space_cfg)
 
+    if cfg.circle_radius == -1
+        radius = particle_radius(system.dynamic_cfg) 
+    else
+        radius = cfg.circle_radius 
+    end
+    
     # Circles
-    circle_base = get_circle(system.dynamic_cfg.ro/2, cfg.circle_rel)
+    circle_base = get_circle(radius, cfg.circle_rel)
     circle_points = Vector{Point2f}(undef, system.num_p * length(circle_base))
     
     update_circles!(circle_points, circle_base, system.state)
