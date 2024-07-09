@@ -52,9 +52,12 @@ struct System{T, C1<:SpaceCfg, C2<:DynamicCfg}
     num_p::Int
 end
 
+function check_inside(state::State{T}, space_cfg) where {T}
+    
+end
+
 function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     num_p = length(state.x)
-    
     diffs = Array{T, 3}(undef, 2, num_p, num_p)
     forces = Array{T, 2}(undef, 2, num_p)
     dists = zeros(T, num_p, num_p)
