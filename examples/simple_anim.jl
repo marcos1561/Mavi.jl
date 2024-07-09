@@ -6,11 +6,6 @@ a step function with constant velocity and rigid walls.
 using Mavi: Mavi, Visualization
 using Mavi.Configs
 
-anim_cfg = Visualization.AnimationCfg(
-    fps = 60,    
-    num_steps_per_frame = 1,
-)
-
 state = Mavi.State{Float64}(
     x=[1, 2],
     y=[1, 2],
@@ -20,11 +15,11 @@ state = Mavi.State{Float64}(
 
 system = Mavi.System(
     state=state, 
-    space_cfg=SpaceCfg(
+    space_cfg=RectangleCfg(
         length=5,
         height=5,
     ), 
-    dynamic_cfg=DynamicCfg(1, 1, 1),
+    dynamic_cfg=HarmTruncCfg(1, 1, 1),
     int_cfg=IntegrationCfg(
         dt=0.1
     ),
@@ -50,5 +45,11 @@ function step!(system::Mavi.System)
         end
     end
 end
+
+anim_cfg = Visualization.AnimationCfg(
+    fps = 60,    
+    circle_radius = particle_radius(system.dynamic_cfg),
+    num_steps_per_frame = 1,
+)
 
 Visualization.animate(system, step!, anim_cfg)
