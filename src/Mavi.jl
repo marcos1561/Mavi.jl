@@ -52,11 +52,30 @@ struct System{T, C1<:SpaceCfg, C2<:DynamicCfg}
     num_p::Int
 end
 
-function check_inside(state::State{T}, space_cfg) where {T}
-    
+"""
+Checks if all particles are inside the given configuration space. If not, throws an error.
+"""
+function check_inside(state::State{T}, space_cfg::RectangleCfg) where {T}
+    if all(x -> 0.0 <= x <= space_cfg.length, state.x) && all(y -> 0.0 <= y <= space_cfg.height, state.y)
+        return true
+    else
+        return false
+    end
+end
+function check_inside(state::State{T}, space_cfg::CircleCfg) where {T}
+    r2 = state.x.^2 + state.y.^2
+    if all(r -> r <= space_cfg.radius, r2)
+        return true
+    else
+        return false
+    end
 end
 
+
 function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
+    if check_inside(state,space_cfg) == false
+        throw("particles must be inside space")
+    end
     num_p = length(state.x)
     diffs = Array{T, 3}(undef, 2, num_p, num_p)
     forces = Array{T, 2}(undef, 2, num_p)
