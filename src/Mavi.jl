@@ -12,6 +12,9 @@ using .Configs
     vy::Vector{T}
 end
 
+include("space_checks.jl")
+using .SpaceChecks
+
 """
 Base struct that represent a system of particles.
 
@@ -51,37 +54,10 @@ struct System{T, C1<:SpaceCfg, C2<:DynamicCfg}
     "Number of particles"
     num_p::Int
 end
-
-
-"""
-Returns the indices of particles outside the given space configuration.
-"""
-function outside_particles(state::State, space_cfg::RectangleCfg)
-    out_ids = findall((state.x .<= 0.0 .| state.x .>= space_cfg.length) .| (state.y .<= 0.0 .| state.y .>= space_cfg.height))
-    return out_ids
-end
-
-function outside_particles(state::State, space_cfg::CircleCfg)
-    r2 = state.x.^2 + state.y.^2
-    out_ids = findall(r2 .>= space_cfg.radius^2)
-    return out_ids
-end
-"""
-Checks if all particles are inside the given space configuration. If not, throws an error.
-"""
-function check_inside(state::State, space_cfg::SpaceCfg)
-    all_inside = true
-    out_ids = outside_particles(state,space_cfg)
-    if length(out_ids) != 0
-        all_inside = false
-    end
-    return all_inside, out_ids
-end
-
 function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
-    all_inside, out_ids = check_inside(state,space_cfg)
+    all_inside, out_ids = check_inside(state, space_cfg)
     if all_inside == false
-        throw("particles $(out_ids) outside space.")
+        throw("Particles with ids=$(out_ids) outside space.")
     end
     num_p = length(state.x)
     diffs = Array{T, 3}(undef, 2, num_p, num_p)
