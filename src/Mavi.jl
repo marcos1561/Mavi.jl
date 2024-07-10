@@ -55,7 +55,7 @@ end
 """
 Checks if all particles are inside the given configuration space. If not, throws an error.
 """
-function check_inside(state::State{T}, space_cfg::RectangleCfg) where {T}
+function check_inside(state::State, space_cfg::RectangleCfg)
     if all(x -> 0.0 <= x <= space_cfg.length, state.x) && all(y -> 0.0 <= y <= space_cfg.height, state.y)
         return true
     else
