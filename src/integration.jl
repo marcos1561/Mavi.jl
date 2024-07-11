@@ -74,31 +74,19 @@ function rigid_walls!(system::System, space_cfg::RectangleCfg)
 
     state.vel[1, findall(out_x)] .*= -1.0
     state.vel[2, findall(out_y)] .*= -1.0
-
-    # for i in 1:system.num_p
-    #     # Hit vertical wall
-    #     if ((state.x[i]+r) > space_cfg.length) || ((state.x[i]-r) < 0)
-    #         state.vx[i] *= -1.
-    #     end
-
-    #     # Hit horizontal wall
-    #     if ((state.y[i]+r) > space_cfg.height) || ((state.y[i]-r) < 0)
-    #         state.vy[i] *= -1.
-    #     end
-    # end
 end
 
 function rigid_walls!(system::System, space_cfg::CircleCfg)
     state = system.state
     max_r2 = (space_cfg.radius - particle_radius(system.dynamic_cfg))^2
     for i in 1:system.num_p
-        x, y = state.x[i], state.y[i]
+        x, y = state.pos[1, i], state.pos[2, i]
         x2, y2 = x^2, y^2
         if (x2 + y2) > max_r2
             r2 = x2 + y2
-            vx, vy = state.vx[i], state.vy[i]
-            state.vx[i] = (vx*(y2 - x2) - 2*vy*x*y) / r2
-            state.vy[i] = (-vy*(y2 - x2) - 2*vx*x*y) / r2
+            vx, vy = state.vel[1, i], state.vel[2, i]
+            state.vel[1, i] = (vx*(y2 - x2) - 2*vy*x*y) / r2
+            state.vel[2, i] = (-vy*(y2 - x2) - 2*vx*x*y) / r2
         end
     end
 end
@@ -112,8 +100,6 @@ function update_verlet!(system::System)
 
     # Update positions
     term = dt^2/2 # quadratic term on accelerated movement
-    # state.x .+= state.vx*dt + system.forces[1,:]*term # uniformly accelerated movement
-    # state.y .+= state.vy*dt + system.forces[2,:]*term
     state.pos .+= state.vel * dt + system.forces * term
 
     # Calculate new forces
@@ -121,8 +107,6 @@ function update_verlet!(system::System)
     calc_forces!(system, system.dynamic_cfg)
 
     # Update velocities
-    # state.vx .+= dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
-    # state.vy .+= dt*(system.forces[2,:] + old_forces[2,:])/2
     state.vel .+= dt/2 * (system.forces + old_forces)
 end
 
