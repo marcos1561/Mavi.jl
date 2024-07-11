@@ -5,11 +5,15 @@ include("configs.jl")
 using .Configs
 
 "Particles state (positions and velocities)"
+# @kwdef struct State{T}
+#     x::Vector{T}
+#     y::Vector{T}
+#     vx::Vector{T}
+#     vy::Vector{T}
+# end
 @kwdef struct State{T}
-    x::Vector{T}
-    y::Vector{T}
-    vx::Vector{T}
-    vy::Vector{T}
+    pos::Matrix{T}
+    vel::Matrix{T}
 end
 
 include("space_checks.jl")

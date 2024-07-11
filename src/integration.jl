@@ -10,8 +10,10 @@ function calc_diffs_and_dists!(system::System)
     for i in 1:system.num_p
         for j in i+1:system.num_p
             # Difference in position
-            x_ij = state.x[i] - state.x[j]
-            y_ij = state.y[i] - state.y[j]
+            x_ij = state.xp[i] - state.x[j]
+            y_ij = state.yp[i] - state.y[j]
+            # diff = stat.pos[:, i] - state.vel[:, 1]
+            
             r_ij = sqrt(x_ij^2 + y_ij^2)
 
             # Update values
