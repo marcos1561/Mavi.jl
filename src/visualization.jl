@@ -52,19 +52,19 @@ end
 
 function update_circles!(circle_points, circle_base, state::State{T}) where {T}
     num_edges = length(circle_base)
-    num_p = length(state.x)
+    num_p = size(state.pos)[2]
     for i in 1:num_p
         begin_id = num_edges * (i-1) + 1
         end_id = begin_id + num_edges - 1 
-        center = [state.x[i], state.y[i]]
+        center = [state.pos[1, i], state.pos[2, i]]
         circle_points[begin_id:end_id] .= circle_base .+ [center]
     end
 end
 
 "Render, in real time, the system using the given step function."
 function animate(system::System{T}, step!, cfg::AnimationCfg) where {T}
-    x_obs = Observable(system.state.x)
-    y_obs = Observable(system.state.y)
+    x_obs = Observable(@view system.state.pos[1, :])
+    y_obs = Observable(@view system.state.pos[2, :])
     pos_obs = [x_obs, y_obs]
     
     fig, ax = scatter(pos_obs...)

@@ -10,9 +10,8 @@ function calc_diffs_and_dists!(system::System)
     for i in 1:system.num_p
         for j in i+1:system.num_p
             # Difference in position
-            x_ij = state.xp[i] - state.x[j]
-            y_ij = state.yp[i] - state.y[j]
-            # diff = stat.pos[:, i] - state.vel[:, 1]
+            x_ij = state.pos[1, i] - state.pos[1, j]
+            y_ij = state.pos[2, i] - state.pos[2, j]
             
             r_ij = sqrt(x_ij^2 + y_ij^2)
 
@@ -68,19 +67,25 @@ end
 "Rigid walls collisions. Reflect velocity on collision."
 function rigid_walls!(system::System, space_cfg::RectangleCfg)
     state = system.state
+    r = particle_radius(system.dynamic_cfg)
 
-    r = system.dynamic_cfg.ro / 2
-    for i in 1:system.num_p
-        # Hit vertical wall
-        if ((state.x[i]+r) > space_cfg.length) || ((state.x[i]-r) < 0)
-            state.vx[i] *= -1.
-        end
+    out_x = @. ((state.pos[1, :] + r) > space_cfg.length) || ((state.pos[1, :] - r) < 0)
+    out_y = @. ((state.pos[2, :] + r) > space_cfg.height) || ((state.pos[2, :] - r) < 0)
 
-        # Hit horizontal wall
-        if ((state.y[i]+r) > space_cfg.height) || ((state.y[i]-r) < 0)
-            state.vy[i] *= -1.
-        end
-    end
+    state.vel[1, findall(out_x)] .*= -1.0
+    state.vel[2, findall(out_y)] .*= -1.0
+
+    # for i in 1:system.num_p
+    #     # Hit vertical wall
+    #     if ((state.x[i]+r) > space_cfg.length) || ((state.x[i]-r) < 0)
+    #         state.vx[i] *= -1.
+    #     end
+
+    #     # Hit horizontal wall
+    #     if ((state.y[i]+r) > space_cfg.height) || ((state.y[i]-r) < 0)
+    #         state.vy[i] *= -1.
+    #     end
+    # end
 end
 
 function rigid_walls!(system::System, space_cfg::CircleCfg)
@@ -107,16 +112,18 @@ function update_verlet!(system::System)
 
     # Update positions
     term = dt^2/2 # quadratic term on accelerated movement
-    state.x .+= state.vx*dt + system.forces[1,:]*term # uniformly accelerated movement
-    state.y .+= state.vy*dt + system.forces[2,:]*term
+    # state.x .+= state.vx*dt + system.forces[1,:]*term # uniformly accelerated movement
+    # state.y .+= state.vy*dt + system.forces[2,:]*term
+    state.pos .+= state.vel * dt + system.forces * term
 
     # Calculate new forces
     calc_diffs_and_dists!(system)
     calc_forces!(system, system.dynamic_cfg)
 
     # Update velocities
-    state.vx .+= dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
-    state.vy .+= dt*(system.forces[2,:] + old_forces[2,:])/2
+    # state.vx .+= dt*(system.forces[1,:] + old_forces[1,:])/2 # mean over old and new forces
+    # state.vy .+= dt*(system.forces[2,:] + old_forces[2,:])/2
+    state.vel .+= dt/2 * (system.forces + old_forces)
 end
 
 "Advance system one time step."
