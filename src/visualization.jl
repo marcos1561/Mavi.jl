@@ -4,12 +4,24 @@ module Visualization
 using GLMakie, Printf
 using Mavi: State, System
 using Mavi.Configs
+using DataStructures
 
+"""
+Animation configurations
+
+# Arguments
+- fps: Animation fps
+- num_stesp_per_frame: How many time steps are done in a single frame.
+- circle_radius: Radius used to draw circles centered on particles positions.  
+    If not given, `particle_radius(dynamic_cfg)` will be used.
+- exec_times_size: Circular buffer length that stores step time execution.
+"""
 @kwdef struct AnimationCfg
     fps::Int=30
     num_steps_per_frame::Int
     circle_radius::Float64=-1
     circle_rel::Int = 20
+    exec_times_size = 40
 end
 
 "Return circle vertices centered in the origin with given radius."
@@ -40,19 +52,19 @@ end
 
 function update_circles!(circle_points, circle_base, state::State{T}) where {T}
     num_edges = length(circle_base)
-    num_p = length(state.x)
+    num_p = size(state.pos)[2]
     for i in 1:num_p
         begin_id = num_edges * (i-1) + 1
         end_id = begin_id + num_edges - 1 
-        center = [state.x[i], state.y[i]]
+        center = [state.pos[1, i], state.pos[2, i]]
         circle_points[begin_id:end_id] .= circle_base .+ [center]
     end
 end
 
 "Render, in real time, the system using the given step function."
 function animate(system::System{T}, step!, cfg::AnimationCfg) where {T}
-    x_obs = Observable(system.state.x)
-    y_obs = Observable(system.state.y)
+    x_obs = Observable(@view system.state.pos[1, :])
+    y_obs = Observable(@view system.state.pos[2, :])
     pos_obs = [x_obs, y_obs]
     
     fig, ax = scatter(pos_obs...)
@@ -74,15 +86,19 @@ function animate(system::System{T}, step!, cfg::AnimationCfg) where {T}
     circle_points_obs = Observable(circle_points)
     circles_lines = linesegments!(ax, circle_points_obs, color=:black)
 
+    exec_times = CircularBuffer{Float64}(cfg.exec_times_size)
+
     display(fig)
     time = 0.0
     while events(fig).window_open[] 
         for _ in 1:cfg.num_steps_per_frame
-            step!(system)
+            info = @timed step!(system)
+            push!(exec_times, info.time)
             time += system.int_cfg.dt
         end
         
-        ax.title = @sprintf("t=%.3f", time)
+        mean_exec_time = sum(exec_times)/length(exec_times) * 1000
+        ax.title = @sprintf("t=%.3f | Δt=%.3f ms", time, mean_exec_time)
 
         update_circles!(circle_points, circle_base, system.state)
         notify(circle_points_obs)

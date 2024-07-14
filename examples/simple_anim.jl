@@ -7,10 +7,8 @@ using Mavi: Mavi, Visualization
 using Mavi.Configs
 
 state = Mavi.State{Float64}(
-    x=[1, 2],
-    y=[1, 2],
-    vx=[0.3, 2],
-    vy=[1, 0],
+    pos=[1 2; 1 2],
+    vel=[0.3 2; 1 0]
 )
 
 system = Mavi.System(
@@ -30,18 +28,17 @@ function step!(system::Mavi.System)
     dt = system.int_cfg.dt
 
     # Constant velocity
-    state.x .+= state.vx * dt 
-    state.y .+= state.vy * dt 
+    state.pos .+= state.vel * dt
 
     # Rigid walls collisions
     space_cfg = system.space_cfg
     r = system.dynamic_cfg.ro/2
     for i in 1:system.num_p
-        if ((state.x[i]+r) > space_cfg.length) || ((state.x[i]-r) < 0)
-            state.vx[i] *= -1.
+        if ((state.pos[1, i]+r) > space_cfg.length) || ((state.pos[1, i]-r) < 0)
+            state.vel[1, i] *= -1.
         end
-        if ((state.y[i]+r) > space_cfg.height) || ((state.y[i]-r) < 0)
-            state.vy[i] *= -1.
+        if ((state.pos[2, i]+r) > space_cfg.height) || ((state.pos[2, i]-r) < 0)
+            state.vel[2, i] *= -1.
         end
     end
 end
