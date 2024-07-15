@@ -2,7 +2,7 @@
 module Configs
 
 export SpaceCfg, DynamicCfg, IntegrationCfg
-export RectangleCfg, CircleCfg, HarmTruncCfg
+export RectangleCfg, CircleCfg, HarmTruncCfg, LenJonesCfg
 export particle_radius
 
 #
@@ -51,7 +51,7 @@ Arguments
 end
 
 particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
-particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2 # i'm not sure about this
+particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2
 
 #
 # Integration Configuration

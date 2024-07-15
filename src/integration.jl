@@ -85,7 +85,7 @@ function calc_forces!(system::System, dynamic_cfg::LenJonesCfg)
             y_ij = diffs[2, i, j]
 
             # Force modulus
-            fmod = 4*epsilon*(6*sigma^6/dist^7 - 12*sigma^12/dist^13)
+            fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
 
             # Force components
             fx_ij = fmod*x_ij/dist
