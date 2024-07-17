@@ -1,7 +1,9 @@
-using Mavi: Mavi
+using Printf
+
+using Mavi
 using Mavi.Integration
 using Mavi.Configs
-using Mavi.Info
+using Mavi.Quantities
 
 state = Mavi.State{Float64}(
     pos = [1 -2.5 3.3 -4 5; -1.7 2.1 -3.8 4.4 -5.4],
@@ -15,14 +17,14 @@ system = Mavi.System(
     int_cfg=IntegrationCfg(dt=0.01),
 )
 
-# Make one step to first calculte distances
-Integration.step!(system)
+Integration.calc_diffs_and_dists!(system)
+
 # Time evolution
 for i in 1:100
     Integration.step!(system)
     if i % 5 == 0 # print every 5 steps
         pe = potential_energy(system,system.dynamic_cfg)
         ke = kinetic_energy(state)
-        println("Potential: $pe, kinetic: $ke, total: $(pe+ke)")
+        @printf("Potential: %7.3f| Kinetic: %7.3f| Total: %7.5f\n", pe, ke, pe+ke)
     end
 end

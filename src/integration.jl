@@ -63,9 +63,8 @@ function calc_forces!(system::System, dynamic_cfg::HarmTruncCfg)
         end
     end
 end
-"""
-Compute total force acting on particles using Lennard-Jones potential.
-"""
+
+"Compute total force acting on particles using Lennard-Jones potential."
 function calc_forces!(system::System, dynamic_cfg::LenJonesCfg)
     # Aliases
     dists = system.dists

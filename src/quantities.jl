@@ -1,21 +1,17 @@
 "Calculation of thermodynamic quantities."
-module Info
+module Quantities
 
 using Mavi: State, System
 using Mavi.Configs
 
 export kinetic_energy, potential_energy
 
-"""
-Returns the system's kinetic energy.
-"""
+"Return system's kinetic energy."
 function kinetic_energy(state::State)
     return sum(state.vel .^2)/2
 end
 
-"""
-Returns the system's potential energy.
-"""
+"Return system's potential energy."
 function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     # Aliases
     N = system.num_p
@@ -36,6 +32,7 @@ function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     pot *= ko/2
     return pot
 end
+
 function potential_energy(system::System, dynamic_cfg::LenJonesCfg)
     # Aliases
     N = system.num_p
