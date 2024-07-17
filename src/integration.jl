@@ -64,6 +64,41 @@ function calc_forces!(system::System, dynamic_cfg::HarmTruncCfg)
     end
 end
 
+"Compute total force acting on particles using Lennard-Jones potential."
+function calc_forces!(system::System, dynamic_cfg::LenJonesCfg)
+    # Aliases
+    dists = system.dists
+    diffs = system.diffs
+
+    sigma = dynamic_cfg.sigma
+    epsilon = dynamic_cfg.epsilon
+
+    N = system.num_p
+
+    # Initialize forces as zero
+    system.forces .= 0.0
+    for i in 1:N
+        for j in i+1:N
+            dist = dists[i, j]
+            x_ij = diffs[1, i, j]
+            y_ij = diffs[2, i, j]
+
+            # Force modulus
+            fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
+
+            # Force components
+            fx_ij = fmod*x_ij/dist
+            fy_ij = fmod*y_ij/dist
+
+            # Update values
+            system.forces[1,i] += fx_ij
+            system.forces[1,j] -= fx_ij
+            system.forces[2,i] += fy_ij
+            system.forces[2,j] -= fy_ij 
+        end
+    end
+end
+
 "Rigid walls collisions. Reflect velocity on collision."
 function rigid_walls!(system::System, space_cfg::RectangleCfg)
     state = system.state

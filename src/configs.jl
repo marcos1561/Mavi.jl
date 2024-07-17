@@ -2,7 +2,7 @@
 module Configs
 
 export SpaceCfg, DynamicCfg, IntegrationCfg
-export RectangleCfg, CircleCfg, HarmTruncCfg
+export RectangleCfg, CircleCfg, HarmTruncCfg, LenJonesCfg
 export particle_radius
 
 #
@@ -20,7 +20,7 @@ end
 end
 
 #
-# Dynamic Configuraitons 
+# Dynamic Configurations 
 #
 abstract type DynamicCfg end
 
@@ -37,7 +37,21 @@ Truncated harmonic potencial configuration.
     ro::Float64
     ra::Float64
 end
-particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2 
+
+"""
+Lennard-Jones potential
+
+Arguments
+- sigma: distance between particles where the potential is zero
+- epsilon: depth of the potential well
+"""
+@kwdef struct LenJonesCfg <: DynamicCfg
+    sigma::Float64
+    epsilon::Float64
+end
+
+particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
+particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2
 
 #
 # Integration Configuration
