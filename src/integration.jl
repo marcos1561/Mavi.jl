@@ -1,7 +1,16 @@
 module Integration
 
-using Mavi: System
+using Mavi
+using Mavi.Configs: IntCfg, ChuncksIntCfg
 using Mavi.Configs
+using Mavi.ChuncksMod
+
+function calc_diff_dist(i, j, state::State)
+    dx = state.pos[1, i] - state.pos[1, j]
+    dy = state.pos[2, i] - state.pos[2, j]
+    dist = sqrt(dx^2 + dy^2)
+    return dx, dy, dist
+end
 
 "Compute the difference and distance between all particles."
 function calc_diffs_and_dists!(system::System)
@@ -25,6 +34,57 @@ function calc_diffs_and_dists!(system::System)
         end
     end
 end
+
+function calc_interaction!(i, j, system::System, dynamic_cfg::HarmTruncCfg)
+    dx, dy, dist = calc_diff_dist(i, j, system.state)
+
+    # Check interaction range
+    if dist < dynamic_cfg.ra # cutoff distance
+        fmod = -dynamic_cfg.ko*(dist - dynamic_cfg.ro) # restoring force
+        fx = fmod*dx/dist # unit vector x_ij/dist
+        fy = fmod*dy/dist
+    else # too far
+        fx = 0.0
+        fy = 0.0
+    end
+
+    system.forces[1, i] +=  fx
+    system.forces[2, i] +=  fy
+    system.forces[1, j] -= fx
+    system.forces[2, j] -= fy
+end
+
+function calc_forces_chuncks!(system::System{T}) where {T}
+    system.forces .= 0
+    
+    chuncks = system.chuncks
+    for col in 1:chuncks.num_cols
+        for row in 1:chuncks.num_rows
+            np = chuncks.num_particles_in_chunck[row, col]
+            chunck = @view chuncks.chunck_particles[1:np, row, col]
+            neighbors = chuncks.neighbors[row, col]
+            
+            for i in 1:np
+                p1_id = chunck[i]
+                for j in (i+1):np
+                    calc_interaction!(p1_id, chunck[j], 
+                        system, system.dynamic_cfg)
+                end
+                
+                for neighbor_id in neighbors
+                    nei_np = chuncks.num_particles_in_chunck[neighbor_id]
+                    nei_chunck = @view chuncks.chunck_particles[1:nei_np, neighbor_id]
+                    
+                    for j in 1:nei_np
+                        calc_interaction!(p1_id, nei_chunck[j], 
+                            system, system.dynamic_cfg)
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 """
 Compute total force acting on all particles using
@@ -146,8 +206,16 @@ function update_verlet!(system::System)
 end
 
 "Advance system one time step."
-function step!(system::System)
+function step!(system::System, int_cfg::IntCfg)
     calc_diffs_and_dists!(system)
+    calc_forces!(system, system.dynamic_cfg)
+    update_verlet!(system)
+    rigid_walls!(system, system.space_cfg)
+end
+
+function step!(system::System, int_cfg::ChuncksIntCfg)
+    
+
     calc_forces!(system, system.dynamic_cfg)
     update_verlet!(system)
     rigid_walls!(system, system.space_cfg)
