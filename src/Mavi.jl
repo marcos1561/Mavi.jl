@@ -66,6 +66,6 @@ end
 
 include("integration.jl")
 include("visualization.jl")
-include("info.jl")
+include("quantities.jl")
 
 end
