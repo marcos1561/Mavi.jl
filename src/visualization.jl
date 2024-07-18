@@ -92,7 +92,7 @@ function animate(system::System{T}, step!, cfg::AnimationCfg) where {T}
     time = 0.0
     while events(fig).window_open[] 
         for _ in 1:cfg.num_steps_per_frame
-            info = @timed step!(system)
+            info = @timed step!(system, system.int_cfg)
             push!(exec_times, info.time)
             time += system.int_cfg.dt
         end

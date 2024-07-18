@@ -2,8 +2,8 @@ module ChuncksMod
 
 export Chuncks, update_chuncks!
 
-using Mavi
-using Mavi.Configs
+using Mavi: State
+using Mavi.Configs: RectangleCfg
 
 struct Chuncks{T}
     num_cols::Int
@@ -70,10 +70,10 @@ function update_chuncks!(chuncks::Chuncks)
 
     chuncks.num_particles_in_chunck .= 0
 
-    num_p = length(state.x)
+    num_p = size(state.pos)[2]
     for i in 1:num_p
-        row_id = trunc(Int, div(-state.y[i] + space_h, chunck_h)) + 1
-        col_id = trunc(Int, div(state.x[i], chunck_l)) + 1
+        row_id = trunc(Int, div(-state.pos[2, i] + space_h, chunck_h)) + 1
+        col_id = trunc(Int, div(state.pos[1, i], chunck_l)) + 1
         
         row_id -= row_id == (chuncks.num_rows + 1) ? 1 : 0
         col_id -= col_id == (chuncks.num_cols + 1) ? 1 : 0

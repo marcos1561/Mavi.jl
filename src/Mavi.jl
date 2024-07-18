@@ -11,6 +11,7 @@ using .Configs
     vel::Matrix{T}
 end
 
+include("init_states.jl")
 include("space_checks.jl")
 include("chuncks.jl")
 using .SpaceChecks
@@ -71,7 +72,7 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
         chuncks = Chuncks(chuncks_cfg.num_cols, chuncks_cfg.num_rows,
             space_cfg, state, particle_radius(dynamic_cfg))
     else
-        chuncks = Chuncks(-1, -1,
+        chuncks = Chuncks(3, 3,
             space_cfg, state, particle_radius(dynamic_cfg))
     end
 
