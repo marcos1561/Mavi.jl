@@ -1,7 +1,8 @@
 module Mavi
 
-include("configs.jl")
+export State, System
 
+include("configs.jl")
 using .Configs
 
 "Particles state (positions and velocities)"
@@ -10,8 +11,11 @@ using .Configs
     vel::Matrix{T}
 end
 
+include("init_states.jl")
 include("space_checks.jl")
+include("chuncks.jl")
 using .SpaceChecks
+using .ChuncksMod
 
 """
 Base struct that represent a system of particles.
@@ -19,11 +23,12 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T, C1<:SpaceCfg, C2<:DynamicCfg}
+struct System{T, C1<:SpaceCfg, C2<:DynamicCfg, C3<:AbstracIntCfg}
     state::State{T}
     space_cfg::C1
     dynamic_cfg::C2
-    int_cfg::IntegrationCfg
+    int_cfg::C3
+    chuncks::Chuncks
     
     """
     Position difference between all particles
@@ -61,7 +66,17 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     diffs = Array{T, 3}(undef, 2, num_p, num_p)
     forces = Array{T, 2}(undef, 2, num_p)
     dists = zeros(T, num_p, num_p)
-    System(state, space_cfg, dynamic_cfg, int_cfg, diffs, forces, dists, num_p)
+
+    if typeof(int_cfg) == ChuncksIntCfg
+        chuncks_cfg = int_cfg.chuncks_cfg
+        chuncks = Chuncks(chuncks_cfg.num_cols, chuncks_cfg.num_rows,
+            space_cfg, state, particle_radius(dynamic_cfg))
+    else
+        chuncks = Chuncks(3, 3,
+            space_cfg, state, particle_radius(dynamic_cfg))
+    end
+
+    System(state, space_cfg, dynamic_cfg, int_cfg, chuncks, diffs, forces, dists, num_p)
 end
 
 include("integration.jl")

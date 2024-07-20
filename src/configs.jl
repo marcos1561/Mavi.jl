@@ -1,9 +1,10 @@
 "Collection of configurations"
 module Configs
 
-export SpaceCfg, DynamicCfg, IntegrationCfg
+export SpaceCfg, DynamicCfg, AbstracIntCfg
 export RectangleCfg, CircleCfg, HarmTruncCfg, LenJonesCfg
-export particle_radius
+export IntCfg, ChuncksIntCfg
+export particle_radius, ChuncksCfg
 
 #
 # Space Configuraitons 
@@ -56,8 +57,20 @@ particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2
 #
 # Integration Configuration
 #
-@kwdef struct IntegrationCfg 
+abstract type AbstracIntCfg end
+
+@kwdef struct IntCfg <: AbstracIntCfg 
     dt::Float64
+end
+
+@kwdef struct ChuncksCfg
+    num_cols::Int
+    num_rows::Int
+end
+
+@kwdef struct ChuncksIntCfg <: AbstracIntCfg
+    dt::Float64
+    chuncks_cfg::ChuncksCfg
 end
 
 end

@@ -1,7 +1,17 @@
 module Integration
 
-using Mavi: System
+using Mavi
+using Mavi.Configs: IntCfg, ChuncksIntCfg
 using Mavi.Configs
+using Mavi.ChuncksMod
+
+"Position difference and distance between particle with id `i` and `j`"
+function calc_diff_and_dist(i, j, state::State)
+    dx = state.pos[1, i] - state.pos[1, j]
+    dy = state.pos[2, i] - state.pos[2, j]
+    dist = sqrt(dx^2 + dy^2)
+    return dx, dy, dist
+end
 
 "Compute the difference and distance between all particles."
 function calc_diffs_and_dists!(system::System)
@@ -9,92 +19,114 @@ function calc_diffs_and_dists!(system::System)
 
     for i in 1:system.num_p
         for j in i+1:system.num_p
-            # Difference in position
-            x_ij = state.pos[1, i] - state.pos[1, j]
-            y_ij = state.pos[2, i] - state.pos[2, j]
-            
-            r_ij = sqrt(x_ij^2 + y_ij^2)
+            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
 
             # Update values
             system.diffs[1,i,j] = x_ij
             system.diffs[1,j,i] = -x_ij
             system.diffs[2,i,j] = y_ij
             system.diffs[2,j,i] = -y_ij
-            system.dists[i,j] = r_ij
-            system.dists[j,i] = r_ij
+            system.dists[i,j] = dist
+            system.dists[j,i] = dist
         end
     end
 end
 
-"""
-Compute total force acting on all particles using
-a truncated harmonic potencial.
-"""
-function calc_forces!(system::System, dynamic_cfg::HarmTruncCfg)
-    # Aliases
-    dists = system.dists
-    diffs = system.diffs
+"Return force on particle with id `i` exerted by particle with id `j`."
+function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
 
-    ko = dynamic_cfg.ko
-    ro = dynamic_cfg.ro
-    ra = dynamic_cfg.ra
-    N = system.num_p
-    # Initialize forces as zero
-    system.forces .= 0.0
-    for i in 1:N
-        for j in i+1:N
-            dist = dists[i, j]
-
-            # Check interaction range
-            if dist < ra # cutoff distance
-                fmod = -ko*(dist - ro) # restoring force
-                fx_ij = fmod*diffs[1, i, j]/dist # unit vector x_ij/dist
-                fy_ij = fmod*diffs[2, i, j]/dist
-            else # too far
-                fx_ij = 0.0
-                fy_ij = 0.0
-            end
-
-            # Update values
-            system.forces[1,i] += fx_ij
-            system.forces[1,j] -= fx_ij
-            system.forces[2,i] += fy_ij
-            system.forces[2,j] -= fy_ij 
-        end
+    # Check interaction range
+    if dist > dynamic_cfg.ra
+        return 0.0, 0.0
     end
+
+    fmod = -dynamic_cfg.ko*(dist - dynamic_cfg.ro) # restoring force
+    fx = fmod*x_ij/dist # unit vector x_ij/dist
+    fy = fmod*y_ij/dist
+
+    return fx, fy
 end
 
-"Compute total force acting on particles using Lennard-Jones potential."
-function calc_forces!(system::System, dynamic_cfg::LenJonesCfg)
-    # Aliases
-    dists = system.dists
-    diffs = system.diffs
+function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
 
-    N = system.num_p
+    # Force modulus
+    fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
 
-    # Initialize forces as zero
-    system.forces .= 0.0
+    # Force components
+    fx = fmod*x_ij/dist
+    fy = fmod*y_ij/dist
+
+    return fx, fy
+end
+
+"Compute total forces on particles using chuncks."
+function calc_forces_chuncks!(system::System)
+    system.forces .= 0
+    
+    chuncks = system.chuncks
+
+    # Iteration over all chunks
+    for col in 1:chuncks.num_cols
+        for row in 1:chuncks.num_rows
+            np = chuncks.num_particles_in_chunck[row, col]
+            chunck = @view chuncks.chunck_particles[1:np, row, col]
+            neighbors = chuncks.neighbors[row, col]
+            
+            # Iteration over all particlus in current chunck
+            for i in 1:np
+                p1_id = chunck[i]
+                
+                # Interaction between particles in the same chunck
+                for j in (i+1):np
+                    p2_id = chunck[j]
+                    fx, fy = calc_interaction(p1_id, p2_id, 
+                        system.state, system.dynamic_cfg)
+                    
+                    system.forces[1, p1_id] += fx
+                    system.forces[2, p1_id] += fy
+                    system.forces[1, p2_id] -= fx
+                    system.forces[2, p2_id] -= fy    
+                end
+                
+                # Interaction of particles in neighboring chunks
+                for neighbor_id in neighbors
+                    nei_np = chuncks.num_particles_in_chunck[neighbor_id]
+                    nei_chunck = @view chuncks.chunck_particles[1:nei_np, neighbor_id]
+                    
+                    for j in 1:nei_np
+                        p2_id = nei_chunck[j]
+                        fx, fy = calc_interaction(p1_id, nei_chunck[j], 
+                            system.state, system.dynamic_cfg)
+                        
+                        system.forces[1, p1_id] +=  fx
+                        system.forces[2, p1_id] +=  fy
+                        system.forces[1, p2_id] -= fx
+                        system.forces[2, p2_id] -= fy        
+                    end
+                end
+            end
+        end
+    end
+end
+
+"Compute total forces on particles."
+function calc_forces!(system::System)
+    system.forces .= 0
+
+    N = system.num_p
     for i in 1:N
         for j in i+1:N
-            dist = dists[i, j]
-            x_ij = diffs[1, i, j]
-            y_ij = diffs[2, i, j]
-
-            # Force modulus
-            fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
-
-            # Force components
-            fx_ij = fmod*x_ij/dist
-            fy_ij = fmod*y_ij/dist
-
-            # Update values
-            system.forces[1,i] += fx_ij
-            system.forces[1,j] -= fx_ij
-            system.forces[2,i] += fy_ij
-            system.forces[2,j] -= fy_ij 
+            fx, fy = calc_interaction(i, j, system.state, system.dynamic_cfg)
+            
+            system.forces[1, i] +=  fx
+            system.forces[2, i] +=  fy
+            system.forces[1, j] -= fx
+            system.forces[2, j] -= fy   
         end
     end
 end
@@ -127,7 +159,7 @@ function rigid_walls!(system::System, space_cfg::CircleCfg)
 end
 
 "Update state using Velocity-Verlet"
-function update_verlet!(system::System)
+function update_verlet!(system::System, calc_forces_in!)
     state = system.state
     old_forces = copy(system.forces)
 
@@ -137,19 +169,23 @@ function update_verlet!(system::System)
     term = dt^2/2 # quadratic term on accelerated movement
     state.pos .+= state.vel * dt + system.forces * term
 
-    # Calculate new forces
-    calc_diffs_and_dists!(system)
-    calc_forces!(system, system.dynamic_cfg)
+    calc_forces_in!(system)
 
     # Update velocities
     state.vel .+= dt/2 * (system.forces + old_forces)
 end
 
 "Advance system one time step."
-function step!(system::System)
-    calc_diffs_and_dists!(system)
-    calc_forces!(system, system.dynamic_cfg)
-    update_verlet!(system)
+function step!(system::System, int_cfg::IntCfg)
+    calc_forces!(system)
+    update_verlet!(system, calc_forces!)
+    rigid_walls!(system, system.space_cfg)
+end
+
+function step!(system::System, int_cfg::ChuncksIntCfg)
+    update_chuncks!(system.chuncks)
+    calc_forces_chuncks!(system)
+    update_verlet!(system, calc_forces_chuncks!)
     rigid_walls!(system, system.space_cfg)
 end
 
