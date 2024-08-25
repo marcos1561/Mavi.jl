@@ -13,9 +13,9 @@ end
 
 include("init_states.jl")
 include("space_checks.jl")
-include("chuncks.jl")
+include("chunks.jl")
 using .SpaceChecks
-using .ChuncksMod
+using .ChunksMod
 
 """
 Base struct that represent a system of particles.
@@ -23,12 +23,12 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T, C1<:SpaceCfg, C2<:DynamicCfg, C3<:AbstracIntCfg}
+struct System{T, C1<:SpaceCfg, C2<:DynamicCfg, C3<:AbstractIntCfg}#, C4<:Union{Chunks, Nothing}}
     state::State{T}
     space_cfg::C1
     dynamic_cfg::C2
     int_cfg::C3
-    chuncks::Chuncks
+    chunks::Union{Chunks, Nothing}
     
     """
     Position difference between all particles
@@ -67,16 +67,18 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     forces = Array{T, 2}(undef, 2, num_p)
     dists = zeros(T, num_p, num_p)
 
-    if typeof(int_cfg) == ChuncksIntCfg
-        chuncks_cfg = int_cfg.chuncks_cfg
-        chuncks = Chuncks(chuncks_cfg.num_cols, chuncks_cfg.num_rows,
+    chunks = nothing
+    if typeof(int_cfg) == ChunksIntCfg
+        chunks_cfg = int_cfg.chunks_cfg
+        chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
             space_cfg, state, particle_radius(dynamic_cfg))
-    else
-        chuncks = Chuncks(3, 3,
-            space_cfg, state, particle_radius(dynamic_cfg))
+    # else
+    #     chunk_space_cfg = RectangleCfg(1, 1)
+    #     chunks = Chunks(3, 3,
+    #         chunk_space_cfg, state, particle_radius(dynamic_cfg))
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chuncks, diffs, forces, dists, num_p)
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p)
 end
 
 include("integration.jl")

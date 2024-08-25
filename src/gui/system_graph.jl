@@ -43,7 +43,22 @@ function update_circles!(circle_points, circle_base, state::State)
     end
 end
 
+
 abstract type GraphCfg end
+
+"""
+Drawn every particle with a circumference and a central point.
+
+- circle_radius: 
+    Radius used to draw circles centered on particles positions.  
+    If not given, `particle_radius(dynamic_cfg)` will be used.
+- circle_rel: 
+    How many vertices used to draw circles.
+"""
+@kwdef struct DefaultGraphCfg <: GraphCfg 
+    circle_radius = -1.0
+    circle_rel = 20
+end
 
 struct DefaultGraph{T1, T2}
     ax::T1
@@ -53,11 +68,7 @@ struct DefaultGraph{T1, T2}
     pos_obs::T2
 end
 
-@kwdef struct DefaultGraphCfg <: GraphCfg 
-    circle_radius = -1.0
-    circle_rel = 20
-end
-
+"Build the Graph respective to `cfg` using the given `grid_layout` from Makie."
 function get_graph(grid_layout, system, cfg::DefaultGraphCfg)
     ax = Axis(grid_layout[1, 1])
 

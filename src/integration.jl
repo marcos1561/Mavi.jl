@@ -1,9 +1,9 @@
 module Integration
 
 using Mavi
-using Mavi.Configs: IntCfg, ChuncksIntCfg
+using Mavi.Configs: IntCfg, ChunksIntCfg
 using Mavi.Configs
-using Mavi.ChuncksMod
+using Mavi.ChunksMod
 
 "Position difference and distance between particle with id `i` and `j`"
 function calc_diff_and_dist(i, j, state::State)
@@ -64,26 +64,26 @@ function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg)
     return fx, fy
 end
 
-"Compute total forces on particles using chuncks."
-function calc_forces_chuncks!(system::System)
+"Compute total forces on particles using chucks."
+function calc_forces_chunks!(system::System)
     system.forces .= 0
     
-    chuncks = system.chuncks
+    chunks = system.chunks
 
     # Iteration over all chunks
-    for col in 1:chuncks.num_cols
-        for row in 1:chuncks.num_rows
-            np = chuncks.num_particles_in_chunck[row, col]
-            chunck = @view chuncks.chunck_particles[1:np, row, col]
-            neighbors = chuncks.neighbors[row, col]
+    for col in 1:chunks.num_cols
+        for row in 1:chunks.num_rows
+            np = chunks.num_particles_in_chunk[row, col]
+            chunk = @view chunks.chunk_particles[1:np, row, col]
+            neighbors = chunks.neighbors[row, col]
             
-            # Iteration over all particlus in current chunck
+            # Iteration over all particles in current chunk
             for i in 1:np
-                p1_id = chunck[i]
+                p1_id = chunk[i]
                 
-                # Interaction between particles in the same chunck
+                # Interaction between particles in the same chunk
                 for j in (i+1):np
-                    p2_id = chunck[j]
+                    p2_id = chunk[j]
                     fx, fy = calc_interaction(p1_id, p2_id, 
                         system.state, system.dynamic_cfg)
                     
@@ -95,12 +95,12 @@ function calc_forces_chuncks!(system::System)
                 
                 # Interaction of particles in neighboring chunks
                 for neighbor_id in neighbors
-                    nei_np = chuncks.num_particles_in_chunck[neighbor_id]
-                    nei_chunck = @view chuncks.chunck_particles[1:nei_np, neighbor_id]
+                    nei_np = chunks.num_particles_in_chunk[neighbor_id]
+                    nei_chunk = @view chunks.chunk_particles[1:nei_np, neighbor_id]
                     
                     for j in 1:nei_np
-                        p2_id = nei_chunck[j]
-                        fx, fy = calc_interaction(p1_id, nei_chunck[j], 
+                        p2_id = nei_chunk[j]
+                        fx, fy = calc_interaction(p1_id, nei_chunk[j], 
                             system.state, system.dynamic_cfg)
                         
                         system.forces[1, p1_id] +=  fx
@@ -182,10 +182,10 @@ function step!(system::System, int_cfg::IntCfg)
     rigid_walls!(system, system.space_cfg)
 end
 
-function step!(system::System, int_cfg::ChuncksIntCfg)
-    update_chuncks!(system.chuncks)
-    calc_forces_chuncks!(system)
-    update_verlet!(system, calc_forces_chuncks!)
+function step!(system::System, int_cfg::ChunksIntCfg)
+    update_chunks!(system.chunks)
+    calc_forces_chunks!(system)
+    update_verlet!(system, calc_forces_chunks!)
     rigid_walls!(system, system.space_cfg)
 end
 

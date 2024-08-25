@@ -1,5 +1,8 @@
-"Systems visualizaions"
+"Systems visualizations"
 module Visualization
+
+export animate
+export AnimationCfg, DefaultInfoUICfg, DefaultGraphCfg, UiSettings
 
 using GLMakie
 using Mavi: State, System
@@ -12,6 +15,11 @@ include("gui/system_graph.jl")
 using .InfoUIs 
 using .SystemGraphs 
 
+"""
+# Arguments
+- sidebar_rel_length:
+    Relative horizontal space allocated to the InfoUI.
+"""
 @kwdef struct UiSettings
     sidebar_rel_length = 0.2
 end
@@ -20,17 +28,25 @@ end
 Animation configurations
 
 # Arguments
+- graph_cfg:
+    Configuration for the part where the system is rendered.
+    More info in "gui/system_graph.jl".
+
+info_cfg:
+    Configuration for the information UI part.
+    More info in "gui/info_ui.jl".
+
 - fps: 
-Animation fps
-- num_stesp_per_frame: 
+    Animation fps
+
+- num_steps_per_frame:
     How many time steps are done in a single frame.
-- circle_radius: 
-    Radius used to draw circles centered on particles positions.  
-    If not given, `particle_radius(dynamic_cfg)` will be used.
-- circle_rel: 
-    How many verticies used to draw circles.
-- exec_times_size: 
+
+- exec_times_size:
     Circular buffer length that stores step time execution.
+
+- ui_settings:
+    General settings for the UI window.
 """
 @kwdef struct AnimationCfg{GraphT, InfoT}
     graph_cfg::GraphT = DefaultGraphCfg()
@@ -41,13 +57,29 @@ Animation fps
     ui_settings = UiSettings()
 end
 
+"""
+Information about the state of execution.
+
+# Arguments
+- sym_time:
+    Current simulation time (the physical time of the system).
+
+- sym_time_count:
+    How many time steps were made.
+
+- times:
+    Buffer with the execution time of the last performed time steps.   
+"""
 mutable struct ExecInfo 
     sym_time::Float64
+    sym_time_count::Int
     times::CircularBuffer{Float64}
 end
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, step!, cfg::AnimationCfg)
+function animate(system::System, step!, cfg::AnimationCfg=AnimationCfg())
+    GLMakie.activate!(; title="Mavi")
+
     fig = Figure(
         backgroundcolor = RGBf(0.98, 0.98, 0.98), 
         # size = (1000, 700),
@@ -72,7 +104,7 @@ function animate(system::System, step!, cfg::AnimationCfg)
     info = InfoUIs.get_info_ui(info_gl, cfg.info_cfg)
     graph = SystemGraphs.get_graph(system_gl, system, cfg.graph_cfg)
 
-    exec_info = ExecInfo(0, CircularBuffer{Float64}(cfg.exec_times_size))
+    exec_info = ExecInfo(0, 0, CircularBuffer{Float64}(cfg.exec_times_size))
 
     display(fig)
     while events(fig).window_open[] 
@@ -82,7 +114,7 @@ function animate(system::System, step!, cfg::AnimationCfg)
             exec_info.sym_time += system.int_cfg.dt
         end
         
-        InfoUIs.update_info_ui(info, exec_info)
+        InfoUIs.update_info_ui(info, exec_info, system)
         SystemGraphs.update_graph(graph, system.state)
 
         sleep(1/cfg.fps)
