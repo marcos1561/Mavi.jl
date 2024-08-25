@@ -1,30 +1,52 @@
+"""
+Example: Extending the Information UI
+
+Calculates kinetic, potential, and total energy during integration, displaying
+the results in real-time on the UI.
+"""
+
 using Printf
 
 using Mavi
 using Mavi.Integration
 using Mavi.Configs
 using Mavi.Quantities
+using Mavi.Visualization
 
-state = Mavi.State{Float64}(
-    pos = [1 -2.5 3.3 -4 5; -1.7 2.1 -3.8 4.4 -5.4],
-    vel = [0.3 2 5.7 9.8 3.; 1 0 7.8 .12 2.2],
-)
+function main()
+    state = Mavi.State{Float64}(
+        pos = [1 -2.5 3.3 -4 5; -1.7 2.1 -3.8 4.4 -5.4],
+        vel = [0.3 2 5.7 9.8 3.; 1 0 7.8 .12 2.2],
+    )
 
-system = Mavi.System(
-    state=state, 
-    space_cfg=CircleCfg(radius=10), 
-    dynamic_cfg=LenJonesCfg(sigma=2,epsilon=4),
-    int_cfg=IntegrationCfg(dt=0.01),
-)
+    system = Mavi.System(
+        state=state, 
+        space_cfg=CircleCfg(radius=10), 
+        dynamic_cfg=LenJonesCfg(sigma=2,epsilon=4),
+        int_cfg=IntCfg(dt=0.01),
+    )
 
-Integration.calc_diffs_and_dists!(system)
+    "Calculates and returns energies formatted for printing"
+    function get_energy(system, exec_info)
+        energys = []
+        Integration.calc_diffs_and_dists!(system)
 
-# Time evolution
-for i in 1:100
-    Integration.step!(system)
-    if i % 5 == 0 # print every 5 steps
-        pe = potential_energy(system,system.dynamic_cfg)
+        pe = potential_energy(system, system.dynamic_cfg)
         ke = kinetic_energy(state)
-        @printf("Potential: %7.3f| Kinetic: %7.3f| Total: %7.5f\n", pe, ke, pe+ke)
+        
+        push!(energys, ("Potencial", @sprintf("%7.3f", pe)))
+        push!(energys, ("Kinetic", @sprintf("%7.3f", ke)))
+        push!(energys, ("Total", @sprintf("%7.3f", pe + ke)))
+
+        return energys
     end
+
+    anim_cfg = AnimationCfg(
+        info_cfg=DefaultInfoUICfg(
+            custom_items = get_energy
+        )
+    )
+
+    animate(system, Integration.step!, anim_cfg)
 end
+main()
