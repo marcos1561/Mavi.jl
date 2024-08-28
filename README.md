@@ -4,6 +4,33 @@
 
 Mavi é um motor de dinâmica de partículas (_Particle Dynamic Engine_).
 
+# Objetivo
+O objetivo do Mavi é servir como objeto de estudo de física e programação em geral, e das funcionalidades de Julia em particular.
+
+O pacote é pensado de maneira a ser o mais modularizado possível, permitindo uma estrutura geral para os programas que independa das particularidades do sistema estudado. Ele é dividido em módulos dedicados a cada aspecto do sistema e do programa: as configurações dinâmicas, espaciais e de integração numérica; os inicializadores e verificadores; a visualização; a coleta de dados etc.
+
+# Configurações do sistema
+O módulo `Configs` reúne diversas configurações do sistema descritas por diferentes tipos:
+
+## Configurações espaciais: `SpaceCfg`
+O sistema pode ser colocado em uma caixa retangular por meio da estrutura `RectangleCfg(length, height)` ou em um recipiente circular por meio da estrutura `CircleCfg(radius)`.
+
+Caso desejado, o usuário pode definir sua própria configuração espacial, bastando para isso definir uma nova estrutura pertencente ao tipo `SpaceCfg`.
+
+## Configurações dinâmicas: `DynamicCfg`
+Aqui são definidos os potenciais de interação entre as partículas. Já estão definidos dois deles:
+
+- Potencial harmônico truncado: `HarmTruncCfg(ko, ro, ra)`
+- Potencial de Lennard-Jones: `LenJonesCfg(sigma, epsilon)`
+
+Os detalhes dos parâmetros podem ser consultados em [configs.jl](src/configs.jl).
+
+A partir do potencial de interação define-se um "raio efetivo" para cada partícula, que será usado na visualização. Essa quantidade é definida pela função `particle_radius(dynamic_cfg)`, que recebe como argumento uma configuração dinâmica particular e define o raio da partícula a partir de um dado parâmetro da configuração dinâmica.
+
+Novamente, o usuário pode implementar qualquer configuração dinâmica, bastando definir uma estrutura do tipo `DynamicCfg` com os respectivos parâmetros e o correspondente raio da partícula com `particle_radius(...)`.
+
+## Configurações de integração
+
 # Interface visual
 O Mavi possui uma interface visual (feita inteiramente com o [Makie](https://docs.makie.org/v0.21/)) cujo objetivo é servir de ferramenta de depuração visual para o sistema sendo explorado. A estrutura da UI possui essencialmente dois elementos:
 
