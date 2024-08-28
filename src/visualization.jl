@@ -17,7 +17,7 @@ using .SystemGraphs
 
 """
 # Arguments
-- sidebar_rel_length:
+- sidebar_rel_length:  
     Relative horizontal space allocated to the InfoUI.
 """
 @kwdef struct UiSettings
@@ -28,24 +28,24 @@ end
 Animation configurations
 
 # Arguments
-- graph_cfg:
+- graph_cfg:  
     Configuration for the part where the system is rendered.
     More info in "gui/system_graph.jl".
 
-info_cfg:
+info_cfg:  
     Configuration for the information UI part.
     More info in "gui/info_ui.jl".
 
-- fps: 
+- fps:  
     Animation fps
 
-- num_steps_per_frame:
+- num_steps_per_frame:  
     How many time steps are done in a single frame.
 
-- exec_times_size:
+- exec_times_size:  
     Circular buffer length that stores step time execution.
 
-- ui_settings:
+- ui_settings:  
     General settings for the UI window.
 """
 @kwdef struct AnimationCfg{GraphT, InfoT}
@@ -61,13 +61,13 @@ end
 Information about the state of execution.
 
 # Arguments
-- sym_time:
+- sym_time:  
     Current simulation time (the physical time of the system).
 
-- sym_time_count:
+- sym_time_count:  
     How many time steps were made.
 
-- times:
+- times:  
     Buffer with the execution time of the last performed time steps.   
 """
 mutable struct ExecInfo 

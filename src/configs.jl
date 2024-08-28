@@ -29,9 +29,14 @@ abstract type DynamicCfg end
 Truncated harmonic potencial configuration.
 
 # Arguments
-- ko: coupling constant
-- ro: oscillation center
-- ra: maximum distance for which the potential is nonzero
+- ko:   
+    Coupling constant
+
+- ro:   
+    Oscillation center
+
+- ra:   
+    Maximum distance for which the potential is nonzero
 """
 @kwdef struct HarmTruncCfg <: DynamicCfg 
     ko::Float64
@@ -40,11 +45,14 @@ Truncated harmonic potencial configuration.
 end
 
 """
-Lennard-Jones potential
+Lennard-Jones potential.
 
-Arguments
-- sigma: distance between particles where the potential is zero
-- epsilon: depth of the potential well
+# Arguments
+- sigma:   
+    Distance between particles where the potential is zero.
+
+- epsilon:   
+    Depth of the potential well.
 """
 @kwdef struct LenJonesCfg <: DynamicCfg
     sigma::Float64

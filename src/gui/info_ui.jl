@@ -12,7 +12,7 @@ Inform physical time (t) and average execution time per time step (Δt).
 It's also possible to inject custom information as explained below.
 
 # Arguments
-- custom_items:
+- custom_items:  
     A function with the given signature:
         
         (System, ExecInfo) -> Array{Tuple{String, String}}

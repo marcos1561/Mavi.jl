@@ -23,8 +23,11 @@ end
 Checks if all particles are inside the given space configuration. 
 
 # Return
-- `all_inside::bool`: True if all particles are inside, false otherwise.
-- `out_ids::Vector{Int}`: Indices of outside particles.
+- all_inside::bool
+    True if all particles are inside, false otherwise.
+
+- out_ids::Vector{Int} 
+    Indices of outside particles.
 """
 function check_inside(state::State, space_cfg::SpaceCfg)
     all_inside = true

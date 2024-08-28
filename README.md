@@ -17,7 +17,7 @@ O pacote é pensado de maneira a ser o mais modularizado possível, permitindo u
 O móudlo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
 
 ## Estado
-O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, implementado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $N \times 2$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula.
+O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, armazenado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $2 \times N$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula.
 
 ## Sistema
 O *sistema*, por sua vez, contém, além do *estado* das partículas, as configurações espaciais, dinâmicas e de integração; a diferença de posição, a força e o módulo da distância entre as partículas; e o número de partículas. É implementado pela estrutura `Mavi.System(...)`, que recebe uma sequência de parâmetros. Há também uma função inicializadora que retorna uma instância de `Mavi.System`; mais detalhes podem ser vistos em [Mavi.jl](src/Mavi.jl).
@@ -42,10 +42,10 @@ Os detalhes dos parâmetros podem ser consultados em [configs.jl](src/configs.jl
 
 A partir do potencial de interação define-se um "raio efetivo" para cada partícula, que será usado na visualização. Essa quantidade é definida pela função `particle_radius(dynamic_cfg)`, que recebe como argumento uma configuração dinâmica particular e define o raio da partícula a partir de um dado parâmetro da configuração dinâmica.
 
-Novamente, o usuário pode implementar qualquer configuração dinâmica, bastando definir uma estrutura do tipo `DynamicCfg` com os respectivos parâmetros e o correspondente raio da partícula com `particle_radius(...)`.
+Novamente, o usuário pode implementar qualquer configuração dinâmica, bastando definir uma estrutura que herda do tipo abstrato `DynamicCfg` com os respectivos parâmetros e o correspondente raio da partícula com `particle_radius(...)`.
 
 ## Configurações de integração: `Configs.AbstractIntCfg`
-As configurações de integração são um pouco mais complexas e envolvem duas possibilidades: a integração numérica simples e a integração pelo "método das caixas", aqui chamadas de *chunks*. As respectivas estruturas, pertencentes ao tipo abstrato `AbstractIntCfg`, são
+As configurações de integração são um pouco mais complexas e envolvem duas possibilidades: a integração numérica simples e a integração pelo "método das caixas", aqui chamadas de *chunks*. As respectivas estruturas, herdeiras do tipo abstrato `AbstractIntCfg`, são
 
 - Integração simples: `IntCfg`
     A integração numérica é feita diretamente, e a estrutura `IntCfg` recebe como parâmetro apenas o passo de integração `dt`.

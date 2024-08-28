@@ -49,10 +49,10 @@ abstract type GraphCfg end
 """
 Drawn every particle with a circumference and a central point.
 
-- circle_radius: 
+- circle_radius:  
     Radius used to draw circles centered on particles positions.  
     If not given, `particle_radius(dynamic_cfg)` will be used.
-- circle_rel: 
+- circle_rel:  
     How many vertices used to draw circles.
 """
 @kwdef struct DefaultGraphCfg <: GraphCfg 
