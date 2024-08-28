@@ -7,17 +7,26 @@ Mavi é um motor de dinâmica de partículas (_Particle Dynamic Engine_).
 # Objetivo
 O objetivo do Mavi é servir como objeto de estudo de física e programação em geral, e das funcionalidades de Julia em particular.
 
-O pacote é pensado de maneira a ser o mais modularizado possível, permitindo uma estrutura geral para os programas que independa das particularidades do sistema estudado. Ele é dividido em módulos dedicados a cada aspecto do sistema e do programa: as configurações dinâmicas, espaciais e de integração numérica; os inicializadores e verificadores; a visualização; a coleta de dados etc.
+O pacote é pensado de maneira a ser o mais modularizado possível, permitindo uma estrutura geral para os programas que independa das particularidades do sistema estudado. Ele é dividido em módulos dedicados a cada aspecto do sistema e do programa: a definição do estado e do sistema; as configurações dinâmicas, espaciais e de integração numérica; os inicializadores e verificadores; a visualização; a coleta de dados etc.
+
+# Estado e sistema
+O móudlo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
+
+## Estado
+O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, implementado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $N \times 2$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula.
+
+## Sistema
+O *sistema*, por sua vez, contém, além do *estado* das partículas, as configurações espaciais, dinâmicas e de integração; a diferença de posição, a força e o módulo da distância entre as partículas; e o número de partículas. É implementado pela estrutura `Mavi.System(...)`, que recebe uma sequência de parâmetros. Há também uma função inicializadora que retorna uma instância de `Mavi.System`; mais detalhes podem ser vistos em [Mavi.jl](src/Mavi.jl).
 
 # Configurações do sistema
 O módulo `Configs` reúne diversas configurações do sistema descritas por diferentes tipos:
 
-## Configurações espaciais: `SpaceCfg`
+## Configurações espaciais: `Configs.SpaceCfg`
 O sistema pode ser colocado em uma caixa retangular por meio da estrutura `RectangleCfg(length, height)` ou em um recipiente circular por meio da estrutura `CircleCfg(radius)`.
 
 Caso desejado, o usuário pode definir sua própria configuração espacial, bastando para isso definir uma nova estrutura pertencente ao tipo `SpaceCfg`.
 
-## Configurações dinâmicas: `DynamicCfg`
+## Configurações dinâmicas: `Configs.DynamicCfg`
 Aqui são definidos os potenciais de interação entre as partículas. Já estão definidos dois deles:
 
 - Potencial harmônico truncado: `HarmTruncCfg(ko, ro, ra)`
@@ -29,7 +38,17 @@ A partir do potencial de interação define-se um "raio efetivo" para cada part�
 
 Novamente, o usuário pode implementar qualquer configuração dinâmica, bastando definir uma estrutura do tipo `DynamicCfg` com os respectivos parâmetros e o correspondente raio da partícula com `particle_radius(...)`.
 
-## Configurações de integração
+## Configurações de integração: `Configs.AbstractIntCfg`
+As configurações de integração são um pouco mais complexas e envolvem duas possibilidades: a integração numérica simples e a integração pelo "método das caixas", aqui chamadas de *chunks*. As respectivas estruturas, pertencentes ao tipo abstrato `AbstractIntCfg`, são
+
+- Integração simples: `IntCfg`
+    A integração numérica é feita diretamente, e a estrutura `IntCfg` recebe como parâmetro apenas o passo de integração `dt`.
+
+- Integração por *chunks*: `ChunksIntCfg`
+    O sistema é dividido em caixas, ou *chunks*, e a interação entre partículas é calculada apenas sobre as caixas vizinhas, simplificando muito o cálculo e consequentemente diminuindo o tempo de simulação. Essa opção é útil quando as interações não têm alcance muito grande.
+
+    A estrutura `ChunksIntCfg` recebe como parâmetros o passo de integração `dt` e uma outra estrutura chamada `ChunksCfg(num_cols,num_rows)`.
+
 
 # Interface visual
 O Mavi possui uma interface visual (feita inteiramente com o [Makie](https://docs.makie.org/v0.21/)) cujo objetivo é servir de ferramenta de depuração visual para o sistema sendo explorado. A estrutura da UI possui essencialmente dois elementos:
