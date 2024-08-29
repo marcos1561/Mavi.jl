@@ -1,16 +1,22 @@
 # Mavi
-
-[![Build Status](https://github.com/marcos1561/Mavi.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/marcos1561/Mavi.jl/actions/workflows/CI.yml?query=branch%3Amain)
-
 Mavi é um motor de dinâmica de partículas (_Particle Dynamic Engine_).
 
-
-# Objetivo
-
-O objetivo do Mavi é servir como objeto de estudo de física e programação em geral, e das funcionalidades de Julia em particular.
+O seu objetivo é servir como objeto de estudo de física e programação em geral, e das funcionalidades de Julia em particular.
 
 O pacote é pensado de maneira a ser o mais modularizado possível, permitindo uma estrutura geral para os programas que independa das particularidades do sistema estudado. Ele é dividido em módulos dedicados a cada aspecto do sistema e do programa: a definição do estado e do sistema; as configurações dinâmicas, espaciais e de integração numérica; os inicializadores e verificadores; a visualização; a coleta de dados etc.
 
+
+# Instalação
+A forma mais fácil de instalar o Mavi é a seguinte:
+
+* Abre um REPL da Julia e entre no modo de gerenciamento de pacotes (apertando `]` com o REPL vazio)
+* Execute o seguinte comando
+    ```julia
+    pkg> dev https://github.com/marcos1561/Mavi.jl.git 
+    ```
+Esses passos vão instalar o Mavi no ambiente atualmente ativo, colocando seus arquivos em `~/.julia/dev/Mavi`.
+
+OBS: O comando `add` também funcionaria, mas nesse caso não poderíamos modificar o Mavi após a instalação.
 
 # Estado e sistema
 
