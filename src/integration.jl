@@ -136,8 +136,14 @@ function rigid_walls!(system::System, space_cfg::RectangleCfg)
     state = system.state
     r = particle_radius(system.dynamic_cfg)
 
-    out_x = @. ((state.pos[1, :] + r) > space_cfg.length) || ((state.pos[1, :] - r) < 0)
-    out_y = @. ((state.pos[2, :] + r) > space_cfg.height) || ((state.pos[2, :] - r) < 0)
+    x = state.pos[1, :] .- space_cfg.bottom_left[1]
+    y = state.pos[2, :] .- space_cfg.bottom_left[2]
+
+    out_x = @. ((x + r) > space_cfg.length) || ((x - r) < 0)
+    out_y = @. ((y + r) > space_cfg.height) || ((y - r) < 0)
+    
+    # out_x = @. ((state.pos[1, :] - space_cfg.bottom_left[1] + r) > space_cfg.length) || ((state.pos[1, :] - space_cfg.bottom_left[1] - r) < 0)
+    # out_y = @. ((state.pos[2, :] - space_cfg.bottom_left[2] + r) > space_cfg.height) || ((state.pos[2, :] - space_cfg.bottom_left[2] - r) < 0)
 
     state.vel[1, findall(out_x)] .*= -1.0
     state.vel[2, findall(out_y)] .*= -1.0

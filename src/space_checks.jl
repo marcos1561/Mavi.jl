@@ -7,8 +7,8 @@ export check_inside
 
 "Return particles indices outside the given space configuration."
 function outside_particles(state::State, space_cfg::RectangleCfg)
-    x_out = @. (state.pos[1, :] < 0.0) | (state.pos[1, :] > space_cfg.length)
-    y_out = @. (state.pos[2, :] < 0.0) | (state.pos[2, :] > space_cfg.height)
+    x_out = @. (state.pos[1, :] - space_cfg.bottom_left[1] < 0.0) | (state.pos[1, :] - space_cfg.bottom_left[1] > space_cfg.length)
+    y_out = @. (state.pos[2, :] - space_cfg.bottom_left[2] < 0.0) | (state.pos[2, :] - space_cfg.bottom_left[2] > space_cfg.height)
     out_ids = findall(x_out .| y_out)
     return out_ids
 end
@@ -23,8 +23,11 @@ end
 Checks if all particles are inside the given space configuration. 
 
 # Return
-- `all_inside::bool`: True if all particles are inside, false otherwise.
-- `out_ids::Vector{Int}`: Indices of outside particles.
+- all_inside::bool
+    True if all particles are inside, false otherwise.
+
+- out_ids::Vector{Int} 
+    Indices of outside particles.
 """
 function check_inside(state::State, space_cfg::SpaceCfg)
     all_inside = true

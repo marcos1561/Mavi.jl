@@ -1,5 +1,7 @@
 module InitStates
 
+export rectangular_grid, random_vel
+
 using Mavi.Configs: RectangleCfg
 
 """
@@ -7,16 +9,23 @@ Return particles positions in a rectangle grid with spacing between
 particles being `offset * radius`.
 
 # Arguments
-- num_p_x: Number of particle in x axis.
-- num_p_y: Number of particle in y axis.
-- offset: Space between particles, which is `offset * radius`.
-- radius: Particle radius.
+- num_p_x:  
+    Number of particle in x axis.
+
+- num_p_y:   
+    Number of particle in y axis.
+
+- offset:   
+    Space between particles, which is `offset * radius`.
+
+- radius:   
+    Particle radius.
 
 # Return
-- pos::Matrix{Float64}
-    Particle positions
+- pos::Matrix{Float64}  
+    Particle positions.
 
-- space_cfg::RectangleCfg
+- space_cfg::RectangleCfg  
     SpaceCfg that contains all particles.
 """
 function rectangular_grid(num_p_x, num_p_y, offset, radius)

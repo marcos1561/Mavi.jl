@@ -70,12 +70,9 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     chunks = nothing
     if typeof(int_cfg) == ChunksIntCfg
         chunks_cfg = int_cfg.chunks_cfg
+        bounding_box = Configs.get_bounding_box(space_cfg) 
         chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-            space_cfg, state, particle_radius(dynamic_cfg))
-    # else
-    #     chunk_space_cfg = RectangleCfg(1, 1)
-    #     chunks = Chunks(3, 3,
-    #         chunk_space_cfg, state, particle_radius(dynamic_cfg))
+            bounding_box, state, particle_radius(dynamic_cfg))
     end
 
     System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p)

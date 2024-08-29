@@ -12,7 +12,7 @@ Inform physical time (t) and average execution time per time step (Δt).
 It's also possible to inject custom information as explained below.
 
 # Arguments
-- custom_items:
+- custom_items:  
     A function with the given signature:
         
         (System, ExecInfo) -> Array{Tuple{String, String}}
@@ -21,7 +21,7 @@ It's also possible to inject custom information as explained below.
         item[1]: Item name. 
         item[2]: Item value (already formatted for printing).
         
-    Items will be displayed line by line in the information panel with fallowing form:
+    Items will be displayed line by line in the information panel in the following manner:
         item[1]: item[2]
 """
 @kwdef struct DefaultInfoUICfg <: InfoUICfg 
