@@ -14,7 +14,7 @@ O pacote é pensado de maneira a ser o mais modularizado possível, permitindo u
 
 # Estado e sistema
 
-O móudlo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
+O módulo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
 
 ## Estado
 O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, armazenado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $2 \times N$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula.
