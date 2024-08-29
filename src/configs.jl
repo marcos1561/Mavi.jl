@@ -14,16 +14,23 @@ abstract type SpaceCfg end
 @kwdef struct RectangleCfg <: SpaceCfg
     length::Float64
     height::Float64
+    bottom_left::Tuple{Float64, Float64}=(0.0, 0.0)
 end
 
 @kwdef struct CircleCfg <: SpaceCfg
     radius::Float64
 end
 
-"""Return bounding RectangleCfg for given space_cfg."""
+"Return bounding RectangleCfg for given space_cfg."
 function get_bounding_box(space_cfg::CircleCfg)
-    r = space_cfg.radius * 2
-    return RectangleCfg(r, r)
+    r = space_cfg.radius
+    length = 2 * r
+    bottom_left = (-r, -r)
+    return RectangleCfg(length, length, bottom_left)
+end
+
+function get_bounding_box(space_cfg::RectangleCfg)
+    return space_cfg
 end
 
 #

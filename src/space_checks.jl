@@ -7,8 +7,8 @@ export check_inside
 
 "Return particles indices outside the given space configuration."
 function outside_particles(state::State, space_cfg::RectangleCfg)
-    x_out = @. (state.pos[1, :] < 0.0) | (state.pos[1, :] > space_cfg.length)
-    y_out = @. (state.pos[2, :] < 0.0) | (state.pos[2, :] > space_cfg.height)
+    x_out = @. (state.pos[1, :] - space_cfg.bottom_left[1] < 0.0) | (state.pos[1, :] - space_cfg.bottom_left[1] > space_cfg.length)
+    y_out = @. (state.pos[2, :] - space_cfg.bottom_left[2] < 0.0) | (state.pos[2, :] - space_cfg.bottom_left[2] > space_cfg.height)
     out_ids = findall(x_out .| y_out)
     return out_ids
 end
