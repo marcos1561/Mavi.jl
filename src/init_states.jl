@@ -1,5 +1,7 @@
 module InitStates
 
+export rectangular_grid, random_vel
+
 using Mavi.Configs: RectangleCfg
 
 """

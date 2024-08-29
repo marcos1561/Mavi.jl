@@ -17,7 +17,16 @@ O pacote é pensado de maneira a ser o mais modularizado possível, permitindo u
 O módulo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
 
 ## Estado
-O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, armazenado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $2 \times N$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula.
+O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, armazenado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $2 \times N$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula. O seguinte exemplo cria um estado com 3 partículas.
+
+```julia
+using Mavi
+
+state = State(
+    pos = [1 2 3; 1 2 3],
+    vel = [1.1 0.4 3; 1.2 2 -0.4],
+)
+```
 
 ## Sistema
 O *sistema*, por sua vez, contém, além do *estado* das partículas, as configurações espaciais, dinâmicas e de integração; a diferença de posição, a força e o módulo da distância entre as partículas; e o número de partículas. É implementado pela estrutura `Mavi.System(...)`, que recebe uma sequência de parâmetros. Há também uma função inicializadora que retorna uma instância de `Mavi.System`; mais detalhes podem ser vistos em [Mavi.jl](src/Mavi.jl).
@@ -55,6 +64,18 @@ As configurações de integração são um pouco mais complexas e envolvem duas 
 
     A estrutura `ChunksIntCfg` recebe como parâmetros o passo de integração `dt` e uma outra estrutura chamada `ChunksCfg(num_cols,num_rows)`.
 
+O seguinte exemplo criar um sistema com espaço circular, utilizando o potencial do Lennard-Jones e a integração temporal simples: 
+
+```julia
+using Mavi
+
+system = Mavi.System(
+    state=state, # Estamos supondo que o estado já foi criado 
+    space_cfg=CircleCfg(radius=10), 
+    dynamic_cfg=LenJonesCfg(sigma=2,epsilon=4),
+    int_cfg=IntCfg(dt=0.01),
+)
+```
 
 # Integração
 
@@ -104,6 +125,7 @@ O módulo `Quantities` contém funções que retornam quantidades físicas de in
     A energia potencial do sistema é calculada pela função `potential_energy(system, dynamic_cfg)`, que recebe como argumentos o sistema e as configurações dinâmicas, visto que depende da escolha da interação entre as partículas.
     O usuário deve estar atento para definir o despacho correto da função `potential_energy()` para uma configuração dinâmica customizada.
 
+O exemplo [print_energy.jl](examples/print_energy.jl) utiliza essas funções.
 
 # Interface visual
 

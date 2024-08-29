@@ -20,6 +20,12 @@ end
     radius::Float64
 end
 
+"""Return bounding RectangleCfg for given space_cfg."""
+function get_bounding_box(space_cfg::CircleCfg)
+    r = space_cfg.radius * 2
+    return RectangleCfg(r, r)
+end
+
 #
 # Dynamic Configurations 
 #
