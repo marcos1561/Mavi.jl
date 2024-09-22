@@ -25,8 +25,8 @@ particles being `offset * radius`.
 - pos::Matrix{Float64}  
     Particle positions.
 
-- space_cfg::RectangleCfg  
-    SpaceCfg that contains all particles.
+- geometry_cfg::RectangleCfg  
+    GeometryCfg that contains all particles.
 """
 function rectangular_grid(num_p_x, num_p_y, offset, radius)
     x = Vector{Float64}()
@@ -42,7 +42,7 @@ function rectangular_grid(num_p_x, num_p_y, offset, radius)
         current_y += radius * (2 + offset)
     end
     
-    space_cfg=RectangleCfg(
+    geometry_cfg=RectangleCfg(
         length=num_p_x*2*radius + radius*offset*(num_p_x + 1),
         height=num_p_y*2*radius + radius*offset*(num_p_y + 1),
     )
@@ -50,7 +50,7 @@ function rectangular_grid(num_p_x, num_p_y, offset, radius)
     pos = Matrix{Float64}(undef, 2, num_p_x*num_p_y)
     pos[1, :] = x
     pos[2, :] = y
-    return pos, space_cfg
+    return pos, geometry_cfg
 end
 
 """

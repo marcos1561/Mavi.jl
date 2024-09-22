@@ -1,14 +1,22 @@
 module Mavi
 
-export State, System
+export State, SecondLawState, SelfPropelledState, System
 
 include("configs.jl")
 using .Configs
 
-"Particles state (positions and velocities)"
-@kwdef struct State{T}
+abstract type State{T} end
+
+"Particles state for Newton's second law (positions and velocities)"
+@kwdef struct SecondLawState{T} <: State{T}
     pos::Matrix{T}
     vel::Matrix{T}
+end
+
+"Overdamped and self propelled state (positions and polarizations)"
+@kwdef struct SelfPropelledState{T} <: State{T}
+    pos::Matrix{T}
+    pol_angle::Vector{T}
 end
 
 include("init_states.jl")
@@ -23,11 +31,11 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T, C1<:SpaceCfg, C2<:DynamicCfg, C3<:AbstractIntCfg}#, C4<:Union{Chunks, Nothing}}
-    state::State{T}
-    space_cfg::C1
-    dynamic_cfg::C2
-    int_cfg::C3
+struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg}
+    state::StateT
+    space_cfg::SpaceCfg{WallTypeT, GeometryCfgT}
+    dynamic_cfg::DynamicCfgT
+    int_cfg::IntCfgT
     chunks::Union{Chunks, Nothing}
     
     """
@@ -58,7 +66,7 @@ struct System{T, C1<:SpaceCfg, C2<:DynamicCfg, C3<:AbstractIntCfg}#, C4<:Union{C
     num_p::Int
 end
 function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
-    all_inside, out_ids = check_inside(state, space_cfg)
+    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg)
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
     end
@@ -70,7 +78,7 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     chunks = nothing
     if typeof(int_cfg) == ChunksIntCfg
         chunks_cfg = int_cfg.chunks_cfg
-        bounding_box = Configs.get_bounding_box(space_cfg) 
+        bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
         chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
             bounding_box, state, particle_radius(dynamic_cfg))
     end

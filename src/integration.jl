@@ -5,21 +5,40 @@ using Mavi.Configs: IntCfg, ChunksIntCfg
 using Mavi.Configs
 using Mavi.ChunksMod
 
-"Position difference and distance between particle with id `i` and `j`"
-function calc_diff_and_dist(i, j, state::State)
+"Position difference (i - j) and distance between particle with id `i` and `j`"
+function calc_diff_and_dist(i, j, state::State, space_cfg::SpaceCfg{RigidWalls, G}) where {G}
     dx = state.pos[1, i] - state.pos[1, j]
     dy = state.pos[2, i] - state.pos[2, j]
     dist = sqrt(dx^2 + dy^2)
     return dx, dy, dist
 end
 
+function calc_diff_and_dist(i, j, state::State, space_cfg::SpaceCfg{PeriodicWalls, G}) where {G}
+    dx = state.pos[1, i] - state.pos[1, j]
+    dy = state.pos[2, i] - state.pos[2, j]
+    
+    geometry_cfg = space_cfg.geometry_cfg
+    length, height = geometry_cfg.length, geometry_cfg.height 
+    
+    if (abs(dx) > length * 0.5)
+        dx -= copysign(length, dx)
+    end
+
+    if (abs(dy) > height * 0.5)
+        dy -= copysign(height, dy)
+    end
+
+    dist = sqrt(dx^2 + dy^2)
+    return dx, dy, dist
+end
+
 "Compute the difference and distance between all particles."
-function calc_diffs_and_dists!(system::System)
+function calc_diffs_and_dists!(system::System, space_cfg)
     state = system.state
 
     for i in 1:system.num_p
         for j in i+1:system.num_p
-            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
+            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
 
             # Update values
             system.diffs[1,i,j] = x_ij
@@ -33,8 +52,8 @@ function calc_diffs_and_dists!(system::System)
 end
 
 "Return force on particle with id `i` exerted by particle with id `j`."
-function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg)
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
+function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
 
     # Check interaction range
     if dist > dynamic_cfg.ra
@@ -48,8 +67,8 @@ function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg)
     return fx, fy
 end
 
-function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg)
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state)
+function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -61,6 +80,24 @@ function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg)
     fx = fmod*x_ij/dist
     fy = fmod*y_ij/dist
 
+    return fx, fy
+end
+
+function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
+    dx, dy, dist = calc_diff_and_dist(i, j, state, space_cfg)
+
+    if dist > dynamic_cfg.r_max
+        return 0, 0
+    end
+
+    if dist > dynamic_cfg.r_eq
+        f_mod = dynamic_cfg.k_adh / (dynamic_cfg.r_eq)
+    else
+        f_mod = dynamic_cfg.k_rep / (dynamic_cfg.r_max - dynamic_cfg.r_eq)
+    end
+
+    r = dist - dynamic_cfg.r_eq
+    fx, fy = -f_mod * dx * r, -f_mod * dy * r
     return fx, fy
 end
 
@@ -85,7 +122,7 @@ function calc_forces_chunks!(system::System)
                 for j in (i+1):np
                     p2_id = chunk[j]
                     fx, fy = calc_interaction(p1_id, p2_id, 
-                        system.state, system.dynamic_cfg)
+                        system.state, system.dynamic_cfg, system.space_cfg)
                     
                     system.forces[1, p1_id] += fx
                     system.forces[2, p1_id] += fy
@@ -101,7 +138,7 @@ function calc_forces_chunks!(system::System)
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
                         fx, fy = calc_interaction(p1_id, nei_chunk[j], 
-                            system.state, system.dynamic_cfg)
+                            system.state, system.dynamic_cfg, system.space_cfg)
                         
                         system.forces[1, p1_id] +=  fx
                         system.forces[2, p1_id] +=  fy
@@ -121,7 +158,7 @@ function calc_forces!(system::System)
     N = system.num_p
     for i in 1:N
         for j in i+1:N
-            fx, fy = calc_interaction(i, j, system.state, system.dynamic_cfg)
+            fx, fy = calc_interaction(i, j, system.state, system.dynamic_cfg, system.space_cfg)
             
             system.forces[1, i] +=  fx
             system.forces[2, i] +=  fy
@@ -132,26 +169,27 @@ function calc_forces!(system::System)
 end
 
 "Rigid walls collisions. Reflect velocity on collision."
-function rigid_walls!(system::System, space_cfg::RectangleCfg)
+function walls!(system::System, space_cfg::SpaceCfg{RigidWalls, RectangleCfg})
     state = system.state
+    geometry_cfg = space_cfg.geometry_cfg
     r = particle_radius(system.dynamic_cfg)
 
-    x = state.pos[1, :] .- space_cfg.bottom_left[1]
-    y = state.pos[2, :] .- space_cfg.bottom_left[2]
+    x = state.pos[1, :] .- geometry_cfg.bottom_left[1]
+    y = state.pos[2, :] .- geometry_cfg.bottom_left[2]
 
-    out_x = @. ((x + r) > space_cfg.length) || ((x - r) < 0)
-    out_y = @. ((y + r) > space_cfg.height) || ((y - r) < 0)
+    out_x = @. ((x + r) > geometry_cfg.length) || ((x - r) < 0)
+    out_y = @. ((y + r) > geometry_cfg.height) || ((y - r) < 0)
     
-    # out_x = @. ((state.pos[1, :] - space_cfg.bottom_left[1] + r) > space_cfg.length) || ((state.pos[1, :] - space_cfg.bottom_left[1] - r) < 0)
-    # out_y = @. ((state.pos[2, :] - space_cfg.bottom_left[2] + r) > space_cfg.height) || ((state.pos[2, :] - space_cfg.bottom_left[2] - r) < 0)
+    # out_x = @. ((state.pos[1, :] - geometry_cfg.bottom_left[1] + r) > geometry_cfg.length) || ((state.pos[1, :] - geometry_cfg.bottom_left[1] - r) < 0)
+    # out_y = @. ((state.pos[2, :] - geometry_cfg.bottom_left[2] + r) > geometry_cfg.height) || ((state.pos[2, :] - geometry_cfg.bottom_left[2] - r) < 0)
 
     state.vel[1, findall(out_x)] .*= -1.0
     state.vel[2, findall(out_y)] .*= -1.0
 end
 
-function rigid_walls!(system::System, space_cfg::CircleCfg)
+function walls!(system::System, space_cfg::SpaceCfg{RigidWalls, CircleCfg})
     state = system.state
-    max_r2 = (space_cfg.radius - particle_radius(system.dynamic_cfg))^2
+    max_r2 = (space_cfg.geometry_cfg.radius - particle_radius(system.dynamic_cfg))^2
     for i in 1:system.num_p
         x, y = state.pos[1, i], state.pos[2, i]
         x2, y2 = x^2, y^2
@@ -163,6 +201,27 @@ function rigid_walls!(system::System, space_cfg::CircleCfg)
         end
     end
 end
+
+"Periodic walls"
+function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg}) 
+    state = system.state
+    geometry_cfg = space_cfg.geometry_cfg
+    center = (geometry_cfg.bottom_left[1] + geometry_cfg.length/2, geometry_cfg.bottom_left[2] + geometry_cfg.height/2)
+
+    for i in 1:system.num_p
+        pos_i = @view state.pos[:, i] 
+        diff = pos_i[1] - center[1]  
+        if abs(diff) > geometry_cfg.length/2
+            pos_i[1] -= sign(diff) * geometry_cfg.length
+        end
+
+        diff = pos_i[2] - center[2]  
+        if abs(diff) > geometry_cfg.height/2
+            pos_i[2] -= sign(diff) * geometry_cfg.height
+        end
+    end
+end
+
 
 "Update state using Velocity-Verlet"
 function update_verlet!(system::System, calc_forces_in!)
@@ -181,18 +240,64 @@ function update_verlet!(system::System, calc_forces_in!)
     state.vel .+= dt/2 * (system.forces + old_forces)
 end
 
+function update_szabo!(system::System)
+    state::SelfPropelledState = system.state
+    
+    dt = system.int_cfg.dt
+
+    dynamic_cfg = system.dynamic_cfg
+    vo, relax_time = dynamic_cfg.vo, dynamic_cfg.relax_time
+    mu, dr = dynamic_cfg.mobility, dynamic_cfg.rot_diff 
+
+    for i in 1:system.num_p
+        theta = state.pol_angle[i]
+        pol_x, pol_y = cos(theta), sin(theta) 
+
+        vel_x = vo * pol_x + mu * system.forces[1, i]
+        vel_y = vo * pol_y + mu * system.forces[2, i]
+        
+        speed = sqrt(vel_x^2 + vel_y^2)
+    
+        cross_prod = (pol_x * vel_y - pol_y * vel_x) / speed 
+        if abs(cross_prod) > 1
+            cross_prod = sign(cross_prod)
+        end
+
+        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
+        
+        state.pos[1, i] += vel_x * dt
+        state.pos[2, i] += vel_y * dt
+        state.pol_angle[i] += d_theta
+    end
+end
+
 "Advance system one time step."
 function step!(system::System, int_cfg::IntCfg)
     calc_forces!(system)
     update_verlet!(system, calc_forces!)
-    rigid_walls!(system, system.space_cfg)
+    walls!(system, system.space_cfg)
 end
 
 function step!(system::System, int_cfg::ChunksIntCfg)
     update_chunks!(system.chunks)
     calc_forces_chunks!(system)
     update_verlet!(system, calc_forces_chunks!)
-    rigid_walls!(system, system.space_cfg)
+    walls!(system, system.space_cfg)
+end
+
+function szabo_step!(system::System, int_cfg::IntCfg)
+    println("SEM CHUNCKS")
+    calc_forces!(system)
+    update_szabo!(system)
+    walls!(system, system.space_cfg)
+end
+
+function szabo_step!(system::System, int_cfg::ChunksIntCfg)
+    println("COM CHUNCKS")
+    update_chunks!(system.chunks)
+    calc_forces_chunks!(system)
+    update_szabo!(system)
+    walls!(system, system.space_cfg)
 end
 
 end
