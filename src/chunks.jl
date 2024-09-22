@@ -5,7 +5,7 @@ export Chunks, update_chunks!
 using Mavi: State
 using Mavi.Configs: RectangleCfg
 
-struct Chunks{T}
+struct Chunks{T, StateT<:State{T}}
     num_cols::Int
     num_rows::Int
     chunk_length::Float64
@@ -13,7 +13,7 @@ struct Chunks{T}
     space_cfg::RectangleCfg
     steps_to_update::Int
 
-    state::State{T}
+    state::StateT
     
     neighbors::Matrix{Vector{CartesianIndex{2}}}
     

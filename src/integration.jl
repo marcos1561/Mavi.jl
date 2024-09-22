@@ -286,14 +286,12 @@ function step!(system::System, int_cfg::ChunksIntCfg)
 end
 
 function szabo_step!(system::System, int_cfg::IntCfg)
-    println("SEM CHUNCKS")
     calc_forces!(system)
     update_szabo!(system)
     walls!(system, system.space_cfg)
 end
 
 function szabo_step!(system::System, int_cfg::ChunksIntCfg)
-    println("COM CHUNCKS")
     update_chunks!(system.chunks)
     calc_forces_chunks!(system)
     update_szabo!(system)
