@@ -23,29 +23,51 @@ OBS: O comando `add` também funcionaria, mas nesse caso não poderíamos modifi
 O módulo principal `Mavi.jl` contém as estruturas que definem o estado e o sistema.
 
 ## Estado
-O *estado* é descrito pela *posição* e *velocidade* de todas as partículas, armazenado por meio da estrutura `Mavi.State(pos, vel)`. `pos` e `vel` são matrizes $2 \times N$ contendo, respectivamente, as coordenadas $(x,y)$ e as velocidades $(v_x,v_y)$ de cada partícula. O seguinte exemplo cria um estado com 3 partículas.
+O estado de um sistema é definido pelas equações que governam a sua dinâmica, por exemplo, uma equação diferencial ordinária, linear e de segunda ordem em $x(t)$, necessita que seja mantido na memória duas variáveis (o próprio $x$ e sua derivada $\dot x$).  
+Estados devem ser subtipos de `State{T}` em que `T` é o tipo dos números que representam o estado (`Int32`, `Float64`, etc). Atualmente existem dois estados implementados:
+
+* `SecondLawState`: contém como membros `pos` e `vel`, ambos devendo ser matrizes $2 \times N$. Esse estado é útil quando a equação a ser resolvida é a segunda lei de Newton.
+* `SelfPropelledState`: estado relativo a um sistema de partículas com dinâmica superamortecida e com mecanismo de auto-alinhamento.
+
+O seguinte exemplo cria um estado com 3 partículas utilizando `SecondLawState`.
 
 ```julia
 using Mavi
 
-state = State(
+state = SecondLawState(
     pos = [1 2 3; 1 2 3],
     vel = [1.1 0.4 3; 1.2 2 -0.4],
 )
 ```
 
 ## Sistema
-O *sistema*, por sua vez, contém, além do *estado* das partículas, as configurações espaciais, dinâmicas e de integração; a diferença de posição, a força e o módulo da distância entre as partículas; e o número de partículas. É implementado pela estrutura `Mavi.System(...)`, que recebe uma sequência de parâmetros. Há também uma função inicializadora que retorna uma instância de `Mavi.System`; mais detalhes podem ser vistos em [Mavi.jl](src/Mavi.jl).
-
+O *sistema*, por sua vez, contém, além do *estado* das partículas, as configurações espaciais, dinâmicas e de integração; a diferença de posição, a força e o módulo da distância entre as partículas; e o número de partículas. É implementado pela estrutura `Mavi.System(...)`, que recebe uma sequência de parâmetros. Mais detalhes podem ser vistos em sua documentação no arquivo [Mavi.jl](src/Mavi.jl).
 
 # Configurações do sistema
 
 O módulo `Configs` reúne diversas configurações do sistema descritas por diferentes tipos:
 
 ## Configurações espaciais: `Configs.SpaceCfg`
-O sistema pode ser colocado em uma caixa retangular por meio da estrutura `RectangleCfg(length, height)` ou em um recipiente circular por meio da estrutura `CircleCfg(radius)`.
+O espaço de um sistema é descrito pelo seu formato geométrico e como suas bordas se comportam:
+* Geometria do espaço: São estruturas que herdam de `GeometryCfg` e contém toda a informação necessária para descrever a geometria do espaço. Exemplos são `RectangleCfg` e `CircleCfg`.  
 
-Caso desejado, o usuário pode definir sua própria configuração espacial, bastando para isso definir uma nova estrutura pertencente ao tipo `SpaceCfg`.
+* Comportamento das Bordas: São estruturas que herdam de `WallType` e não necessariamente devem possuir membros, apenas server para informar qual é tipo da borda. Exemplo são `RigidWalls` e `PeriodicWalls`.
+
+Essas duas estruturas devem, então, ser encapsuladas na estrutura `SpaceCfg`.
+
+Ex: Configurando um retângulo centrado na origem com bordas periódicas
+
+```julia
+using Mavi.Configs
+
+space_cfg = SpaceCfg(
+    geometry_cfg=RectangleCfg(
+        length=5,
+        height=10
+    ),
+    wall_type=PeriodicWalls(),
+)
+```
 
 ## Configurações dinâmicas: `Configs.DynamicCfg`
 Aqui são definidos os potenciais de interação entre as partículas. Já estão definidos dois deles:

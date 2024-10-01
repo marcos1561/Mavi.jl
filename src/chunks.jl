@@ -10,7 +10,7 @@ struct Chunks{T, StateT<:State{T}}
     num_rows::Int
     chunk_length::Float64
     chunk_height::Float64
-    space_cfg::RectangleCfg
+    geometry_cfg::RectangleCfg
     steps_to_update::Int
 
     state::StateT
@@ -20,7 +20,7 @@ struct Chunks{T, StateT<:State{T}}
     chunk_particles::Array{Int, 3}
     num_particles_in_chunk::Array{Int, 2}
 end
-function Chunks(num_cols, num_rows, space_cfg::RectangleCfg, state, particle_r)
+function Chunks(num_cols, num_rows, geometry_cfg::RectangleCfg, state, particle_r)
     neighbors = Matrix{Vector{CartesianIndex{2}}}(undef, num_rows, num_cols)
     for i in 1:(num_rows-1)
         neighbors[i, 1] = [
@@ -49,15 +49,15 @@ function Chunks(num_cols, num_rows, space_cfg::RectangleCfg, state, particle_r)
     end
     neighbors[num_rows, num_cols] = []
     
-    chunk_length = space_cfg.length / num_cols
-    chunk_height = space_cfg.height / num_rows
+    chunk_length = geometry_cfg.length / num_cols
+    chunk_height = geometry_cfg.height / num_rows
 
     nc = (ceil(0.5*chunk_length/particle_r) + 1) * ((ceil(0.5*chunk_height/particle_r) + 1))
     nc = trunc(Int, ceil(nc*1.1))
     chunk_particles = Array{Int}(undef, nc, num_rows, num_cols)
     num_particles_in_chunk = zeros(Int, num_rows, num_cols)
 
-    Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg, 1, 
+    Chunks(num_cols, num_rows, chunk_length, chunk_height, geometry_cfg, 1, 
         state, neighbors, chunk_particles, num_particles_in_chunk)
 end
 
@@ -65,8 +65,8 @@ end
 function update_chunks!(chunks::Chunks)
     state = chunks.state
 
-    space_h = chunks.space_cfg.height
-    bottom_left = chunks.space_cfg.bottom_left
+    space_h = chunks.geometry_cfg.height
+    bottom_left = chunks.geometry_cfg.bottom_left
     chunk_l, chunk_h = chunks.chunk_length, chunks.chunk_height
 
     chunks.num_particles_in_chunk .= 0
