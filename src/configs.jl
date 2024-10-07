@@ -105,9 +105,9 @@ end
 end
 
 particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
-particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2
+particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
-particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma/2
+particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 
 #
 # Integration Configuration

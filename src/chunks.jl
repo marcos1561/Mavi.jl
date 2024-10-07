@@ -3,7 +3,7 @@ module ChunksMod
 export Chunks, update_chunks!
 
 using Mavi: State
-using Mavi.Configs: RectangleCfg
+using Mavi.Configs
 
 struct Chunks{T, StateT<:State{T}}
     num_cols::Int
@@ -20,7 +20,50 @@ struct Chunks{T, StateT<:State{T}}
     chunk_particles::Array{Int, 3}
     num_particles_in_chunk::Array{Int, 2}
 end
-function Chunks(num_cols, num_rows, space_cfg::RectangleCfg, state, particle_r)
+function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg}, state, particle_r) where W
+    neighbors = get_neighbors(num_rows, num_cols, space_cfg.wall_type)
+    
+    chunk_length = space_cfg.geometry_cfg.length / num_cols
+    chunk_height = space_cfg.geometry_cfg.height / num_rows
+
+    nc = (ceil(0.5*chunk_length/particle_r) + 1) * ((ceil(0.5*chunk_height/particle_r) + 1))
+    nc = trunc(Int, ceil(nc*1.1))
+    chunk_particles = Array{Int}(undef, nc, num_rows, num_cols)
+    num_particles_in_chunk = zeros(Int, num_rows, num_cols)
+
+    Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg.geometry_cfg, 1, 
+        state, neighbors, chunk_particles, num_particles_in_chunk)
+end
+
+function get_neighbors(num_rows, num_cols, wall_type::PeriodicWalls)
+    neighbors = Matrix{Vector{CartesianIndex{2}}}(undef, num_rows, num_cols)
+
+    function get_id(x, num_t)
+        if x == 0
+            return num_t
+        end
+
+        if x % (num_t + 1) == 0
+            return 1
+        end
+        return x
+    end
+
+    for i in 1:num_rows
+        for j in 1:num_cols
+            neighbors[i, j] = [
+                CartesianIndex(get_id(i+1, num_rows), get_id(j  , num_cols)),
+                CartesianIndex(get_id(i+1, num_rows), get_id(j+1, num_cols)),
+                CartesianIndex(get_id(i  , num_rows), get_id(j+1, num_cols)),
+                CartesianIndex(get_id(i-1, num_rows), get_id(j+1, num_cols)),
+            ]
+        end
+    end
+
+    return neighbors
+end
+
+function get_neighbors(num_rows, num_cols, wall_type::RigidWalls)
     neighbors = Matrix{Vector{CartesianIndex{2}}}(undef, num_rows, num_cols)
     for i in 1:(num_rows-1)
         neighbors[i, 1] = [
@@ -48,17 +91,7 @@ function Chunks(num_cols, num_rows, space_cfg::RectangleCfg, state, particle_r)
         neighbors[num_rows, j] = [CartesianIndex(num_rows, j+1)]
     end
     neighbors[num_rows, num_cols] = []
-    
-    chunk_length = space_cfg.length / num_cols
-    chunk_height = space_cfg.height / num_rows
-
-    nc = (ceil(0.5*chunk_length/particle_r) + 1) * ((ceil(0.5*chunk_height/particle_r) + 1))
-    nc = trunc(Int, ceil(nc*1.1))
-    chunk_particles = Array{Int}(undef, nc, num_rows, num_cols)
-    num_particles_in_chunk = zeros(Int, num_rows, num_cols)
-
-    Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg, 1, 
-        state, neighbors, chunk_particles, num_particles_in_chunk)
+    return neighbors
 end
 
 "Update particles chunk positions."

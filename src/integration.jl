@@ -114,7 +114,7 @@ function calc_interaction(i, j, state::State, dynamic_cfg::RunTumbleCfg, space_c
     end
 
     # Force modulus
-    fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
+    fmod = -4*epsilon*(-12*sigma^12/dist^13 + 6*sigma^6/dist^7)
 
     # Force components
     fx = fmod*x_ij/dist
@@ -346,6 +346,12 @@ function szabo_step!(system::System, int_cfg::ChunksIntCfg)
     update_chunks!(system.chunks)
     calc_forces_chunks!(system)
     update_szabo!(system)
+    walls!(system, system.space_cfg)
+end
+
+function rtp_step!(system::System, int_cfg::IntCfg)
+    calc_forces!(system)
+    update_rtp!(system)
     walls!(system, system.space_cfg)
 end
 

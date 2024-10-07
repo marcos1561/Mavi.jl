@@ -8,7 +8,7 @@ using Mavi.Configs
 using Mavi.Visualization
 
 function main()
-    num_particles = 5
+    num_particles = 50
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))
@@ -17,7 +17,7 @@ function main()
         vo=1,
         sigma=1,
         epsilon=1,
-        tumble_rate=5,
+        tumble_rate=1,
     )
 
     pos, geometry_cfg = rectangular_grid(
@@ -40,14 +40,18 @@ function main()
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
         int_cfg=ChunksIntCfg(
-            dt=0.01,
+            dt=0.001,
             chunks_cfg=ChunksCfg(
                 num_cols=num_p_x-1, 
-                num_rows=num_p_y-1,
+                num_rows=num_p_y-1, 
             ),
         ),
     )
 
-    animate(system, Mavi.Integration.rtp_step!, AnimationCfg(num_steps_per_frame=10))
+    animate(
+        system, 
+        Mavi.Integration.rtp_step!, 
+        AnimationCfg(num_steps_per_frame=100),
+    )
 end
 main()
