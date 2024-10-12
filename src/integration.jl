@@ -101,6 +101,28 @@ function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
     return fx, fy
 end
 
+function calc_interaction(i, j, state::State, dynamic_cfg::RunTumbleCfg, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
+
+    sigma = dynamic_cfg.sigma
+    epsilon = dynamic_cfg.epsilon
+    cutoff = 2^(1/6)*sigma
+
+    # Distant particles
+    if dist > cutoff
+        return 0.0, 0.0
+    end
+
+    # Force modulus
+    fmod = -4*epsilon*(-12*sigma^12/dist^13 + 6*sigma^6/dist^7)
+
+    # Force components
+    fx = fmod*x_ij/dist
+    fy = fmod*y_ij/dist
+
+    return fx, fy
+end
+
 "Compute total forces on particles using chucks."
 function calc_forces_chunks!(system::System)
     system.forces .= 0
@@ -271,6 +293,35 @@ function update_szabo!(system::System)
     end
 end
 
+function update_rtp!(system::System)
+    state::SelfPropelledState = system.state
+    
+    dt = system.int_cfg.dt
+
+    dynamic_cfg = system.dynamic_cfg
+    vo, sigma, epsilon, tumble_rate = dynamic_cfg.vo, dynamic_cfg.sigma, dynamic_cfg.epsilon, dynamic_cfg.tumble_rate
+
+    for i in 1:system.num_p
+        theta = state.pol_angle[i]
+        pol_x, pol_y = cos(theta), sin(theta) 
+
+        vel_x = vo * pol_x + system.forces[1, i]
+        vel_y = vo * pol_y + system.forces[2, i]
+        
+        speed = sqrt(vel_x^2 + vel_y^2)
+        
+        # Update positions
+        state.pos[1, i] += vel_x * dt
+        state.pos[2, i] += vel_y * dt
+
+        # Update director
+        u = rand()
+        if u < tumble_rate * dt # accept tumble
+            state.pol_angle[i] = 2*π*rand()
+        end
+    end
+end
+
 "Advance system one time step."
 function step!(system::System, int_cfg::IntCfg)
     calc_forces!(system)
@@ -295,6 +346,19 @@ function szabo_step!(system::System, int_cfg::ChunksIntCfg)
     update_chunks!(system.chunks)
     calc_forces_chunks!(system)
     update_szabo!(system)
+    walls!(system, system.space_cfg)
+end
+
+function rtp_step!(system::System, int_cfg::IntCfg)
+    calc_forces!(system)
+    update_rtp!(system)
+    walls!(system, system.space_cfg)
+end
+
+function rtp_step!(system::System, int_cfg::ChunksIntCfg)
+    update_chunks!(system.chunks)
+    calc_forces_chunks!(system)
+    update_rtp!(system)
     walls!(system, system.space_cfg)
 end
 

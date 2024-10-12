@@ -3,7 +3,7 @@ module Configs
 
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, RigidWalls, PeriodicWalls
-export HarmTruncCfg, LenJonesCfg, SzaboCfg
+export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksIntCfg
 export particle_radius, ChunksCfg
 
@@ -97,9 +97,17 @@ end
     rot_diff::Float64
 end
 
+@kwdef struct RunTumbleCfg <: DynamicCfg
+    vo::Float64
+    sigma::Float64
+    epsilon::Float64
+    tumble_rate::Float64
+end
+
 particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
-particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma/2
+particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
+particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 
 #
 # Integration Configuration

@@ -79,8 +79,13 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg) where {T}
     if typeof(int_cfg) == ChunksIntCfg
         chunks_cfg = int_cfg.chunks_cfg
         bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
+        chunks_space_cfg = SpaceCfg(
+            wall_type=space_cfg.wall_type,
+            geometry_cfg=bounding_box,
+        )
+
         chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-            bounding_box, state, particle_radius(dynamic_cfg))
+            chunks_space_cfg, state, particle_radius(dynamic_cfg))
     end
 
     System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p)
