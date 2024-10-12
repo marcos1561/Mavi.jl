@@ -20,8 +20,8 @@ function main()
     dynamic_cfg = HarmTruncCfg(10, 1, 1)
     radius = particle_radius(dynamic_cfg)
 
-    pos, space_cfg = InitStates.rectangular_grid(num_p_x, num_p_y, offset, radius)
-    state = Mavi.State{Float64}(
+    pos, geometry_cfg = InitStates.rectangular_grid(num_p_x, num_p_y, offset, radius)
+    state = Mavi.SecondLawState{Float64}(
         pos=pos,
         vel=InitStates.random_vel(num_p, 1/5),
     )
@@ -41,7 +41,10 @@ function main()
 
     system = Mavi.System(
         state=state, 
-        space_cfg=space_cfg,
+        space_cfg=SpaceCfg(
+            wall_type=RigidWalls(),
+            geometry_cfg=geometry_cfg,
+        ),
         dynamic_cfg=dynamic_cfg,
         int_cfg=int_cfg,
     )

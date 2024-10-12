@@ -79,7 +79,7 @@ function get_graph(grid_layout, system, cfg::DefaultGraphCfg)
     scatter!(ax, pos_obs...)
     # ax.aspect = 1
 
-    drawn_borders(ax, system.space_cfg)
+    drawn_borders(ax, system.space_cfg.geometry_cfg)
 
     if cfg.circle_radius == -1
         radius = particle_radius(system.dynamic_cfg) 

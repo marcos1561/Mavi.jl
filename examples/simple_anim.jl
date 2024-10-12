@@ -7,17 +7,20 @@ using Mavi: Mavi, Visualization
 using Mavi.Configs
 
 function main()
-    state = Mavi.State{Float64}(
+    state = Mavi.SecondLawState{Float64}(
         pos=[1 2; 1 2],
         vel=[0.3 2; 1 0]
     )
 
     system = Mavi.System(
         state=state, 
-        space_cfg=RectangleCfg(
-            length=5,
-            height=5,
-        ), 
+        space_cfg=SpaceCfg(
+            wall_type=RigidWalls(),
+            geometry_cfg=RectangleCfg(
+                length=5,
+                height=5,
+            ), 
+        ),
         dynamic_cfg=HarmTruncCfg(1, 1, 1),
         int_cfg=IntCfg(
             dt=0.1
@@ -32,13 +35,13 @@ function main()
         state.pos .+= state.vel * dt
 
         # Rigid walls collisions
-        space_cfg = system.space_cfg
+        geometry_cfg = system.space_cfg.geometry_cfg
         r = system.dynamic_cfg.ro/2
         for i in 1:system.num_p
-            if ((state.pos[1, i]+r) > space_cfg.length) || ((state.pos[1, i]-r) < 0)
+            if ((state.pos[1, i]+r) > geometry_cfg.length) || ((state.pos[1, i]-r) < 0)
                 state.vel[1, i] *= -1.
             end
-            if ((state.pos[2, i]+r) > space_cfg.height) || ((state.pos[2, i]-r) < 0)
+            if ((state.pos[2, i]+r) > geometry_cfg.height) || ((state.pos[2, i]-r) < 0)
                 state.vel[2, i] *= -1.
             end
         end
