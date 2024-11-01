@@ -8,7 +8,7 @@ using Mavi.Configs
 using Mavi.Visualization
 
 function main()
-    num_particles = 50
+    num_particles = 2000
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))
@@ -51,7 +51,6 @@ function main()
             ),
         ),
     )
-
     animate(system, Mavi.Integration.szabo_step!, AnimationCfg(num_steps_per_frame=10))
 end
 main()

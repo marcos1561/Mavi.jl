@@ -35,7 +35,7 @@ function main()
             ),
         ) 
     else
-        int_cfg = int_cfg=IntCfg(dt=0.001)
+        int_cfg = IntCfg(dt=0.001)
     end
 
 

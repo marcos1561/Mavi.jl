@@ -2,7 +2,7 @@
 module Visualization
 
 export animate
-export AnimationCfg, DefaultInfoUICfg, DefaultGraphCfg, UiSettings
+export AnimationCfg, VideoCfg, DefaultInfoUICfg, DefaultGraphCfg, UiSettings, CircleGraphCfg
 
 using GLMakie
 using Mavi: State, System
@@ -58,6 +58,24 @@ info_cfg:
 end
 
 """
+Save video configuration.
+
+- path: 
+    path to save video (relative to where the REPL is)
+
+- duration:
+    Video duration in seconds.
+
+- anim_cfg:
+    Animation configurations.    
+"""
+@kwdef struct VideoCfg{AnimT}
+    path::String
+    duration::Float64
+    anim_cfg::AnimT=AnimationCfg()
+end
+
+"""
 Information about the state of execution.
 
 # Arguments
@@ -76,16 +94,21 @@ mutable struct ExecInfo
     times::CircularBuffer{Float64}
 end
 
+get_anim_cfg(cfg::AnimationCfg) = cfg
+get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
+
 "Render, in real time, the system using the given step function."
-function animate(system::System, step!, cfg::AnimationCfg=AnimationCfg())
+function animate(system::System, step!, cfg=AnimationCfg())
     GLMakie.activate!(; title="Mavi")
+
+    anim_cfg = get_anim_cfg(cfg)
 
     fig = Figure(
         backgroundcolor = RGBf(0.98, 0.98, 0.98), 
         # size = (1000, 700),
     )
 
-    ui_settings = cfg.ui_settings
+    ui_settings = anim_cfg.ui_settings
 
     system_gl = fig[1, 2] = GridLayout()
     
@@ -101,23 +124,46 @@ function animate(system::System, step!, cfg::AnimationCfg=AnimationCfg())
     
     Box(sidebar_gl[:, 1], cornerradius=5)
 
-    info = InfoUIs.get_info_ui(info_gl, cfg.info_cfg)
-    graph = SystemGraphs.get_graph(system_gl, system, cfg.graph_cfg)
+    info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
+    graph = SystemGraphs.get_graph(system_gl, system, anim_cfg.graph_cfg)
 
-    exec_info = ExecInfo(0, 0, CircularBuffer{Float64}(cfg.exec_times_size))
+    exec_info = ExecInfo(0, 0, CircularBuffer{Float64}(anim_cfg.exec_times_size))
 
-    display(fig)
-    while events(fig).window_open[] 
-        for _ in 1:cfg.num_steps_per_frame
+    context = (
+        anim_cfg=anim_cfg,
+        system=system,
+        graph=graph,
+        exec_info=exec_info,
+    )
+
+    function make_frame(context)
+        anim_cfg = context.anim_cfg
+        system = context.system
+        exec_info = context.exec_info
+        graph = context.graph
+
+        for _ in 1:anim_cfg.num_steps_per_frame
             step_info = @timed step!(system, system.int_cfg)
             push!(exec_info.times, step_info.time)
             exec_info.sym_time += system.int_cfg.dt
         end
         
         InfoUIs.update_info_ui(info, exec_info, system)
-        SystemGraphs.update_graph(graph, system.state)
-
-        sleep(1/cfg.fps)
+        SystemGraphs.update_graph(graph, system)
+    end
+    
+    is_video = typeof(cfg) <: VideoCfg
+    if is_video
+        num_frames = trunc(Int, anim_cfg.fps * cfg.duration)
+        record(fig, cfg.path, 1:num_frames; framerate=anim_cfg.fps) do frame
+            make_frame(context)
+        end
+    else
+        display(fig)
+        while events(fig).window_open[] 
+            make_frame(context)
+            sleep(1/anim_cfg.fps)
+        end
     end
 end
 

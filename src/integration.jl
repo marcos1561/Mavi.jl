@@ -6,16 +6,16 @@ using Mavi.Configs
 using Mavi.ChunksMod
 
 "Position difference (i - j) and distance between particle with id `i` and `j`"
-function calc_diff_and_dist(i, j, state::State, space_cfg::SpaceCfg{RigidWalls, G}) where {G}
-    dx = state.pos[1, i] - state.pos[1, j]
-    dy = state.pos[2, i] - state.pos[2, j]
+function calc_diff_and_dist(i, j, pos, space_cfg::SpaceCfg{RigidWalls, G}) where {G}
+    dx = pos[1, i] - pos[1, j]
+    dy = pos[2, i] - pos[2, j]
     dist = sqrt(dx^2 + dy^2)
     return dx, dy, dist
 end
 
-function calc_diff_and_dist(i, j, state::State, space_cfg::SpaceCfg{PeriodicWalls, G}) where {G}
-    dx = state.pos[1, i] - state.pos[1, j]
-    dy = state.pos[2, i] - state.pos[2, j]
+function calc_diff_and_dist(i, j, pos, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg})
+    dx = pos[1, i] - pos[1, j]
+    dy = pos[2, i] - pos[2, j]
     
     geometry_cfg = space_cfg.geometry_cfg
     length, height = geometry_cfg.length, geometry_cfg.height 
@@ -38,7 +38,7 @@ function calc_diffs_and_dists!(system::System, space_cfg)
 
     for i in 1:system.num_p
         for j in i+1:system.num_p
-            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
+            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
             # Update values
             system.diffs[1,i,j] = x_ij
@@ -53,7 +53,7 @@ end
 
 "Return force on particle with id `i` exerted by particle with id `j`."
 function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg, space_cfg)
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     # Check interaction range
     if dist > dynamic_cfg.ra
@@ -68,7 +68,7 @@ function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg, space_c
 end
 
 function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg, space_cfg)
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -84,7 +84,7 @@ function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg, space_cf
 end
 
 function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
-    dx, dy, dist = calc_diff_and_dist(i, j, state, space_cfg)
+    dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     if dist > dynamic_cfg.r_max
         return 0, 0
@@ -102,7 +102,7 @@ function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
 end
 
 function calc_interaction(i, j, state::State, dynamic_cfg::RunTumbleCfg, space_cfg)
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state, space_cfg)
+    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -224,11 +224,27 @@ function walls!(system::System, space_cfg::SpaceCfg{RigidWalls, CircleCfg})
     end
 end
 
+# function resolve_wall!(center, geometry_cfg, state)
+#     pos_i = @view state.pos[:, i] 
+#     diff = pos_i[1] - center[1]  
+#     if abs(diff) > geometry_cfg.length/2
+#         pos_i[1] -= sign(diff) * geometry_cfg.length
+#     end
+
+#     diff = pos_i[2] - center[2]  
+#     if abs(diff) > geometry_cfg.height/2
+#         pos_i[2] -= sign(diff) * geometry_cfg.height
+#     end
+# end
+
 "Periodic walls"
 function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg}) 
     state = system.state
     geometry_cfg = space_cfg.geometry_cfg
     center = (geometry_cfg.bottom_left[1] + geometry_cfg.length/2, geometry_cfg.bottom_left[2] + geometry_cfg.height/2)
+
+    # context = (center, geometry_cfg)
+    # iterate_particles(state, context, resolve_wall!)
 
     for i in 1:system.num_p
         pos_i = @view state.pos[:, i] 

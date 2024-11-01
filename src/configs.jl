@@ -4,7 +4,7 @@ module Configs
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, RigidWalls, PeriodicWalls
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
-export IntCfg, ChunksIntCfg
+export IntCfg, ChunksIntCfg, has_chunks
 export particle_radius, ChunksCfg
 
 #
@@ -127,5 +127,8 @@ end
     dt::Float64
     chunks_cfg::ChunksCfg
 end
+
+has_chunks(int_cfg::IntCfg) = false
+has_chunks(int_cfg::ChunksIntCfg) = true
 
 end
