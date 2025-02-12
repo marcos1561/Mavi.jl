@@ -9,7 +9,7 @@ O pacote é pensado de maneira a ser o mais modularizado possível, permitindo u
 # Instalação
 A forma mais fácil de instalar o Mavi é a seguinte:
 
-* Abre um REPL da Julia e entre no modo de gerenciamento de pacotes (apertando `]` com o REPL vazio)
+* Abra um REPL da Julia e entre no modo de gerenciamento de pacotes (apertando `]` com o REPL vazio)
 * Execute o seguinte comando
     ```julia
     pkg> dev https://github.com/marcos1561/Mavi.jl.git 
