@@ -8,7 +8,7 @@ using Mavi.Configs
 using Mavi.Visualization
 
 function main()
-    num_particles = 2000
+    num_particles = 200
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))

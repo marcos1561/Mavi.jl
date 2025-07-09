@@ -1,11 +1,13 @@
 module Configs
 
-export RingsCfg, particle_radius
+export RingsCfg, particle_radius, num_max_particles
 export HarmTruncCfg
 export get_interaction_cfg, InteractionMatrix
 export RingsIntCfg, ChunksCfg
 
 import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
+using Reexport
+@reexport using Mavi.Configs
 
 abstract type InteractionCfg end
 
@@ -26,7 +28,7 @@ function get_interaction_cfg(t1, t2, interaction::InteractionMatrix)
     interaction.matrix[t1, t2]
 end
 
-struct RingsCfg{T, InteracFinderT<:InteractionFinder{T}} <: DynamicCfg
+@kwdef struct RingsCfg{T, InteracFinderT<:InteractionFinder{T}} <: DynamicCfg
     p0::Vector{Float64}
     relax_time::Vector{Float64}
     vo::Vector{Float64}
@@ -37,34 +39,10 @@ struct RingsCfg{T, InteracFinderT<:InteractionFinder{T}} <: DynamicCfg
     l_spring::Vector{Float64}
     num_particles::Vector{Int}
     interaction_finder::InteracFinderT
-    num_max_particles::Int
 end
-function RingsCfg(;
-    p0,
-    relax_time,
-    vo,
-    mobility,
-    rot_diff,
-    k_area,
-    k_spring,
-    l_spring,
-    num_particles,
-    interaction_finder,
-    )
-    num_max_particles = maximum(num_particles)
-    RingsCfg(
-        p0,
-        relax_time,
-        vo,
-        mobility,
-        rot_diff,
-        k_area,
-        k_spring,
-        l_spring,
-        num_particles,
-        interaction_finder,
-        num_max_particles,
-    )
+
+function num_max_particles(dynamic_cfg::RingsCfg)
+    return maximum(dynamic_cfg.num_particles)
 end
 
 function particle_radius(dynamic_cfg::RingsCfg{HarmTruncCfg, I}) where I 

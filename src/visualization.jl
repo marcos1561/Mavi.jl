@@ -92,6 +92,7 @@ mutable struct ExecInfo
     sym_time::Float64
     sym_time_count::Int
     times::CircularBuffer{Float64}
+    times_ui::CircularBuffer{Float64}
 end
 
 get_anim_cfg(cfg::AnimationCfg) = cfg
@@ -127,7 +128,10 @@ function animate(system::System, step!, cfg=AnimationCfg())
     info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
     graph = SystemGraphs.get_graph(system_gl, system, anim_cfg.graph_cfg)
 
-    exec_info = ExecInfo(0, 0, CircularBuffer{Float64}(anim_cfg.exec_times_size))
+    exec_info = ExecInfo(0, 0, 
+        CircularBuffer{Float64}(anim_cfg.exec_times_size), 
+        CircularBuffer{Float64}(anim_cfg.exec_times_size),
+    )
 
     context = (
         anim_cfg=anim_cfg,
@@ -148,7 +152,6 @@ function animate(system::System, step!, cfg=AnimationCfg())
             exec_info.sym_time += system.int_cfg.dt
         end
         
-        InfoUIs.update_info_ui(info, exec_info, system)
         SystemGraphs.update_graph(graph, system)
     end
     
@@ -160,9 +163,17 @@ function animate(system::System, step!, cfg=AnimationCfg())
         end
     else
         display(fig)
-        while events(fig).window_open[] 
+        time_wait = 1/anim_cfg.fps 
+        @async while isopen(fig.scene) 
+            t1 = time()
             make_frame(context)
-            sleep(1/anim_cfg.fps)
+            InfoUIs.update_info_ui(info, exec_info, system)
+            time_to_wait = time_wait - (time() - t1)
+            if time_to_wait < 0
+                time_to_wait = 0.01
+            end
+            sleep(time_wait/2)
+            push!(exec_info.times_ui, time() - t1)
         end
     end
 end

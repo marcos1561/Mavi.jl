@@ -1,5 +1,5 @@
 module Rings
-    
+
 export RingsSystem, States, Configs, InitStates, Integration
 
 import Mavi

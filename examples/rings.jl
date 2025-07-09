@@ -1,6 +1,6 @@
 using Mavi.Rings
 using Mavi.Visualization
-using Mavi.Configs: SpaceCfg, PeriodicWalls
+# using Mavi.Configs: SpaceCfg, PeriodicWalls
 
 function create_system(;num_particles, num_cols, num_rows)
     interaction_cfg = Configs.HarmTruncCfg(
@@ -34,9 +34,9 @@ function create_system(;num_particles, num_cols, num_rows)
         pad_x=0.1, pad_y=0.1,
     )
 
-    space_cfg = SpaceCfg(
+    space_cfg = Configs.SpaceCfg(
         geometry_cfg = geometry_cfg,
-        wall_type = PeriodicWalls(),
+        wall_type = Configs.PeriodicWalls(),
     )
     state = States.RingsState(
         rings_pos = rings_pos,
@@ -64,8 +64,18 @@ function main()
         num_rows = 13,
     )
     
+    num_rings = size(system.state.rings_pos, 3)
+    
+    colors = []
+    for _ in 1:size(system.state.rings_pos, 3)
+        push!(colors, rand(Visualization.RGBf))
+    end
+    
     anim_cfg = AnimationCfg(
         num_steps_per_frame=10,
+        graph_cfg=DefaultGraphCfg(
+            colors_map=colors,
+        ),
     )
 
     animate(system, Integration.step!, anim_cfg)

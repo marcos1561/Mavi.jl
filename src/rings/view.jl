@@ -11,7 +11,10 @@ function get_graph_data(cfg::DefaultGraphCfg, system, state::RingsState)
         for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
             system.debug_info.graph_pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
             system.debug_info.graph_pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
-            system.debug_info.graph_type[idx] = state.type[ring_id] 
+            
+            # system.debug_info.graph_type[idx] = state.type[ring_id] 
+            system.debug_info.graph_type[idx] = ring_id
+            
             # system.debug_info.graph_pos[1, idx] = system.info.continuos_pos[1, p_id, ring_id] 
             # system.debug_info.graph_pos[2, idx] = system.info.continuos_pos[2, p_id, ring_id] 
             idx += 1
@@ -19,7 +22,9 @@ function get_graph_data(cfg::DefaultGraphCfg, system, state::RingsState)
     end
 
     num_t = idx-1
-    return (pos=system.debug_info.graph_pos[:, 1:num_t], types=system.debug_info.graph_type[1:num_t])
+    pos_view = @view system.debug_info.graph_pos[:, 1:num_t]
+    types_view = @view system.debug_info.graph_type[1:num_t]
+    return (pos=pos_view, types=types_view)
 end
 
 function get_graph_data(system, state::RingsState)

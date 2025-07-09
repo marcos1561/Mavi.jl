@@ -3,7 +3,8 @@ Example creating many particles to demonstrate the difference
 in performance between using chunks or not.
 """
 
-using Mavi: Mavi, Visualization
+using Mavi
+using Mavi.Visualization
 using Mavi.Configs
 using Mavi.InitStates
 

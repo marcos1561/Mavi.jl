@@ -9,7 +9,7 @@ using Mavi.Configs: SpaceCfg, RectangleCfg, PeriodicWalls
 export step!
 
 function to_scalar_idx(dynamic_cfg, ring_id, particle_id)
-    return (ring_id - 1) * dynamic_cfg.num_max_particles + particle_id
+    return (ring_id - 1) * num_max_particles(dynamic_cfg) + particle_id
 end
 
 function get_ring_id(idx, num_particles)
@@ -30,8 +30,8 @@ function update_chunks!(chunks::Chunks{RingsState})
 end
 
 function calc_interaction(i, j, state, dynamic_cfg::RingsCfg, space_cfg)
-    r1 = get_ring_id(i, dynamic_cfg.num_max_particles)
-    r2 = get_ring_id(j, dynamic_cfg.num_max_particles)
+    r1 = get_ring_id(i, num_max_particles(dynamic_cfg))
+    r2 = get_ring_id(j, num_max_particles(dynamic_cfg))
 
     t1, t2 = state.type[r1], state.type[r2]
     
