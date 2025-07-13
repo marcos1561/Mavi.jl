@@ -5,7 +5,8 @@ export animate
 export AnimationCfg, VideoCfg, DefaultInfoUICfg, DefaultGraphCfg, UiSettings, CircleGraphCfg
 
 using GLMakie
-using Mavi: State, System
+using Mavi.States: State
+using Mavi.Systems: System
 using Mavi.Configs
 using DataStructures
 
@@ -164,7 +165,7 @@ function animate(system::System, step!, cfg=AnimationCfg())
     else
         display(fig)
         time_wait = 1/anim_cfg.fps 
-        @async while isopen(fig.scene) 
+        while isopen(fig.scene) 
             t1 = time()
             make_frame(context)
             InfoUIs.update_info_ui(info, exec_info, system)

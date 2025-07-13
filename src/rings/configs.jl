@@ -1,13 +1,16 @@
 module Configs
 
-export RingsCfg, particle_radius, num_max_particles
+# export RingsCfg, particle_radius, num_max_particles
+export RingsCfg, num_max_particles
 export HarmTruncCfg
 export get_interaction_cfg, InteractionMatrix
-export RingsIntCfg, ChunksCfg
+# export RingsIntCfg, ChunksCfg
+export RingsIntCfg
 
-import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
+# import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
 using Reexport
 @reexport using Mavi.Configs
+import Mavi.Configs as MaviCfg
 
 abstract type InteractionCfg end
 
@@ -45,7 +48,7 @@ function num_max_particles(dynamic_cfg::RingsCfg)
     return maximum(dynamic_cfg.num_particles)
 end
 
-function particle_radius(dynamic_cfg::RingsCfg{HarmTruncCfg, I}) where I 
+function MaviCfg.particle_radius(dynamic_cfg::RingsCfg{HarmTruncCfg, I}) where I 
     return get_interaction_cfg(1, 1, dynamic_cfg.interaction_finder).dist_eq / 2.0
 end
 
@@ -54,6 +57,6 @@ end
     chunks_cfg::Union{ChunksCfg, Nothing} = nothing
 end
 
-has_chunks(int_cfg::RingsIntCfg) = !(int_cfg.chunks_cfg === nothing)
+MaviCfg.has_chunks(int_cfg::RingsIntCfg) = !(int_cfg.chunks_cfg === nothing)
 
 end

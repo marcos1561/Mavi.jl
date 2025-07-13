@@ -1,11 +1,11 @@
 module States
 
-import Mavi
-
 export RingsState
 export get_active_ids
 
-struct RingsState{T} <: Mavi.State{T}
+import Mavi
+
+struct RingsState{T} <: Mavi.States.State{T}
     rings_pos::Array{T, 3} # size: (Nº of dimension, Nº of particles in the ring, Nº of rings)
     pos::Matrix{T} # size: (Nº of dimension , Total Nº of particles)
     pol::Vector{T}

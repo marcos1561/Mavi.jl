@@ -4,9 +4,9 @@ in performance between using chunks or not.
 """
 
 using Mavi
-using Mavi.Visualization
 using Mavi.Configs
 using Mavi.InitStates
+using Mavi.Visualization
 
 function main()
     # Set to false to see the performance without chunks.
@@ -21,10 +21,10 @@ function main()
     dynamic_cfg = HarmTruncCfg(10, 1, 1)
     radius = particle_radius(dynamic_cfg)
 
-    pos, geometry_cfg = InitStates.rectangular_grid(num_p_x, num_p_y, offset, radius)
+    pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
     state = Mavi.SecondLawState{Float64}(
         pos=pos,
-        vel=InitStates.random_vel(num_p, 1/5),
+        vel=random_vel(num_p, 1/5),
     )
 
     if use_chunks
@@ -39,8 +39,7 @@ function main()
         int_cfg = IntCfg(dt=0.001)
     end
 
-
-    system = Mavi.System(
+    system = System(
         state=state, 
         space_cfg=SpaceCfg(
             wall_type=RigidWalls(),
@@ -56,6 +55,6 @@ function main()
         exec_times_size=100,
     )
 
-    Visualization.animate(system, Mavi.Integration.step!, anim_cfg)
+    animate(system, Mavi.Integration.step!, anim_cfg)
 end
 main()

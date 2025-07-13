@@ -3,16 +3,17 @@ Creates a system with two particles and animate it using
 a step function with constant velocity and rigid walls. 
 """
 
-using Mavi: Mavi, Visualization
+using Mavi
+using Mavi.Visualization
 using Mavi.Configs
 
 function main()
-    state = Mavi.SecondLawState{Float64}(
+    state = Mavi.States.SecondLawState{Float64}(
         pos=[1 2; 1 2],
         vel=[0.3 2; 1 0]
     )
 
-    system = Mavi.System(
+    system = System(
         state=state, 
         space_cfg=SpaceCfg(
             wall_type=RigidWalls(),
@@ -27,7 +28,7 @@ function main()
         ),
     )
 
-    function step!(system::Mavi.System, int_cfg)
+    function step!(system::System, int_cfg)
         state = system.state
         dt = int_cfg.dt
 
@@ -47,11 +48,11 @@ function main()
         end
     end
 
-    anim_cfg = Visualization.AnimationCfg(
+    anim_cfg = AnimationCfg(
         fps = 60,    
         num_steps_per_frame = 1,
     )
 
-    Visualization.animate(system, step!, anim_cfg)
+    animate(system, step!, anim_cfg)
 end
 main()

@@ -1,12 +1,12 @@
 module Integration
 
-using Mavi
-using Mavi.Configs: IntCfg, ChunksIntCfg
+using Mavi.Systems: System
+using Mavi.States
 using Mavi.Configs
 using Mavi.ChunksMod
 
 "Position difference (i - j) and distance between particle with id `i` and `j`"
-function calc_diff_and_dist(i, j, pos, space_cfg::SpaceCfg{RigidWalls, G}) where {G}
+function calc_diff_and_dist(i, j, pos, space_cfg)
     dx = pos[1, i] - pos[1, j]
     dy = pos[2, i] - pos[2, j]
     dist = sqrt(dx^2 + dy^2)

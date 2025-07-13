@@ -1,10 +1,10 @@
 module Integration
     
-import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces_chunks!
+import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces_chunks!, calc_forces!
 using Mavi.Rings.Configs
 using Mavi.Rings.States
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
-using Mavi.Configs: SpaceCfg, RectangleCfg, PeriodicWalls
+using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls 
 
 export step!
 
@@ -76,7 +76,7 @@ function calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg::HarmT
     end
     
     # compute atr force
-    adh_size = interaction_cfg.dist_max - dist_eq 
+    adh_size = interaction_cfg.dist_max - dist_eq
     fmod = -interaction_cfg.k_atr/adh_size*(dist - dist_eq) # restoring force
     fx = fmod * dx / dist # unit vector x_ij/dist
     fy = fmod * dy / dist
@@ -116,7 +116,9 @@ function calc_area(ring_pos)
     return area / 2.0
 end
 
-function update_continuos_pos!(system)
+function update_continuos_pos!(system, wall_type) end
+
+function update_continuos_pos!(system, wall_type::PeriodicWalls)
     continuos_pos = system.info.continuos_pos
     for ring_id in get_active_ids(system.state)
         continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
@@ -135,7 +137,7 @@ end
 function get_continuos_pos(ring_id, system, wall_type)
     ring_type = system.state.type[ring_id]
     num_particles = system.dynamic_cfg.num_particles[ring_type]
-    return @view system.state.ring_pos[:, 1:num_particles, ring_id]
+    return @view system.state.rings_pos[:, 1:num_particles, ring_id]
 end
 
 function get_continuos_pos(ring_id, system, wall_type::PeriodicWalls)
@@ -189,7 +191,11 @@ function area_forces!(system)
 end
 
 function forces!(system)
-    calc_forces_chunks!(system)
+    if Configs.has_chunks(system.int_cfg)
+        calc_forces_chunks!(system) 
+    else
+        calc_forces!(system) 
+    end
 
     state = system.state
     dynamic_cfg = system.dynamic_cfg
@@ -243,6 +249,65 @@ function walls!(system, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg})
     end
 end
 
+function walls!(system, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}) where T
+    state = system.state
+    lines = space_cfg.geometry_cfg.lines
+    p_radius = Configs.particle_radius(system.dynamic_cfg)
+    for ring_id in get_active_ids(system.state)
+        ring_type = system.state.type[ring_id]
+        for i in 1:system.dynamic_cfg.num_particles[ring_type]
+            pos_i = @view state.rings_pos[:, i, ring_id] 
+            
+            for line in lines
+                point_x = line.p1.x #+ line.normal.x * p_radius
+                point_y = line.p1.y #+ line.normal.y * p_radius
+                
+                x, y = pos_i[1] - point_x, pos_i[2] - point_y
+                delta_s = x * line.normal.x + y * line.normal.y   
+                
+                if abs(delta_s) > p_radius
+                    continue
+                end
+                
+                delta_t = x * line.tangent.x + y * line.tangent.y   
+                
+                is_corner = false
+                if delta_t > 0
+                    if delta_t > line.length
+                        if delta_t > (line.length + p_radius)
+                            continue
+                        end
+                        is_corner = true
+                        corner_p = line.p2
+                    end
+                elseif delta_t > -p_radius    
+                    is_corner = true
+                    corner_p = line.p1
+                else
+                    continue
+                end
+                
+                if is_corner 
+                    dx = pos_i[1] - corner_p.x
+                    dy = pos_i[2] - corner_p.y
+                    norm = sqrt(dx^2 + dy^2)
+                    if norm > p_radius
+                        continue
+                    end
+                    alpha = p_radius / sqrt(dx^2 + dy^2) - 1
+                    pos_i[1] += alpha * dx
+                    pos_i[2] += alpha * dy
+                else
+                    sgn = sign(delta_s)
+                    alpha = sgn * (p_radius - sgn * delta_s) 
+                    pos_i[1] += alpha * line.normal.x
+                    pos_i[2] += alpha * line.normal.y
+                end
+            end
+        end
+    end
+end
+
 function update!(system)
     state = system.state
     
@@ -264,7 +329,6 @@ function update!(system)
         vel_cm_y = 0.0
 
         for i in 1:num_particles
-
             p_id = to_scalar_idx(dynamic_cfg, ring_id, i)
 
             vel_x = vo * pol_x + mu * system.forces[1, p_id]
@@ -291,8 +355,11 @@ function update!(system)
 end
 
 function step!(system, int_cfg::RingsIntCfg)
-    update_chunks!(system.chunks)
-    update_continuos_pos!(system)
+    if Configs.has_chunks(int_cfg)
+        update_chunks!(system.chunks)
+    end
+    update_continuos_pos!(system, system.space_cfg.wall_type)
+    
     forces!(system)
     update!(system)
     walls!(system, system.space_cfg)

@@ -1,7 +1,8 @@
 "Calculation of thermodynamic quantities."
 module Quantities
 
-using Mavi: State, System
+using Mavi.States: State
+using Mavi.Systems: System
 using Mavi.Configs
 
 export kinetic_energy, potential_energy

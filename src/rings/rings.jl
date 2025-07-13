@@ -1,6 +1,6 @@
 module Rings
 
-export RingsSystem, States, Configs, InitStates, Integration
+export RingsSystem, RingsState, Configs, InitStates, Integration
 
 import Mavi
 
@@ -16,12 +16,14 @@ end
     graph_type::Vector{Int}
 end
 
-include("state.jl")
+include("states.jl")
 include("configs.jl")
 include("integration.jl")
 include("utils.jl")
-include("init_state.jl")
+include("init_states.jl")
 include("view.jl")
+
+using .States: RingsState
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg)
     info = RingsInfo(

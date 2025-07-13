@@ -1,6 +1,6 @@
 module SpaceChecks
 
-using Mavi: State
+using Mavi.States: State
 using Mavi.Configs
 
 export check_inside
@@ -17,6 +17,10 @@ function outside_particles(state::State, geometry_cfg::CircleCfg)
     r2 = @. state.pos[1, :]^2 + state.pos[2, :]^2
     out_ids = findall(r2 .> geometry_cfg.radius^2)
     return out_ids
+end
+
+function outside_particles(state::State, geometry_cfg)
+    return []
 end
 
 """

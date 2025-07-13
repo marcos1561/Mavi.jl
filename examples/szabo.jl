@@ -3,6 +3,7 @@ Simple exemple using Szabo model
 """
 
 using Mavi
+using Mavi.States
 using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization

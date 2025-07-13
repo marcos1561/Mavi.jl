@@ -4,7 +4,8 @@ export GraphCfg, DefaultGraphCfg
 export CircleGraph, CircleGraphCfg
 
 using GLMakie
-using Mavi: State, System
+using Mavi.States: State
+using Mavi.Systems: System
 using Mavi.Configs
 
 "Return circle vertices centered in the origin with given radius."
@@ -35,6 +36,24 @@ function drawn_borders(ax, space_cfg::RectangleCfg)
     ylims!(ax, y - dy, y + h + dy)
 end
 
+function drawn_borders(ax, space_cfg::LinesCfg)
+    for line in space_cfg.lines
+        p1, p2 = line.p1, line.p2
+        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=:black)
+        # l, h = space_cfg.length, space_cfg.height
+        # x, y = space_cfg.bottom_left
+        # lines!(ax, [x, y], [x+l, y], color=:black)
+        # lines!(ax, [x+l, y], [x+l, y+h], color=:black)
+        # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
+        # lines!(ax, [y+h, x], [x, y], color=:black)
+
+        # dx = l*0.1
+        # dy = h*0.1
+        # xlims!(ax, x - dx, x + l + dx)
+        # ylims!(ax, y - dy, y + h + dy)
+    end
+end
+
 function drawn_borders(ax, space_cfg::CircleCfg)
     arc!(ax, Point2f(0), space_cfg.radius, -π, π, color=:black)
 end
@@ -62,10 +81,14 @@ Drawn every particle with a circumference and a central point.
 - circle_rel:  
     How many vertices used to draw circles.
 """
-@kwdef struct DefaultGraphCfg <: GraphCfg 
+@kwdef struct DefaultGraphCfg <: GraphCfg
     circle_radius = -1.0
     circle_rel = 20
-    colors_map = [:blue]
+    colors_map = [RGBf(GLMakie.to_color(:black))]
+end
+function DefaultGraphCfg(circle_radius, circle_rel, color_map::Vector{Symbol})
+    color_map = RGBf.(GLMakie.to_color.(color_map))
+    DefaultGraphCfg(circle_radius, circle_rel, color_map)
 end
 
 struct DefaultGraph{T1, T2, T3}

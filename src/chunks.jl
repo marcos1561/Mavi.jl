@@ -2,7 +2,7 @@ module ChunksMod
 
 export Chunks, update_chunks!
 
-using Mavi: State
+using Mavi.States: State
 using Mavi.Configs
 
 struct Chunks{T, StateT<:State{T}, InfoT}
@@ -65,7 +65,7 @@ function get_neighbors(num_rows, num_cols, wall_type::PeriodicWalls)
     return neighbors
 end
 
-function get_neighbors(num_rows, num_cols, wall_type::RigidWalls)
+function get_neighbors(num_rows, num_cols, wall_type::Union{RigidWalls, SlipperyWalls})
     neighbors = Matrix{Vector{CartesianIndex{2}}}(undef, num_rows, num_cols)
     for i in 1:(num_rows-1)
         neighbors[i, 1] = [

@@ -7,7 +7,7 @@ using Mavi.Rings.Configs: get_interaction_cfg
 function get_graph_data(cfg::DefaultGraphCfg, system, state::RingsState)
     idx = 1
     for ring_id in get_active_ids(state)
-        ring_type = system.chunks.state.type[ring_id]
+        ring_type = state.type[ring_id]
         for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
             system.debug_info.graph_pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
             system.debug_info.graph_pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
@@ -35,7 +35,7 @@ function get_graph_data(system, state::RingsState)
 
     idx = 1
     for ring_id in get_active_ids(state)
-        ring_type = system.chunks.state.type[ring_id]
+        ring_type = state.type[ring_id]
         for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
             pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
             pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
