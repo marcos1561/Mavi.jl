@@ -1,9 +1,10 @@
 """
 Example: Extending the Information UI
 
-Calculates kinetic, potential, and total energy during integration, displaying
-the results in real-time on the UI.
+Calculates kinetic, potential, and total energies during integration, displaying
+the results in real time on the UI.
 """
+module Example
 
 using Printf
 
@@ -50,6 +51,10 @@ function main()
         )
     )
 
-    animate(system, Integration.step!, anim_cfg)
+    animate(system, Integration.newton_step!, anim_cfg)
 end
-main()
+
+end
+
+import .Example
+Example.main()

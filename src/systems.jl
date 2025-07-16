@@ -1,6 +1,6 @@
 module Systems
 
-export System
+export System, particles_radius
 
 using Mavi.States: State
 using Mavi.SpaceChecks
@@ -72,10 +72,15 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
         )
 
         chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-            chunks_space_cfg, state, particle_radius(dynamic_cfg), extra_info=dynamic_cfg)
+            chunks_space_cfg, state, minimum(particle_radius(dynamic_cfg)), extra_info=dynamic_cfg)
     end
 
     System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p, info, debug_info)
+end
+
+function particles_radius(system, dynamic_cfg)
+    p_radius = particle_radius(dynamic_cfg)
+    fill(p_radius, system.num_p)
 end
 
 end

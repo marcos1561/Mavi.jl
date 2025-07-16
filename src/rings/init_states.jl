@@ -17,29 +17,42 @@ function create_circle(center, radius, num_p)
 end
 
 function rectangular_grid(;
-    num_cols, num_rows, num_particles, p_radius, 
+    num_cols, num_rows, num_particles, p_radius, types=nothing, 
     pad_x=0, pad_y=0, radius_k=1)
-    ring_r = get_ring_radius(p_radius, num_particles)
+    if types === nothing
+        num_particles = [num_particles]
+        p_radius = [p_radius]
+        types = fill(1, num_cols * num_rows)
+    end
+
+    ring_r = get_ring_radius.(p_radius, num_particles)
     ring_length = 2 * (ring_r + p_radius)
 
-    pad_x = pad_x * ring_r
-    pad_y = pad_y * ring_r
+    max_ring_r = maximum(ring_r)
+    max_ring_length = maximum(ring_length)
+    max_num_particles = maximum(num_particles)
 
-    ring_pos = Array{Float64}(undef, 2, num_particles, num_cols * num_rows)
+    pad_x = pad_x * max_ring_r
+    pad_y = pad_y * max_ring_r
+
+    ring_pos = Array{Float64}(undef, 2, max_num_particles, num_cols * num_rows)
+    ring_pos .= 0
     idx = 1
     for col_id in 1:num_cols
         for row_id in 1:num_rows
-            center_x = pad_x/2 + (col_id-1) * (ring_length + pad_x) + ring_length/2
-            center_y = pad_y/2 + (row_id-1) * (ring_length + pad_x) + ring_length/2
+            center_x = pad_x/2 + (col_id-1) * (max_ring_length + pad_x) + max_ring_length/2
+            center_y = pad_y/2 + (row_id-1) * (max_ring_length + pad_x) + max_ring_length/2
             
-            ring_pos[:, :, idx] = create_circle([center_x, center_y], ring_r * radius_k, num_particles)
+            ring_type = types[idx]
+            num_p = num_particles[ring_type]
+            ring_pos[:, 1:num_p, idx] = create_circle([center_x, center_y], ring_r[ring_type] * radius_k, num_p)
             idx += 1
         end
     end
 
-    space_l = num_cols * (pad_x + ring_length)
-    space_h = num_rows * (pad_y + ring_length)
-    geometry_cfg = RectangleCfg(space_l, space_h, (0, 0))
+    space_l = num_cols * (pad_x + max_ring_length)
+    space_h = num_rows * (pad_y + max_ring_length)
+    geometry_cfg = RectangleCfg(length=space_l, height=space_h)
 
     return ring_pos, geometry_cfg
 end

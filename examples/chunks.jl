@@ -1,7 +1,10 @@
 """
-Example creating many particles to demonstrate the difference
+Example: Using Chunks
+
+This example creates many particles to demonstrate the difference
 in performance between using chunks or not.
 """
+module Example
 
 using Mavi
 using Mavi.Configs
@@ -27,17 +30,18 @@ function main()
         vel=random_vel(num_p, 1/5),
     )
 
-    if use_chunks
-        int_cfg = ChunksIntCfg(
-            dt=0.001,
-            chunks_cfg=ChunksCfg(
-                num_cols=trunc(Int, num_p_x*0.9), 
-                num_rows=trunc(Int, num_p_y*0.9),
-            ),
-        ) 
-    else
-        int_cfg = IntCfg(dt=0.001)
+    chunks_cfg = nothing
+    if use_chunks    
+        chunks_cfg = ChunksCfg(
+            num_cols=trunc(Int, num_p_x*0.9), 
+            num_rows=trunc(Int, num_p_y*0.9),
+        )
     end
+    
+    int_cfg = IntCfg(
+        dt=0.001,
+        chunks_cfg=chunks_cfg,
+    )
 
     system = System(
         state=state, 
@@ -55,6 +59,10 @@ function main()
         exec_times_size=100,
     )
 
-    animate(system, Mavi.Integration.step!, anim_cfg)
+    animate(system, Mavi.Integration.newton_step!, anim_cfg)
 end
-main()
+
+end
+
+import .Example
+Example.main()

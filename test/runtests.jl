@@ -4,18 +4,19 @@ using Test
 
 @testset "Mavi.jl" begin
     function create_system()
-        state = Mavi.State{Float64}(
-            x=[1,2],
-            y=[1,2],
-            vx=[1,2],
-            vy=[1,2],
+        state = Mavi.SecondLawState(
+            pos=[[1, 1];; [2, 1];; [3, 2]],
+            vel=[[0, 0];; [1, 1];; [-1, 2]],
         )
 
-        system = Mavi.System(
+        system = System(
             state=state, 
-            space_cfg=RectangleCfg(1, 1), 
+            space_cfg=SpaceCfg(
+                geometry_cfg=RectangleCfg(length=5, height=5),
+                wall_type=RigidWalls(),
+            ),
             dynamic_cfg=HarmTruncCfg(1, 1, 1),
-            int_cfg=IntegrationCfg(1)
+            int_cfg=IntCfg(dt=1),
         )
         return
     end

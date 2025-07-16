@@ -1,11 +1,11 @@
 module SystemGraphs
 
-export GraphCfg, DefaultGraphCfg
-export CircleGraph, CircleGraphCfg
+export GraphCfg, DefaultGraphCfg, CircleGraphCfg
+export DefaultGraph, CircleGraph
 
 using GLMakie
+using Mavi.Systems: System, particles_radius
 using Mavi.States: State
-using Mavi.Systems: System
 using Mavi.Configs
 
 "Return circle vertices centered in the origin with given radius."
@@ -81,14 +81,21 @@ Drawn every particle with a circumference and a central point.
 - circle_rel:  
     How many vertices used to draw circles.
 """
-@kwdef struct DefaultGraphCfg <: GraphCfg
-    circle_radius = -1.0
-    circle_rel = 20
-    colors_map = [RGBf(GLMakie.to_color(:black))]
+struct DefaultGraphCfg <: GraphCfg
+    circle_radius::Float64
+    circle_rel::Int
+    colors_map::Vector{RGBf}
 end
-function DefaultGraphCfg(circle_radius, circle_rel, color_map::Vector{Symbol})
-    color_map = RGBf.(GLMakie.to_color.(color_map))
-    DefaultGraphCfg(circle_radius, circle_rel, color_map)
+function DefaultGraphCfg(;circle_radius=-1.0, circle_rel=20, colors_map=nothing)
+    if colors_map === nothing
+        colors_map = [RGBf(GLMakie.to_color(:black))]
+    end
+
+    if colors_map isa Vector{Symbol}
+        colors_map = RGBf.(GLMakie.to_color.(colors_map))
+    end
+
+    DefaultGraphCfg(circle_radius, circle_rel, colors_map)
 end
 
 struct DefaultGraph{T1, T2, T3}
@@ -133,13 +140,20 @@ function get_graph(grid_layout, system, cfg::DefaultGraphCfg)
     drawn_borders(ax, system.space_cfg.geometry_cfg)
     
     if cfg.circle_radius == -1
-        radius = particle_radius(system.dynamic_cfg) 
+        radius = particles_radius(system, system.dynamic_cfg)
     else
-        radius = cfg.circle_radius 
+        if cfg.circle_radius <: Number
+            radius = fill(cfg.circle_radius, size(data.pos, 2)) 
+        elseif length(cfg.circle_radius) != 2
+            throw(ArgumentError(
+                "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
+                "the same as number of particles ($(size(data.pos, 2)))"
+            ))
+        end
     end
     
     function points_to_circle(pos)
-        [Circle(Point2f(pos[1, i], pos[2, i]), radius) for i in axes(pos, 2)]
+        [Circle(Point2f(pos[1, i], pos[2, i]), radius[i]) for i in axes(pos, 2)]
     end
     
     # scatter!(ax, x_obs, y_obs, color=colors_obs)

@@ -5,12 +5,12 @@ export Chunks, update_chunks!
 using Mavi.States: State
 using Mavi.Configs
 
-struct Chunks{T, StateT<:State{T}, InfoT}
+struct Chunks{T, StateT<:State{T}, InfoT, RT}
     num_cols::Int
     num_rows::Int
     chunk_length::Float64
     chunk_height::Float64
-    geometry_cfg::RectangleCfg
+    geometry_cfg::RectangleCfg{RT}
     steps_to_update::Int
 
     state::StateT
@@ -21,7 +21,7 @@ struct Chunks{T, StateT<:State{T}, InfoT}
     chunk_particles::Array{Int, 3}
     num_particles_in_chunk::Array{Int, 2}
 end
-function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg}, state, particle_r; extra_info=nothing) where W
+function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{T}}, state, particle_r; extra_info=nothing) where {W, T}
     neighbors = get_neighbors(num_rows, num_cols, space_cfg.wall_type)
     
     chunk_length = space_cfg.geometry_cfg.length / num_cols
@@ -106,8 +106,6 @@ function update_particle_chunk!(chunks, i)
     row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
     col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
     
-    # println(state.pos[1, i], "|", state.pos[2, i])
-
     row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
     col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
 
@@ -124,6 +122,8 @@ function update_chunks!(chunks::Chunks)
         update_particle_chunk!(chunks, i)
     end
 end
+
+function update_chunks!(chunks::Nothing) end
 
 # function update_chunks!(chunks::Chunks)
 #     state = chunks.state

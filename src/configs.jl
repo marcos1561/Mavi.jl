@@ -7,16 +7,21 @@ export RigidWalls, PeriodicWalls, SlipperyWalls
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksIntCfg, has_chunks
 export particle_radius, ChunksCfg
+export DeviceMode, Sequencial, Threaded
 
 #
 # Space Configurations 
 #
 abstract type GeometryCfg end
 
-@kwdef struct RectangleCfg <: GeometryCfg
-    length::Float64
-    height::Float64
-    bottom_left::Tuple{Float64, Float64}=(0.0, 0.0)
+struct RectangleCfg{T<:Number} <: GeometryCfg
+    length::T
+    height::T
+    bottom_left::Tuple{T, T}
+end
+function RectangleCfg(;length, height, bottom_left=(0, 0))
+    args = promote(length, height, bottom_left...)
+    RectangleCfg(args[1:end-2]..., args[end-1:end])
 end
 
 
@@ -69,7 +74,7 @@ function get_bounding_box(space_cfg::CircleCfg)
     return RectangleCfg(length, length, bottom_left)
 end
 
-function get_bounding_box(space_cfg::RectangleCfg)
+function get_bounding_box(space_cfg::RectangleCfg{T}) where T
     return space_cfg
 end
 
@@ -172,21 +177,22 @@ particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 #
 abstract type AbstractIntCfg end
 
-@kwdef struct IntCfg <: AbstractIntCfg 
-    dt::Float64
-end
+abstract type DeviceMode end
+struct Threaded <: DeviceMode end
+struct Sequencial <: DeviceMode end
 
 @kwdef struct ChunksCfg
     num_cols::Int
     num_rows::Int
 end
 
-@kwdef struct ChunksIntCfg <: AbstractIntCfg
-    dt::Float64
-    chunks_cfg::ChunksCfg
+@kwdef struct IntCfg{T<:Number, ChunkT<:Union{ChunksCfg, Nothing}, Device<:DeviceMode} <: AbstractIntCfg 
+    dt::T
+    chunks_cfg::ChunkT = nothing
+    device::Device = Sequencial()
 end
 
-has_chunks(int_cfg::IntCfg) = false
-has_chunks(int_cfg::ChunksIntCfg) = true
+has_chunks(int_cfg::IntCfg{T, Nothing, D}) where {T, D} = false
+has_chunks(int_cfg::IntCfg{T, ChunksCfg, D}) where {T, D} = true
 
 end

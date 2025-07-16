@@ -1,16 +1,16 @@
 module Configs
 
-# export RingsCfg, particle_radius, num_max_particles
-export RingsCfg, num_max_particles
+export RingsCfg, num_max_particles, has_types_cfg
 export HarmTruncCfg
-export get_interaction_cfg, InteractionMatrix
-# export RingsIntCfg, ChunksCfg
-export RingsIntCfg
+export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
+export IntCfg
 
+import Mavi.Configs as MaviCfg
 # import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
+
 using Reexport
 @reexport using Mavi.Configs
-import Mavi.Configs as MaviCfg
+
 
 abstract type InteractionCfg end
 
@@ -27,36 +27,106 @@ struct InteractionMatrix{T} <: InteractionFinder{T}
     matrix::Matrix{T}
 end
 
-function get_interaction_cfg(t1, t2, interaction::InteractionMatrix)
-    interaction.matrix[t1, t2]
+list_interactions(interactions::InteractionCfg) = [interactions]
+
+function list_interactions(interactions::InteractionMatrix)
+    mat = interactions.matrix
+    return [mat[i, j] for i in 1:size(mat, 1) for j in i:size(mat, 2)]
 end
 
-@kwdef struct RingsCfg{T, InteracFinderT<:InteractionFinder{T}} <: DynamicCfg
-    p0::Vector{Float64}
-    relax_time::Vector{Float64}
-    vo::Vector{Float64}
-    mobility::Vector{Float64}
-    rot_diff::Vector{Float64}
-    k_area::Vector{Float64}
-    k_spring::Vector{Float64}
-    l_spring::Vector{Float64}
-    num_particles::Vector{Int}
+list_self_interactions(interactions::InteractionCfg) = [interactions]
+
+function list_self_interactions(interactions::InteractionMatrix)
+    mat = interactions.matrix
+    return [mat[i, i] for i in axes(mat, 1)]
+end
+
+@inline function get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionMatrix)
+    interaction.matrix[state.types[ring_id1], state.types[ring_id2]]
+end
+
+@inline function get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionMatrix)
+    interaction.matrix[ring_type_1, ring_type_2]
+end
+
+@inline function get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionCfg) 
+    interaction
+end
+
+@inline function get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionCfg) 
+    interaction
+end
+
+struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFinderT<:Union{InteractionFinder{T}, T}} <: DynamicCfg
+    p0::U
+    relax_time::U
+    vo::U
+    mobility::U
+    rot_diff::U
+    k_area::U
+    k_spring::U
+    l_spring::U
+    num_particles::Union{Vector{Int}, Int}
+    num_types::Int
     interaction_finder::InteracFinderT
 end
+function RingsCfg(;
+    p0, relax_time, vo, mobility, rot_diff, k_area, k_spring, l_spring,
+    num_particles, interaction_finder,
+    )
+    U = typeof(p0)
+    if U <: Number && !(num_particles isa Int)
+        throw(ArgumentError("If U is Number, num_particles must be Int"))
+    elseif U <: AbstractVector && !(num_particles isa AbstractVector)
+        throw(ArgumentError("If U is AbstractVector, num_particles must be Vector"))
+    end
 
-function num_max_particles(dynamic_cfg::RingsCfg)
-    return maximum(dynamic_cfg.num_particles)
+    if U <: Number
+        num_types = 1
+    else
+        num_types = length(p0)
+    end
+
+    RingsCfg(
+        p0, relax_time, vo, mobility, rot_diff, 
+        k_area, k_spring, l_spring, num_particles, num_types, interaction_finder,
+    )
 end
 
-function MaviCfg.particle_radius(dynamic_cfg::RingsCfg{HarmTruncCfg, I}) where I 
-    return get_interaction_cfg(1, 1, dynamic_cfg.interaction_finder).dist_eq / 2.0
+@inline function num_max_particles(dynamic_cfg::RingsCfg{U, T, F}) where {U<:AbstractVector, T, F}
+    maximum(dynamic_cfg.num_particles)
 end
 
-@kwdef struct RingsIntCfg <: AbstractIntCfg
-    dt::Float64
-    chunks_cfg::Union{ChunksCfg, Nothing} = nothing
+@inline function num_max_particles(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F}
+    dynamic_cfg.num_particles
 end
 
-MaviCfg.has_chunks(int_cfg::RingsIntCfg) = !(int_cfg.chunks_cfg === nothing)
+@inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F} = false
+@inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:AbstractVector, T, F} = true
+
+function MaviCfg.particle_radius(dynamic_cfg::RingsCfg)
+    p_radius = Vector{Float64}(undef, dynamic_cfg.num_types)
+    for i in 1:dynamic_cfg.num_types
+        inter = get_interaction_cfg(i, i, dynamic_cfg.interaction_finder)
+        p_radius[i] = particle_radius(inter) 
+    end
+    
+    if length(p_radius) == 1
+        p_radius = p_radius[1]
+    end
+
+    return p_radius
+end
+
+function MaviCfg.particle_radius(interaction_cfg::HarmTruncCfg) 
+    return interaction_cfg.dist_eq / 2.0
+end
+
+# @kwdef struct RingsIntCfg <: AbstractIntCfg
+#     dt::Float64
+#     chunks_cfg::Union{ChunksCfg, Nothing} = nothing
+# end
+
+# MaviCfg.has_chunks(int_cfg::RingsIntCfg) = !(int_cfg.chunks_cfg === nothing)
 
 end

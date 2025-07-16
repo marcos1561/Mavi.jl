@@ -1,7 +1,10 @@
 """
+Example: Custom step function
+
 Creates a system with two particles and animate it using 
 a step function with constant velocity and rigid walls. 
 """
+module Example
 
 using Mavi
 using Mavi.Visualization
@@ -28,9 +31,9 @@ function main()
         ),
     )
 
-    function step!(system::System, int_cfg)
+    function step!(system::System)
         state = system.state
-        dt = int_cfg.dt
+        dt = system.int_cfg.dt
 
         # Constant velocity
         state.pos .+= state.vel * dt
@@ -55,4 +58,8 @@ function main()
 
     animate(system, step!, anim_cfg)
 end
-main()
+
+end
+
+import .Example
+Example.main()

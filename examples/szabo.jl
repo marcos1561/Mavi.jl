@@ -1,6 +1,9 @@
 """
+Example: Szabo
+
 Simple exemple using Szabo model
 """
+module Example
 
 using Mavi
 using Mavi.States
@@ -44,7 +47,7 @@ function main()
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
-        int_cfg=ChunksIntCfg(
+        int_cfg=IntCfg(
             dt=0.01,
             chunks_cfg=ChunksCfg(
                 num_cols=num_p_x-1, 
@@ -54,4 +57,8 @@ function main()
     )
     animate(system, Mavi.Integration.szabo_step!, AnimationCfg(num_steps_per_frame=10))
 end
-main()
+
+end
+
+import .Example
+Example.main()

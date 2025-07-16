@@ -1,7 +1,5 @@
 module Mavi
 
-export System
-
 # Core Stuff
 include("configs.jl")
 include("states.jl")
@@ -14,6 +12,8 @@ include("visualization.jl")
 include("quantities.jl")
 
 using .Systems
+export System
+
 using .States
 
 # Rings Stuff

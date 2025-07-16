@@ -6,7 +6,7 @@ using Mavi.Configs
 export check_inside
 
 "Return particles indices outside the given geometry configuration."
-function outside_particles(state::State, geometry_cfg::RectangleCfg)
+function outside_particles(state::State, geometry_cfg::RectangleCfg) 
     x_out = @. (state.pos[1, :] - geometry_cfg.bottom_left[1] < 0.0) | (state.pos[1, :] - geometry_cfg.bottom_left[1] > geometry_cfg.length)
     y_out = @. (state.pos[2, :] - geometry_cfg.bottom_left[2] < 0.0) | (state.pos[2, :] - geometry_cfg.bottom_left[2] > geometry_cfg.height)
     out_ids = findall(x_out .| y_out)

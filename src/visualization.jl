@@ -148,7 +148,7 @@ function animate(system::System, step!, cfg=AnimationCfg())
         graph = context.graph
 
         for _ in 1:anim_cfg.num_steps_per_frame
-            step_info = @timed step!(system, system.int_cfg)
+            step_info = @timed step!(system)
             push!(exec_info.times, step_info.time)
             exec_info.sym_time += system.int_cfg.dt
         end
