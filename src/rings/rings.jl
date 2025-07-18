@@ -8,8 +8,9 @@ import Mavi
 @kwdef struct RingsInfo{T}
     continuos_pos::Array{T, 3}
     areas::Vector{Float64}
+    neighbors_count::Array{Int, 2}
 end
-
+ 
 @kwdef struct DebugInfo{T}
     graph_pos::Matrix{T}
     graph_radius::Vector{Float64}
@@ -32,8 +33,9 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg)
     end
 
     info = RingsInfo(
-        continuos_pos = similar(state.rings_pos),
-        areas = Vector{Float64}(undef, size(state.rings_pos)[3]),
+        continuos_pos=similar(state.rings_pos),
+        areas=Vector{Float64}(undef, size(state.rings_pos, 3)),
+        neighbors_count=zeros(Int, size(state.pos, 2), Threads.nthreads())
     )
 
     num_total_p = length(state.pos)
@@ -64,6 +66,19 @@ end
 
 @inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}) where {U<:Number, T, I}
     return dynamic_cfg.num_particles
+end
+
+function Mavi.Systems.get_num_total_particles(system, state::RingsState)
+    num_p = 0
+    if state.types === nothing
+        num_p = size(state.pos, 2)
+    else
+        for t in state.types
+            num_p += system.dynamic_cfg.num_particles[t]
+        end
+    end
+
+    return num_p
 end
 
 function Mavi.Systems.particles_radius(system, dynamic_cfg::RingsCfg)

@@ -57,6 +57,7 @@ function main()
         fps=60,    
         num_steps_per_frame=300,
         exec_times_size=100,
+        graph_cfg=CircleGraphCfg(colors_map=:magma),
     )
 
     animate(system, Mavi.Integration.newton_step!, anim_cfg)

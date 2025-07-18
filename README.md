@@ -47,6 +47,7 @@ A `System` should be integrated by a function that executes one time step at a t
 
 ```julia
 function step!(system)
+    clean_forces(system) # Sets forces array to zero
     calc_forces!(system) # Calculates all the forces
     update!(system)      # Integrates equations of motion
     walls!(system)       # Resolves wall collisions
@@ -139,10 +140,10 @@ The step function should evolve a `System` in one time step. The actions usually
 - integrate equations of motion
 - resolve wall collisions    
 
-Mavi already has a general system to compute pair interactions, some ready to use functions to integrate equations of motion (such as Newton's Second Law) and wall collisions resolvers.
+Mavi already has a general system to compute pair interactions, some ready to use functions to integrate equations of motion (such as Newton's Second Law) and wall collisions resolvers, but users are free to create their own methods as specified below.
 
 ## How to use custom forces?
-Forces are calculated based on `DynamicCfg` with the function `calc_interaction(i, j, state, dynamic_cfg, space_cfg)` (which is in the module `Mavi.Integration` and in the file [`integration.jl`](src/integration.jl)). So, one can use custom forces creating a new `DynamicCfg` and a method for `calc_interaction`
+Forces are calculated based on `DynamicCfg` with the function `calc_interaction(i, j, dynamic_cfg, system)` (which is in the module `Mavi.Integration` and in the file [`integration.jl`](src/integration.jl)). So, one can use custom forces creating a new `DynamicCfg` and a method for `calc_interaction`
 
 Example: Let's create a constant radial force (with modulus `force`) applied only when the distance between particles is less than `min_dist`
 
@@ -157,8 +158,8 @@ struct RadialForce <: DynamicCfg
 end
 
 # Creating new method used in the forces calculation.
-function Integration.calc_interaction(i, j, state, dynamic_cfg::RadialForce, space_cfg)
-    dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
+    dx, dy, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist

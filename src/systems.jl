@@ -1,11 +1,16 @@
 module Systems
 
-export System, particles_radius
+export System, particles_radius, get_forces, clean_forces, get_num_total_particles
 
 using Mavi.States: State
 using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
+
+mutable struct TimeInfo
+    num_steps::Int
+    time::Float64
+end
 
 """
 Base struct that represent a system of particles.
@@ -32,11 +37,13 @@ struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCf
     diffs::Array{T, 3}
     
     """
-    Total force of all particles
+    Total force of all particles. One should use get_forces(system) to
+    get a Num "Dimensions X Num Particles" matrix.
 
-    forces[d, i] = Total force on particle i in dimension d.
+    forces[d, i, thread id] = Total force on particle i in dimension d.
     """
-    forces::Array{T, 2}
+    forces::Array{T, 3}
+    # forces_local::Union{Array{T, 3}, Nothing}
     
     """
     Distance between all particles
@@ -48,6 +55,8 @@ struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCf
     "Number of particles"
     num_p::Int
 
+    time_info::TimeInfo
+
     info::InfoT
     debug_info::DebugT
 end
@@ -56,10 +65,21 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
     end
+
+    num_forces_slices = 1
+    if int_cfg.device isa Threaded
+        num_forces_slices = Threads.nthreads()
+    end
+
     num_p = size(state.pos)[2]
     diffs = Array{T, 3}(undef, 2, num_p, num_p)
-    forces = Array{T, 2}(undef, 2, num_p)
+    forces = Array{T, 3}(undef, 2, num_p, num_forces_slices)
     dists = zeros(T, num_p, num_p)
+
+    # forces_local = nothing
+    # if int_cfg.device isa Threaded
+    #     forces_local =  Array{T, 3}(undef, 2, num_p, num_forces_slices)
+    # end
 
     chunks = nothing
     # if typeof(int_cfg) == ChunksIntCfg
@@ -75,12 +95,20 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
             chunks_space_cfg, state, minimum(particle_radius(dynamic_cfg)), extra_info=dynamic_cfg)
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p, info, debug_info)
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p, TimeInfo(0, 0.01), info, debug_info)
 end
+
+@inline get_forces(system) = @view system.forces[:, :, 1]
+
+@inline clean_forces(system) = system.forces .= 0
 
 function particles_radius(system, dynamic_cfg)
     p_radius = particle_radius(dynamic_cfg)
     fill(p_radius, system.num_p)
 end
 
+@inline get_num_total_particles(system, state) = size(state.pos, 2)
+
+@inline get_num_total_particles(system) = get_num_total_particles(system, system.state)
+    
 end

@@ -80,6 +80,7 @@ function create_system(;num_cols, num_rows)
         geometry_cfg = geometry_cfg,
         wall_type = Configs.PeriodicWalls(),
     )
+    
     state = RingsState(
         rings_pos = rings_pos,
         pol = InitStates.random_pol(num_rings),
@@ -133,15 +134,10 @@ function main()
     end
     
     anim_cfg = AnimationCfg(
-        num_steps_per_frame=10,
-        graph_cfg=DefaultGraphCfg(colors_map=colors),
+        graph_cfg=CircleGraphCfg(colors_map=colors),
     )
-    animate(system, Integration.step!, anim_cfg)
 
-    # while true
-    # for _ in 1:10
-    #     Integration.step!(system, system.int_cfg)
-    # end
+    animate(system, Integration.step!, anim_cfg)
 end
 
 end

@@ -1,10 +1,10 @@
 module SystemGraphs
 
-export GraphCfg, DefaultGraphCfg, CircleGraphCfg
-export DefaultGraph, CircleGraph
+export GraphCfg, MainGraphCfg, CircleCfg, ScatterGraphCfg
+export MainGraph, CircleGraphCfg, ScatterGraphCfg
 
-using GLMakie
-using Mavi.Systems: System, particles_radius
+using GLMakie, ColorSchemes, DataStructures
+using Mavi.Systems
 using Mavi.States: State
 using Mavi.Configs
 
@@ -69,8 +69,120 @@ function update_circles!(circle_points, circle_base, pos)
     end
 end
 
-
 abstract type GraphCfg end
+abstract type Graph end
+abstract type GraphCompCfg <: GraphCfg end
+abstract type GraphComp <: Graph end
+
+struct ScatterGraphCfg{C, KW, F} <: GraphCompCfg
+    colors_map::C
+    kwargs::KW
+    update_data::F
+end
+function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothing)
+    if colors_map isa Vector{Symbol}
+        colors_map = RGBf.(GLMakie.to_color.(colors_map))
+    end
+
+    if update_data === nothing
+        update_data = update_graph_data
+    end
+
+    if kwargs === nothing
+        kwargs = ()
+    end
+
+    ScatterGraphCfg(colors_map, kwargs, update_data)
+end
+
+struct ScatterGraph{O} <: GraphComp
+    types::Vector{Int}
+    obs_list::O
+    cfg::ScatterGraphCfg
+end
+
+function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
+    data = get_graph_data(cfg, system, system.state)
+    colors = Vector{RGBf}(undef, size(system.state.pos, 2))
+
+    types_obs = Observable(data.types)
+    colors_obs = lift(types_obs) do types
+        get_colors(cfg.colors_map, colors, types)
+    end
+    
+    scatter!(ax, pos_obs; color=colors_obs, cfg.kwargs...)
+        
+    ScatterGraph(data.types, (types_obs=types_obs,), cfg)
+end
+
+struct CircleGraphCfg{C, F} <: GraphCompCfg
+    circle_radius::Float64
+    circle_rel::Int
+    colors_map::C
+    update_data::F
+end
+function CircleGraphCfg(;circle_radius=-1.0, circle_rel=20, colors_map=:random, 
+    update_data=nothing)
+    # if colors_map === nothing
+    #     colors_map = RGBf(GLMakie.to_color(:black))
+    # end
+
+    if colors_map isa Vector{Symbol}
+        colors_map = RGBf.(GLMakie.to_color.(colors_map))
+    end
+
+    if update_data === nothing
+        update_data = update_graph_data
+    end
+
+    CircleGraphCfg(circle_radius, circle_rel, colors_map, update_data)
+end
+
+struct CircleGraph{C, O} <: GraphComp
+    types::Vector{Int}
+    colors::Vector{C}
+    obs_list::O
+    cfg::CircleGraphCfg
+end
+
+function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
+    if cfg.circle_radius == -1
+        radius = particles_radius(system, system.dynamic_cfg)
+    else
+        if cfg.circle_radius <: Number
+            radius = fill(cfg.circle_radius, size(data.pos, 2)) 
+        elseif length(cfg.circle_radius) != size(data.pos, 2)
+            throw(ArgumentError(
+                "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
+                "the same as number of particles ($(size(data.pos, 2)))"
+            ))
+        end
+    end
+
+    data = get_graph_data(cfg, system, system.state)
+    colors = Vector{RGBf}(undef, size(system.state.pos, 2))
+
+    types_obs = Observable(data.types)
+    colors_obs = lift(types_obs) do types
+        get_colors(cfg.colors_map, colors, types[1:get_num_total_particles(system)])
+    end
+
+    function points_to_circle(pos)
+        [Circle(Point2f(pos[1, i], pos[2, i]), radius[i]) for i in axes(pos, 2)]
+    end
+
+    poly!(ax,
+        lift(pos_obs) do pos
+            points_to_circle(pos)
+        end,
+        # color = :dodgerblue,
+        color=colors_obs,
+        strokecolor=:black,
+        strokewidth=0.5,
+    )
+
+    CircleGraph(data.types, colors, (types_obs=types_obs,), cfg)
+end
 
 """
 Drawn every particle with a circumference and a central point.
@@ -81,131 +193,126 @@ Drawn every particle with a circumference and a central point.
 - circle_rel:  
     How many vertices used to draw circles.
 """
-struct DefaultGraphCfg <: GraphCfg
-    circle_radius::Float64
-    circle_rel::Int
-    colors_map::Vector{RGBf}
+struct MainGraphCfg{T<:Tuple} <: GraphCfg
+    comps_cfgs::T
 end
-function DefaultGraphCfg(;circle_radius=-1.0, circle_rel=20, colors_map=nothing)
-    if colors_map === nothing
-        colors_map = [RGBf(GLMakie.to_color(:black))]
-    end
-
-    if colors_map isa Vector{Symbol}
-        colors_map = RGBf.(GLMakie.to_color.(colors_map))
-    end
-
-    DefaultGraphCfg(circle_radius, circle_rel, colors_map)
+function MainGraphCfg(comps::AbstractVector)
+    MainGraphCfg(tuple(comp...))
+end
+function MainGraphCfg(comp::GraphCompCfg)
+    MainGraphCfg((comp,))
+end
+function MainGraphCfg()
+    MainGraphCfg(CircleGraphCfg())
 end
 
-struct DefaultGraph{T1, T2, T3}
-    ax::T1
-    pos_obs::T2
-    colors_obs::T3
-    cfg::DefaultGraphCfg
+struct MainGraph{A, T<:Number, O, C<:Tuple} <: Graph
+    ax::A
+    pos::Matrix{T}
+    pos_obs::O
+    components::C
+    cfg::MainGraphCfg
 end
 
-function get_graph_data(system, state) end
+function get_colors(cmap, colors, types)
+    try
+        cmap = colorschemes[cmap]
+    catch end
 
-function get_graph_data(graph_cfg::DefaultGraphCfg, system, state)
-    return (pos=state.pos, types=fill(1, size(state.pos)[2]))
-end
+    if cmap isa RGBf
+        colors .= cmap
+    elseif cmap isa Symbol 
+        if cmap == :random 
+            type_to_color = Dict(t => rand(RGBf) for t in unique(types))
 
-function get_colors(graph_cfg::DefaultGraphCfg, colors, types)
-    count = 1
-    for t in types
-        if graph_cfg.colors_map[t] == :random
-            colors[count] = rand(RGBf)
+            for idx in eachindex(colors)
+                colors[idx] = type_to_color[types[idx]]
+            end
         else
-            colors[count] = graph_cfg.colors_map[t]
+            colors .= RGBf(GLMakie.to_color(cmap))
         end
-        count += 1
+    elseif cmap isa ColorScheme
+        for idx in eachindex(colors)
+            colors[idx] = cmap[rand(Float64)]
+        end
+    else
+        count = 1
+        for t in types
+            if t > length(cmap) || t < 1
+                colors[count] = RGBf(GLMakie.to_color(:pink))
+            elseif cmap[t] == :random
+                colors[count] = rand(RGBf)
+            else
+                colors[count] = cmap[t]
+            end
+            count += 1
+        end
     end
-
     cv = @view colors[1:length(types)]
     return cv
 end
 
+function get_graph_data(graph_cfg::GraphCfg, system, state::State)
+    return (pos=state.pos, types=Vector(1:system.num_p), num_p=system.num_p)
+end
+
+update_graph_data(graph::Graph, system, state::State) = DefaultDict{Symbol, Bool}(false)
+
+@inline get_graph_data(graph::Graph, system) = get_graph_data(graph, system, system.state)
+@inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system, system.state)
+
 "Build the Graph respective to `cfg` using the given `grid_layout` from Makie."
-function get_graph(grid_layout, system, cfg::DefaultGraphCfg)
-    ax = Axis(grid_layout[1, 1], aspect=DataAspect())
-
-    data = get_graph_data(cfg, system, system.state)
-
-    pos_obs = Observable(data.pos)
-
-    colors = Vector{RGBf}(undef, size(data.pos, 2))
-    colors_obs = Observable(get_colors(cfg, colors, data.types))
+function get_graph(ax, system, cfg::MainGraphCfg)
+    data = get_graph_data(cfg, system, system.state)    
+    pos_view = @view data.pos[:, 1:data.num_p]
+    pos_obs = Observable(pos_view)
 
     drawn_borders(ax, system.space_cfg.geometry_cfg)
     
-    if cfg.circle_radius == -1
-        radius = particles_radius(system, system.dynamic_cfg)
-    else
-        if cfg.circle_radius <: Number
-            radius = fill(cfg.circle_radius, size(data.pos, 2)) 
-        elseif length(cfg.circle_radius) != 2
-            throw(ArgumentError(
-                "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
-                "the same as number of particles ($(size(data.pos, 2)))"
-            ))
-        end
+    graphs = Vector{GraphComp}()
+    for g in cfg.comps_cfgs
+        push!(graphs, get_graph(ax, pos_obs, system, g))
     end
-    
-    function points_to_circle(pos)
-        [Circle(Point2f(pos[1, i], pos[2, i]), radius[i]) for i in axes(pos, 2)]
-    end
-    
+
     # scatter!(ax, x_obs, y_obs, color=colors_obs)
     
     # Circles
-    poly!(ax,
-        lift(pos_obs) do pos
-            points_to_circle(pos)
-        end,
-        # color = :dodgerblue,
-        color = colors_obs,
-        strokecolor = :black,
-        strokewidth = 0.5,
-    )
+    # poly!(ax,
+    #     lift(pos_obs) do pos
+    #         points_to_circle(pos)
+    #     end,
+    #     # color = :dodgerblue,
+    #     color = colors_obs,
+    #     strokecolor = :black,
+    #     strokewidth = 0.5,
+    # )
 
-    DefaultGraph(ax, pos_obs, colors_obs, cfg)
+    # scatter_graph = nothing
+    # if !(scatter_cfg === nothing)
+    #     colors = Vector{RGBf}(undef, size(data.pos, 2))
+    #     sc_colors_obs = Observable(get_colors(cfg.scatter_cfg.colors_map, colors, data.types))
+    #     scatter!(pos_obs, color=colors_obs)
+        
+    #     scatter_graph = ScatterGraph(sc_colors_obs, cfg.scatter_cfg)
+    # end
+
+    graph = MainGraph(ax, data.pos, pos_obs, tuple(graphs...), cfg)
+    update_graph(graph, system)
+    graph
 end
 
-function update_graph(graph::DefaultGraph, system)
-    get_graph_data(graph.cfg, system, system.state)
-    notify(graph.pos_obs)
-end
-
-"""
-Drawn every particle as circle with given radius and color.
-"""
-struct CircleGraphCfg <: GraphCfg end
-
-mutable struct CircleGraph{T1, T2}
-    ax::T1
-    circles::T2
-end
-
-function update_circles!(graph, pos, radius, color)
-    for c in graph.circles
-        delete!(graph.ax, c)
+function update_graph(graph::MainGraph, system)
+    update_graph_data(graph, system)
+    for c in graph.components
+        to_update = c.cfg.update_data(c, system)
+        update_all = to_update === nothing
+        for (name, obs) in pairs(c.obs_list)
+            if update_all || to_update[name]
+                notify(obs)
+            end
+        end
     end
-
-    graph.circles = [mesh!(graph.ax, Circle(p, r), color=c, shading=NoShading) for (p, r, c) in zip(pos, radius, color)]
-end
-
-function get_graph(grid_layout, system, cfg::CircleGraphCfg)
-    ax = Axis(grid_layout[1, 1])
-    circles =  [mesh!(ax, Circle(Point2f(0, 0), 1.0), color=:red, shading=NoShading)]
-    drawn_borders(ax, system.space_cfg.geometry_cfg)
-    CircleGraph(ax, circles)
-end
-
-function update_graph(graph::CircleGraph, system)
-    data = get_graph_data(system, system.state)
-    new_pos = Point2f[(data.pos[1, i], data.pos[2, i]) for i in 1:size(data.pos)[2]]
-    update_circles!(graph, new_pos, data.radius, data.color)
+    notify(graph.pos_obs)
 end
 
 end

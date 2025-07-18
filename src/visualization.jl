@@ -1,12 +1,14 @@
 "Systems visualizations"
 module Visualization
 
-export animate
-export AnimationCfg, VideoCfg, DefaultInfoUICfg, DefaultGraphCfg, UiSettings, CircleGraphCfg
+export animate, random_colors
+export AnimationCfg, VideoCfg, UiSettings
+export DefaultInfoUICfg
+export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
 
 using GLMakie
 using Mavi.States: State
-using Mavi.Systems: System
+using Mavi.Systems
 using Mavi.Configs
 using DataStructures
 
@@ -15,6 +17,10 @@ include("gui/system_graph.jl")
 
 using .InfoUIs 
 using .SystemGraphs 
+
+function random_colors(num)
+    return [rand(RGBf) for _ in 1:num]
+end
 
 """
 # Arguments
@@ -49,13 +55,14 @@ info_cfg:
 - ui_settings:  
     General settings for the UI window.
 """
-@kwdef struct AnimationCfg{GraphT, InfoT}
-    graph_cfg::GraphT = DefaultGraphCfg()
+@kwdef struct AnimationCfg{GraphT, InfoT, K<:Union{Dict, Nothing}}
+    graph_cfg::GraphT = MainGraphCfg()
     info_cfg::InfoT = DefaultInfoUICfg()
     fps = 30
     num_steps_per_frame = 10
-    exec_times_size = 40
+    exec_times_size = 100
     ui_settings = UiSettings()
+    fig_kwargs::K=nothing
 end
 
 """
@@ -70,10 +77,17 @@ Save video configuration.
 - anim_cfg:
     Animation configurations.    
 """
-@kwdef struct VideoCfg{AnimT}
+struct VideoCfg{D<:Number, A<:AnimationCfg}
     path::String
-    duration::Float64
-    anim_cfg::AnimT=AnimationCfg()
+    duration::D
+    anim_cfg::A
+end
+function VideoCfg(;path, duration, anim_cfg=nothing)
+    if anim_cfg === nothing
+        anim_cfg = AnimationCfg()
+    end
+
+    VideoCfg(path, duration, anim_cfg)
 end
 
 """
@@ -99,35 +113,55 @@ end
 get_anim_cfg(cfg::AnimationCfg) = cfg
 get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 
+get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:GraphCfg, I} = anim_cfg.graph_cfg
+get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:SystemGraphs.GraphCompCfg, I} = MainGraphCfg(anim_cfg.graph_cfg)
+
 "Render, in real time, the system using the given step function."
-function animate(system::System, step!, cfg=AnimationCfg())
+function animate(system::System, step!, cfg=nothing)
     GLMakie.activate!(; title="Mavi")
 
+    if cfg === nothing
+        cfg = AnimationCfg()
+    end
+
+    is_video = typeof(cfg) <: VideoCfg
     anim_cfg = get_anim_cfg(cfg)
 
-    fig = Figure(
-        backgroundcolor = RGBf(0.98, 0.98, 0.98), 
-        # size = (1000, 700),
-    )
+    fig_kwargs = anim_cfg.fig_kwargs
+    if fig_kwargs === nothing
+        fig_kwargs = Dict()
+    end
+    if !haskey(fig_kwargs, :backgroundcolor)
+        fig_kwargs[:backgroundcolor] = RGBf(0.94, 0.94, 0.94)
+    end
+
+    fig = Figure(; fig_kwargs...)
 
     ui_settings = anim_cfg.ui_settings
 
-    system_gl = fig[1, 2] = GridLayout()
-    
-    sidebar_gl = fig[1, 1] = GridLayout()
-    info_gl = sidebar_gl[1, 1] = GridLayout(
-        halign=:left, 
-        valign=:top, 
-        tellwidth=false,
-    )
-    
-    rowsize!(sidebar_gl, 1, Relative(1))
-    colsize!(fig.layout, 1, Relative(ui_settings.sidebar_rel_length))
-    
-    Box(sidebar_gl[:, 1], cornerradius=5)
+    if !is_video
+        system_gl = fig[1, 2] = GridLayout()
+        system_ax = Axis(system_gl[1, 1], aspect=DataAspect())
 
-    info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
-    graph = SystemGraphs.get_graph(system_gl, system, anim_cfg.graph_cfg)
+        sidebar_gl = fig[1, 1] = GridLayout()
+        info_gl = sidebar_gl[1, 1] = GridLayout(
+            halign=:left, 
+            valign=:top, 
+            tellwidth=false,
+        )
+
+        rowsize!(sidebar_gl, 1, Relative(1))
+        colsize!(fig.layout, 1, Relative(ui_settings.sidebar_rel_length))
+        
+        Box(sidebar_gl[:, 1], cornerradius=5)
+        
+        info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
+    else
+        system_ax = Axis(fig[1, 1], aspect=DataAspect())
+        # system_ax = fig
+    end
+
+    graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
 
     exec_info = ExecInfo(0, 0, 
         CircularBuffer{Float64}(anim_cfg.exec_times_size), 
@@ -156,7 +190,6 @@ function animate(system::System, step!, cfg=AnimationCfg())
         SystemGraphs.update_graph(graph, system)
     end
     
-    is_video = typeof(cfg) <: VideoCfg
     if is_video
         num_frames = trunc(Int, anim_cfg.fps * cfg.duration)
         record(fig, cfg.path, 1:num_frames; framerate=anim_cfg.fps) do frame

@@ -55,7 +55,13 @@ function main()
             ),
         ),
     )
-    animate(system, Mavi.Integration.szabo_step!, AnimationCfg(num_steps_per_frame=10))
+
+    anim_cfg = AnimationCfg(
+        num_steps_per_frame=15,
+        graph_cfg=CircleGraphCfg(colors_map=:viridis),
+    )
+
+    animate(system, Mavi.Integration.szabo_step!, anim_cfg)
 end
 
 end

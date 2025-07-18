@@ -6,7 +6,7 @@ export update_verlet!, update_rtp!, update_szabo!
 
 using Base.Threads
 
-using Mavi.Systems: System
+using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
 using Mavi.ChunksMod
@@ -58,7 +58,10 @@ function calc_diffs_and_dists!(system::System, space_cfg)
 end
 
 "Return force on particle with id `i` exerted by particle with id `j`."
-function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg, space_cfg)
+function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
+    state = system.state
+    space_cfg = system.space_cfg
+
     x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     # Check interaction range
@@ -73,7 +76,10 @@ function calc_interaction(i, j, state::State, dynamic_cfg::HarmTruncCfg, space_c
     return fx, fy
 end
 
-function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg, space_cfg)
+function calc_interaction(i, j, dynamic_cfg::LenJonesCfg, system::System)
+    state = system.state
+    space_cfg = system.space_cfg
+    
     x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     sigma = dynamic_cfg.sigma
@@ -89,7 +95,10 @@ function calc_interaction(i, j, state::State, dynamic_cfg::LenJonesCfg, space_cf
     return fx, fy
 end
 
-function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
+function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
+    state = system.state
+    space_cfg = system.space_cfg
+
     dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     if dist > dynamic_cfg.r_max
@@ -107,7 +116,10 @@ function calc_interaction(i, j, state::State, dynamic_cfg::SzaboCfg, space_cfg)
     return fx, fy
 end
 
-function calc_interaction(i, j, state::State, dynamic_cfg::RunTumbleCfg, space_cfg)
+function calc_interaction(i, j, dynamic_cfg::RunTumbleCfg, system::System)
+    state = system.state
+    space_cfg = system.space_cfg
+
     x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     sigma = dynamic_cfg.sigma
@@ -131,8 +143,8 @@ end
 
 "Compute total forces on particles using chucks."
 function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
-    system.forces .= 0
-    
+    forces = get_forces(system)
+
     # Iteration over all chunks
     for col in 1:chunks.num_cols
         for row in 1:chunks.num_rows
@@ -147,13 +159,12 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
                 # Interaction between particles in the same chunk
                 for j in (i+1):np
                     p2_id = chunk[j]
-                    fx, fy = calc_interaction(p1_id, p2_id, 
-                        system.state, system.dynamic_cfg, system.space_cfg)
+                    fx, fy = calc_interaction(p1_id, p2_id, system.dynamic_cfg, system)
                     
-                    system.forces[1, p1_id] += fx
-                    system.forces[2, p1_id] += fy
-                    system.forces[1, p2_id] -= fx
-                    system.forces[2, p2_id] -= fy    
+                    forces[1, p1_id] += fx
+                    forces[2, p1_id] += fy
+                    forces[1, p2_id] -= fx
+                    forces[2, p2_id] -= fy    
                 end
                 
                 # Interaction of particles in neighboring chunks
@@ -164,12 +175,12 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
                         fx, fy = calc_interaction(p1_id, nei_chunk[j], 
-                            system.state, system.dynamic_cfg, system.space_cfg)
+                            system.dynamic_cfg, system)
                         
-                        system.forces[1, p1_id] +=  fx
-                        system.forces[2, p1_id] +=  fy
-                        system.forces[1, p2_id] -= fx
-                        system.forces[2, p2_id] -= fy        
+                        forces[1, p1_id] +=  fx
+                        forces[2, p1_id] +=  fy
+                        forces[1, p2_id] -= fx
+                        forces[2, p2_id] -= fy        
                     end
                 end
             end
@@ -178,10 +189,10 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
 end
 
 function calc_forces!(system::System, chunks::Chunks, device::Threaded)
-    forces_local = [zeros(size(system.forces)) for _ in 1:nthreads()]
+    # forces_local = [zeros(size(system.forces)) for _ in 1:nthreads()]
 
-    @threads :static for col in 1:chunks.num_cols
-        tid = threadid()
+    Threads.@threads :static for col in 1:chunks.num_cols
+        forces = @view system.forces[:, :, Threads.threadid()]
         for row in 1:chunks.num_rows
             np = chunks.num_particles_in_chunk[row, col]
             chunk = @view chunks.chunk_particles[1:np, row, col]
@@ -192,12 +203,12 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
                 for j in (i+1):np
                     p2_id = chunk[j]
                     fx, fy = calc_interaction(p1_id, p2_id, 
-                        system.state, system.dynamic_cfg, system.space_cfg)
+                        system.dynamic_cfg, system)
                     
-                    forces_local[tid][1, p1_id] += fx
-                    forces_local[tid][2, p1_id] += fy
-                    forces_local[tid][1, p2_id] -= fx
-                    forces_local[tid][2, p2_id] -= fy    
+                    forces[1, p1_id] += fx
+                    forces[2, p1_id] += fy
+                    forces[1, p2_id] -= fx
+                    forces[2, p2_id] -= fy    
                 end
                 for neighbor_id in neighbors
                     nei_np = chunks.num_particles_in_chunk[neighbor_id]
@@ -205,11 +216,11 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
                         fx, fy = calc_interaction(p1_id, nei_chunk[j], 
-                            system.state, system.dynamic_cfg, system.space_cfg)
-                        forces_local[tid][1, p1_id] +=  fx
-                        forces_local[tid][2, p1_id] +=  fy
-                        forces_local[tid][1, p2_id] -= fx
-                        forces_local[tid][2, p2_id] -= fy        
+                            system.dynamic_cfg, system)
+                        forces[1, p1_id] +=  fx
+                        forces[2, p1_id] +=  fy
+                        forces[1, p2_id] -= fx
+                        forces[2, p2_id] -= fy        
                     end
                 end
             end
@@ -217,25 +228,77 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
     end
 
     # Soma todas as forças locais no array global
-    system.forces .= 0
-    for f in forces_local
-        system.forces .+= f
-    end
+    get_forces(system) .= sum(system.forces, dims=3)
 end
+# function calc_forces!(system::System, chunks::Chunks, device::Threaded)
+#     # chunk_locks = Vector{Threads.ReentrantLock}(undef, chunks.num_cols * chunks.num_rows)
+#     chunk_locks = Matrix{Threads.ReentrantLock}(undef, chunks.num_rows, chunks.num_cols)
+#     for i in 1:chunks.num_rows
+#         for j in 1:chunks.num_cols
+#             chunk_locks[i, j] = Threads.ReentrantLock()
+#         end
+#     end
+
+#     forces = system.forces 
+#     forces .= 0
+
+#     # @threads for col in 1:chunks.num_cols
+#     #     for row in 1:chunks.num_rows
+#     @threads for cart_idx in CartesianIndices((chunks.num_rows, chunks.num_cols))
+#             np = chunks.num_particles_in_chunk[cart_idx]
+#             chunk = @view chunks.chunk_particles[1:np, cart_idx]
+#             neighbors = chunks.neighbors[cart_idx]
+            
+#             for i in 1:np
+#                 p1_id = chunk[i]
+#                 for j in (i+1):np
+#                     p2_id = chunk[j]
+#                     fx, fy = calc_interaction(p1_id, p2_id, 
+#                         system.state, system.dynamic_cfg, system.space_cfg)
+                    
+#                     lock(chunk_locks[cart_idx]) do
+#                         forces[1, p1_id] += fx
+#                         forces[2, p1_id] += fy
+#                         forces[1, p2_id] -= fx
+#                         forces[2, p2_id] -= fy    
+#                     end
+#                 end
+#                 for neighbor_id in neighbors
+#                     nei_np = chunks.num_particles_in_chunk[neighbor_id]
+#                     nei_chunk = @view chunks.chunk_particles[1:nei_np, neighbor_id]
+#                     for j in 1:nei_np
+#                         p2_id = nei_chunk[j]
+#                         fx, fy = calc_interaction(p1_id, nei_chunk[j], 
+#                             system.state, system.dynamic_cfg, system.space_cfg)
+                        
+#                         lock(chunk_locks[cart_idx]) do
+#                             forces[1, p1_id] +=  fx
+#                             forces[2, p1_id] +=  fy
+#                         end
+#                         lock(chunk_locks[neighbor_id]) do
+#                             forces[1, p2_id] -= fx
+#                             forces[2, p2_id] -= fy
+#                         end        
+#                     end
+#                 end
+#             end
+#         end
+#     # end
+# end
 
 "Compute total forces on particles."
 function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
-    system.forces .= 0
+    forces = get_forces(system)
 
     N = system.num_p
     for i in 1:N
         for j in i+1:N
-            fx, fy = calc_interaction(i, j, system.state, system.dynamic_cfg, system.space_cfg)
+            fx, fy = calc_interaction(i, j, system.dynamic_cfg, system)
             
-            system.forces[1, i] +=  fx
-            system.forces[2, i] +=  fy
-            system.forces[1, j] -= fx
-            system.forces[2, j] -= fy   
+            forces[1, i] +=  fx
+            forces[2, i] +=  fy
+            forces[1, j] -= fx
+            forces[2, j] -= fy   
         end
     end
 end
@@ -299,27 +362,31 @@ function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{
     end
 end
 
+@inline walls!(system::System) = walls!(system, system.space_cfg, system.dynamic_cfg)
+@inline walls!(system::System, space_cfg::SpaceCfg, dynamic_cfg::DynamicCfg) = walls!(system, system.space_cfg)
 
 "Update state using Velocity-Verlet"
 function update_verlet!(system::System, calc_forces_in!)
     state = system.state
-    old_forces = copy(system.forces)
+    forces = get_forces(system)
+    old_forces = copy(forces)
 
     dt = system.int_cfg.dt
 
     # Update positions
     term = dt^2/2 # quadratic term on accelerated movement
-    state.pos .+= state.vel * dt + system.forces * term
+    state.pos .+= state.vel * dt + forces * term
 
-    calc_forces_in!(system, system.chunks)
+    clean_forces(system)
+    calc_forces_in!(system)
 
     # Update velocities
-    state.vel .+= dt/2 * (system.forces + old_forces)
+    state.vel .+= dt/2 * (forces + old_forces)
 end
 
 function update_szabo!(system::System)
     state::SelfPropelledState = system.state
-    
+    forces = get_forces(system)
     dt = system.int_cfg.dt
 
     dynamic_cfg = system.dynamic_cfg
@@ -330,8 +397,8 @@ function update_szabo!(system::System)
         theta = state.pol_angle[i]
         pol_x, pol_y = cos(theta), sin(theta) 
 
-        vel_x = vo * pol_x + mu * system.forces[1, i]
-        vel_y = vo * pol_y + mu * system.forces[2, i]
+        vel_x = vo * pol_x + mu * forces[1, i]
+        vel_y = vo * pol_y + mu * forces[2, i]
         
         speed = sqrt(vel_x^2 + vel_y^2)
     
@@ -350,7 +417,8 @@ end
 
 function update_rtp!(system::System)
     state::SelfPropelledState = system.state
-    
+    forces = get_forces(system)
+
     dt = system.int_cfg.dt
 
     dynamic_cfg = system.dynamic_cfg
@@ -360,8 +428,8 @@ function update_rtp!(system::System)
         theta = state.pol_angle[i]
         pol_x, pol_y = cos(theta), sin(theta) 
 
-        vel_x = vo * pol_x + system.forces[1, i]
-        vel_y = vo * pol_y + system.forces[2, i]
+        vel_x = vo * pol_x + forces[1, i]
+        vel_y = vo * pol_y + forces[2, i]
         
         speed = sqrt(vel_x^2 + vel_y^2)
         
@@ -379,6 +447,7 @@ end
 
 "Advance system one time step."
 function newton_step!(system::System)
+    clean_forces(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_verlet!(system, calc_forces!)
@@ -386,6 +455,7 @@ function newton_step!(system::System)
 end
 
 function szabo_step!(system::System)
+    clean_forces(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_szabo!(system)
@@ -393,6 +463,7 @@ function szabo_step!(system::System)
 end
 
 function rtp_step!(system::System)
+    clean_forces(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_rtp!(system)

@@ -13,7 +13,7 @@ using Mavi.Visualization
 
 function create_system(;num_particles, num_cols, num_rows)
     interaction_cfg = Configs.HarmTruncCfg(
-        k_rep=13,
+        k_rep=20,
         k_atr=1,
         dist_eq=1,
         dist_max=1 + 0.1,
@@ -26,7 +26,7 @@ function create_system(;num_particles, num_cols, num_rows)
         mobility=1.0,
         rot_diff=0.05,
         k_area=1.0,
-        k_spring=10.0,
+        k_spring=20.0,
         l_spring=1.0,
         num_particles=num_particles,
         interaction_finder=interaction_cfg,
@@ -50,17 +50,21 @@ function create_system(;num_particles, num_cols, num_rows)
         pol=InitStates.random_pol(num_rings),
     )
 
+    bbox = space_cfg.geometry_cfg
+    max_size = interaction_cfg.dist_max * 1.1
+    num_x_chunks = floor(Int, bbox.length / max_size)
+    num_y_chunks = floor(Int, bbox.height / max_size)
+
     system = RingsSystem(
         state=state,
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
         int_cfg=Configs.IntCfg(
             dt=0.01,
-            chunks_cfg=Configs.ChunksCfg(44, 44)
+            chunks_cfg=Configs.ChunksCfg(num_x_chunks, num_y_chunks),
+            device=Configs.Threaded(),
         ),
     )
-
-    print(typeof(system))
 
     return system
 end
@@ -71,19 +75,12 @@ function main()
         num_cols=13,
         num_rows=13,
     )
-    
-    colors = []
-    for _ in 1:size(system.state.rings_pos, 3)
-        push!(colors, rand(Visualization.RGBf))
-    end
-    
-    anim_cfg = AnimationCfg(
-        num_steps_per_frame=10,
-        graph_cfg=DefaultGraphCfg(
-            colors_map=colors,
-        ),
-    )
 
+    anim_cfg = AnimationCfg(
+        num_steps_per_frame=15,
+        graph_cfg=CircleGraphCfg(),
+    )
+    
     animate(system, Integration.step!, anim_cfg)
 end
 

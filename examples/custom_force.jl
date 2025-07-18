@@ -1,12 +1,11 @@
 """
-Example: Custom Forces
+Example: Custom Force
 
-This example demonstrates how to define and use a custom pairwise force
-in a particle simulation using the Mavi.jl framework. A new force type,
-`RadialForce`, is implemented, which applies a constant repulsive force
-between particles within a specified minimum distance. The simulation
-initializes a grid of particles and visualizes their dynamics under this
-custom interaction.
+This example demonstrates how to define and use a custom pairwise force. 
+A new force type, `RadialForce`, is implemented, which applies a constant 
+repulsive force between particles within a specified minimum distance. 
+The simulation initializes a grid of particles and visualizes their 
+dynamics under this custom interaction.
 """
 module Example
 
@@ -22,8 +21,8 @@ end
 
 Configs.particle_radius(dynamic_cfg::DynamicCfg) = dynamic_cfg.min_dist/2
 
-function Integration.calc_interaction(i, j, state, dynamic_cfg::RadialForce, space_cfg)
-    dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
+    dx, dy, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist
@@ -74,9 +73,8 @@ function main()
     )
 
     anim_cfg = AnimationCfg(
-        fps=60,    
         num_steps_per_frame=300,
-        exec_times_size=100,
+        graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
     animate(system, Mavi.Integration.newton_step!, anim_cfg)

@@ -46,9 +46,7 @@ function main()
     end
 
     anim_cfg = AnimationCfg(
-        info_cfg=DefaultInfoUICfg(
-            custom_items = get_energy
-        )
+        info_cfg=DefaultInfoUICfg(custom_items=get_energy),
     )
 
     animate(system, Integration.newton_step!, anim_cfg)

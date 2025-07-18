@@ -1,11 +1,13 @@
 module Integration
     
-import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces!
+import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces!, walls!
+import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
+
 using Mavi.Rings: get_num_particles
+using Mavi.Systems
 using Mavi.Rings.Configs
 using Mavi.Rings.States
-import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
-using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls 
+using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls
 
 export step!
 
@@ -15,6 +17,15 @@ end
 
 @inline get_ring_id(idx, num_particles) = div(idx-1, num_particles) + 1
 
+@inline get_particle_id(idx, num_particles) = idx - (get_ring_id(idx, num_particles) - 1) * num_particles
+@inline get_particle_id(idx, num_particles, ring_id) = idx - (ring_id - 1) * num_particles
+
+@inline function get_particle_ring_id(idx, num_particles)
+    ring_id = get_ring_id(idx, num_particles)
+    particle_id = get_particle_id(idx, num_particles, ring_id)
+    return particle_id, ring_id
+end
+    
 function update_chunks!(chunks::Chunks{T, StateT, InfoT}) where {T, StateT<:RingsState, InfoT}
     chunks.num_particles_in_chunk .= 0
     for ring_id in get_active_ids(chunks.state)
@@ -24,18 +35,31 @@ function update_chunks!(chunks::Chunks{T, StateT, InfoT}) where {T, StateT<:Ring
     end
 end
 
-function calc_interaction(i, j, state, dynamic_cfg::RingsCfg, space_cfg)
+function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     r1 = get_ring_id(i, num_max_particles(dynamic_cfg))
     r2 = get_ring_id(j, num_max_particles(dynamic_cfg))
-    interaction_cfg = get_interaction_cfg(r1, r2, state, dynamic_cfg.interaction_finder)
-    return calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg, space_cfg)
+    interaction_cfg = get_interaction_cfg(r1, r2, system.state, dynamic_cfg.interaction_finder)
+    return calc_interaction_force(i, j, interaction_cfg, system)
 end
 
-function calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg::HarmTruncCfg, space_cfg)
+function calc_interaction_force(i, j, interaction_cfg::HarmTruncCfg, system::System)
+    state = system.state
+    space_cfg = system.space_cfg
+    dynamic_cfg = system.dynamic_cfg
+
     dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
     
+    if dist < 2*Configs.particle_radius(interaction_cfg) * 1.1
+        r1 = get_ring_id(i, size(state.rings_pos, 2))
+        r2 = get_ring_id(j, size(state.rings_pos, 2))
+        if r1 != r2
+            system.info.neighbors_count[i, Threads.threadid()] += 1
+            system.info.neighbors_count[j, Threads.threadid()] += 1
+        end
+    end
+
     if dist > interaction_cfg.dist_max
-        return [0.0, 0.0]
+        return 0.0, 0.0
     end
 
     num_max_particles = size(state.rings_pos)[2]
@@ -47,7 +71,7 @@ function calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg::HarmT
         num_p = get_num_particles(dynamic_cfg, state, ring_id1) 
         
         if diff == 1 || diff == num_p - 1
-            return [0.0, 0.0]     
+            return 0.0, 0.0     
         end
     end
 
@@ -59,11 +83,11 @@ function calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg::HarmT
         fx = fmod * dx / dist 
         fy = fmod * dy / dist
         
-        return [fx, fy]
+        return fx, fy
     end
     
     if ring_id1 == ring_id2
-        return [0.0, 0.0]
+        return 0.0, 0.0
     end
     
     # compute atr force
@@ -72,7 +96,7 @@ function calc_interaction_force(i, j, state, dynamic_cfg, interaction_cfg::HarmT
     fx = fmod * dx / dist # unit vector x_ij/dist
     fy = fmod * dy / dist
     
-    return [fx, fy]
+    return fx, fy
 end
 
 function springs_force(first_id, second_id, ring_id, state, rings_cfg, space_cfg)
@@ -80,6 +104,8 @@ function springs_force(first_id, second_id, ring_id, state, rings_cfg, space_cfg
     p2_id = to_scalar_idx(rings_cfg, ring_id, second_id)
     dx, dy, dist = calc_diff_and_dist(p1_id, p2_id, state.pos, space_cfg)
     
+    # k = rings_cfg.k_spring
+    # l = rings_cfg.l_spring
     if !has_types_func(state)
         k = rings_cfg.k_spring
         l = rings_cfg.l_spring
@@ -94,21 +120,25 @@ function springs_force(first_id, second_id, ring_id, state, rings_cfg, space_cfg
     spring_fx = dx/dist * fmod
     spring_fy = dy/dist * fmod
 
-    return [spring_fx, spring_fy]
+    return spring_fx, spring_fy
 end
 
-function cross_prod(v1, v2)
+@inline function cross_prod(v1, v2)
     return v1[1] * v2[2] - v1[2] * v2[1]
 end
 
 function calc_area(ring_pos)
     area = 0.0
-    num_points = size(ring_pos)[2] 
+    num_points = size(ring_pos, 2) 
 
     for i in 1:(num_points - 1)
-        area += cross_prod(ring_pos[:, i], ring_pos[:, i+1])
+        p1 = @view ring_pos[:, i]
+        p2 = @view ring_pos[:, i+1]
+        area += cross_prod(p1, p2)
     end
-    area += cross_prod(ring_pos[:, end], ring_pos[:, 1])
+    p1 = @view ring_pos[:, end]
+    p2 = @view ring_pos[:, 1]
+    area += cross_prod(p1, p2)
     return area / 2.0
 end
 
@@ -116,7 +146,7 @@ function update_continuos_pos!(system, wall_type) end
 
 function update_continuos_pos!(system, wall_type::PeriodicWalls)
     continuos_pos = system.info.continuos_pos
-    for ring_id in get_active_ids(system.state)
+    Threads.@threads for ring_id in get_active_ids(system.state)
         continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
         for i in 2:get_num_particles(system.dynamic_cfg, system.state, ring_id) 
             i_idx = to_scalar_idx(system.dynamic_cfg, ring_id, i)
@@ -147,10 +177,18 @@ function area_forces!(system)
         l0 = system.dynamic_cfg.l_spring
         num_particles = get_num_particles(system.dynamic_cfg)
     end
+    
+    # Threads.@threads for ring_id in get_active_ids(system.state)
+    #     area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
+    #     system.info.areas[ring_id] = area
+    # end
+
+    forces = get_forces(system)
 
     for ring_id in get_active_ids(system.state)
         area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
         system.info.areas[ring_id] = area
+        # area = system.info.areas[ring_id]
 
         if has_types
             ring_type = system.state.types[ring_id]
@@ -177,7 +215,7 @@ function area_forces!(system)
             
             id1_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, id1)
             id2_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, id2)
-            dx, dy, _ = calc_diff_and_dist(id2_scalar, id1_scalar, system.state.pos, system.space_cfg)
+            @inbounds dx, dy, _ = calc_diff_and_dist(id2_scalar, id1_scalar, system.state.pos, system.space_cfg)
 
             a_deriv_x = 1/2 * dy
             a_deriv_y = -1/2 * dx
@@ -186,8 +224,8 @@ function area_forces!(system)
             fy = -fmod * a_deriv_y
             
             idx_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, i)
-            system.forces[1, idx_scalar] += fx
-            system.forces[2, idx_scalar] += fy
+            forces[1, idx_scalar] += fx
+            forces[2, idx_scalar] += fy
         end
     end
 end
@@ -198,6 +236,7 @@ function forces!(system)
     state = system.state
     dynamic_cfg = system.dynamic_cfg
     space_cfg = system.space_cfg
+    forces = get_forces(system)
 
     for ring_id in get_active_ids(state)
         num_particles = get_num_particles(dynamic_cfg, state, ring_id)
@@ -213,10 +252,10 @@ function forces!(system)
             p1_id = to_scalar_idx(system.dynamic_cfg, ring_id, first_id)
             p2_id = to_scalar_idx(system.dynamic_cfg, ring_id, second_id)
 
-            system.forces[1, p1_id] += fx
-            system.forces[2, p1_id] += fy        
-            system.forces[1, p2_id] -= fx
-            system.forces[2, p2_id] -= fy        
+            forces[1, p1_id] += fx
+            forces[2, p1_id] += fy        
+            forces[1, p2_id] -= fx
+            forces[2, p2_id] -= fy        
         end
     end
 
@@ -224,7 +263,7 @@ function forces!(system)
 end
 
 "Periodic walls"
-function walls!(system, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}) where T 
+function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}, dynamic_cfg::RingsCfg) where T 
     state = system.state
     geometry_cfg = space_cfg.geometry_cfg
     center = (geometry_cfg.bottom_left[1] + geometry_cfg.length/2, geometry_cfg.bottom_left[2] + geometry_cfg.height/2)
@@ -245,7 +284,7 @@ function walls!(system, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}) whe
     end
 end
 
-function walls!(system, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}) where T
+function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}, dynamic_cfg::RingsCfg) where T
     state = system.state
     lines = space_cfg.geometry_cfg.lines
     p_radius = Configs.particle_radius(system.dynamic_cfg)
@@ -305,7 +344,8 @@ end
 
 function update!(system)
     state = system.state
-    
+    forces = get_forces(system)
+
     dt = system.int_cfg.dt
 
     state = system.state
@@ -335,8 +375,8 @@ function update!(system)
         for i in 1:num_particles
             p_id = to_scalar_idx(dynamic_cfg, ring_id, i)
 
-            vel_x = vo * pol_x + mu * system.forces[1, p_id]
-            vel_y = vo * pol_y + mu * system.forces[2, p_id]
+            vel_x = vo * pol_x + mu * forces[1, p_id]
+            vel_y = vo * pol_y + mu * forces[2, p_id]
             
             vel_cm_x += vel_x
             vel_cm_y += vel_y
@@ -361,9 +401,14 @@ end
 function step!(system)
     update_chunks!(system.chunks)
     update_continuos_pos!(system, system.space_cfg.wall_type)
+    
+    system.info.neighbors_count .= 0
+    clean_forces(system)
     forces!(system)
+    system.info.neighbors_count[:, 1] .= sum(system.info.neighbors_count, dims=2)
+    
     update!(system)
-    walls!(system, system.space_cfg)
+    walls!(system)
 end
 
 end

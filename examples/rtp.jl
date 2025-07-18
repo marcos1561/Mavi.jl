@@ -28,7 +28,7 @@ function main()
         num_p_x,
         num_p_y,
         1, # offset
-        particle_radius(dynamic_cfg), # radius
+        particle_radius(dynamic_cfg),
     )
 
     space_cfg = SpaceCfg(
