@@ -1,8 +1,12 @@
 """
-Simple exemple using Run-and-Tumble model
+Example: Run-and-Tumble
+
+Simple example using Run-and-Tumble model
 """
+module Example
 
 using Mavi
+using Mavi.States
 using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
@@ -24,7 +28,7 @@ function main()
         num_p_x,
         num_p_y,
         1, # offset
-        particle_radius(dynamic_cfg), # radius
+        particle_radius(dynamic_cfg),
     )
 
     space_cfg = SpaceCfg(
@@ -39,7 +43,7 @@ function main()
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
-        int_cfg=ChunksIntCfg(
+        int_cfg=IntCfg(
             dt=0.001,
             chunks_cfg=ChunksCfg(
                 num_cols=num_p_x-1, 
@@ -54,4 +58,8 @@ function main()
         AnimationCfg(num_steps_per_frame=100),
     )
 end
-main()
+
+end
+
+import .Example
+Example.main()

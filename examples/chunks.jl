@@ -1,11 +1,15 @@
 """
-Example creating many particles to demonstrate the difference
+Example: Using Chunks
+
+This example creates many particles to demonstrate the difference
 in performance between using chunks or not.
 """
+module Example
 
-using Mavi: Mavi, Visualization
+using Mavi
 using Mavi.Configs
 using Mavi.InitStates
+using Mavi.Visualization
 
 function main()
     # Set to false to see the performance without chunks.
@@ -20,26 +24,26 @@ function main()
     dynamic_cfg = HarmTruncCfg(10, 1, 1)
     radius = particle_radius(dynamic_cfg)
 
-    pos, geometry_cfg = InitStates.rectangular_grid(num_p_x, num_p_y, offset, radius)
+    pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
     state = Mavi.SecondLawState{Float64}(
         pos=pos,
-        vel=InitStates.random_vel(num_p, 1/5),
+        vel=random_vel(num_p, 1/5),
     )
 
-    if use_chunks
-        int_cfg = ChunksIntCfg(
-            dt=0.001,
-            chunks_cfg=ChunksCfg(
-                num_cols=trunc(Int, num_p_x*0.9), 
-                num_rows=trunc(Int, num_p_y*0.9),
-            ),
-        ) 
-    else
-        int_cfg = int_cfg=IntCfg(dt=0.001)
+    chunks_cfg = nothing
+    if use_chunks    
+        chunks_cfg = ChunksCfg(
+            num_cols=trunc(Int, num_p_x*0.9), 
+            num_rows=trunc(Int, num_p_y*0.9),
+        )
     end
+    
+    int_cfg = IntCfg(
+        dt=0.001,
+        chunks_cfg=chunks_cfg,
+    )
 
-
-    system = Mavi.System(
+    system = System(
         state=state, 
         space_cfg=SpaceCfg(
             wall_type=RigidWalls(),
@@ -53,8 +57,13 @@ function main()
         fps=60,    
         num_steps_per_frame=300,
         exec_times_size=100,
+        graph_cfg=CircleGraphCfg(colors_map=:magma),
     )
 
-    Visualization.animate(system, Mavi.Integration.step!, anim_cfg)
+    animate(system, Mavi.Integration.newton_step!, anim_cfg)
 end
-main()
+
+end
+
+import .Example
+Example.main()

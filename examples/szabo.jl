@@ -1,14 +1,18 @@
 """
+Example: Szabo
+
 Simple exemple using Szabo model
 """
+module Example
 
 using Mavi
+using Mavi.States
 using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
 
 function main()
-    num_particles = 50
+    num_particles = 200
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))
@@ -43,7 +47,7 @@ function main()
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
-        int_cfg=ChunksIntCfg(
+        int_cfg=IntCfg(
             dt=0.01,
             chunks_cfg=ChunksCfg(
                 num_cols=num_p_x-1, 
@@ -52,6 +56,15 @@ function main()
         ),
     )
 
-    animate(system, Mavi.Integration.szabo_step!, AnimationCfg(num_steps_per_frame=10))
+    anim_cfg = AnimationCfg(
+        num_steps_per_frame=15,
+        graph_cfg=CircleGraphCfg(colors_map=:viridis),
+    )
+
+    animate(system, Mavi.Integration.szabo_step!, anim_cfg)
 end
-main()
+
+end
+
+import .Example
+Example.main()

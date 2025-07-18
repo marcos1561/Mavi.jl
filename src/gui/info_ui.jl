@@ -31,6 +31,7 @@ end
 struct DefaultInfoUI
     sym_time_obs::Observable{String}
     exec_times_obs::Observable{String}
+    exec_times_ui_obs::Observable{String}
     custom_items::Observable{String}
     configs::DefaultInfoUICfg
 end
@@ -49,20 +50,26 @@ function get_info_ui(grid_layout, cfg::DefaultInfoUICfg)
     exec_time = Observable("Δt: 0 ms")
     Label(grid_layout[2, 1], exec_time, halign=:left, padding=padding)
     
-    custom_items = Observable("")
-    Label(grid_layout[3, 1], custom_items, halign=:left, padding=padding,
+    exec_time_ui = Observable("FPS:")
+    Label(grid_layout[3, 1], exec_time_ui, halign=:left, padding=padding)
+    
+    custom_items = Observable(" ")
+    Label(grid_layout[4, 1], custom_items, halign=:left, padding=padding,
         justification=:left)
 
-    DefaultInfoUI(sym_time, exec_time, custom_items, cfg)
+    DefaultInfoUI(sym_time, exec_time, exec_time_ui, custom_items, cfg)
 end
 
 function update_info_ui(info::DefaultInfoUI, exec_info, system)
     exec_times = exec_info.times
+    exec_times_ui = exec_info.times_ui
     sym_time = exec_info.sym_time
 
     mean_exec_time = sum(exec_times)/length(exec_times) * 1000
+    mean_exec_time_ui = sum(exec_times_ui)/length(exec_times_ui)
     info.sym_time_obs[] = @sprintf("t: %.3f", sym_time)
     info.exec_times_obs[] = @sprintf("Δt: %.3f ms", mean_exec_time)
+    info.exec_times_ui_obs[] = @sprintf("FPS: %.2f", 1/mean_exec_time_ui)
 
     if !isnothing(info.configs.custom_items)
         items = info.configs.custom_items(system, exec_info)
