@@ -1,6 +1,6 @@
 module Systems
 
-export System, particles_radius, get_forces, clean_forces, get_num_total_particles
+export System, particles_radius, get_forces, clean_forces!, get_num_total_particles
 
 using Mavi.States: State
 using Mavi.SpaceChecks
@@ -100,7 +100,7 @@ end
 
 @inline get_forces(system) = @view system.forces[:, :, 1]
 
-@inline clean_forces(system) = system.forces .= 0
+@inline clean_forces!(system) = system.forces .= 0
 
 function particles_radius(system, dynamic_cfg)
     p_radius = particle_radius(dynamic_cfg)

@@ -163,7 +163,7 @@ A `System` should be integrated by a function that executes one time step at a t
 
 ```julia
 function step!(system)
-    clean_forces(system) # Sets forces array to zero
+    clean_forces!(system) # Sets forces array to zero
     calc_forces!(system) # Calculates all the forces
     update!(system)      # Integrates equations of motion
     walls!(system)       # Resolves wall collisions

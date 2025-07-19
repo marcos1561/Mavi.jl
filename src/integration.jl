@@ -378,7 +378,7 @@ function update_verlet!(system::System, calc_forces_in!)
     term = dt^2/2 # quadratic term on accelerated movement
     state.pos .+= state.vel * dt + forces * term
 
-    clean_forces(system)
+    clean_forces!(system)
     calc_forces_in!(system)
 
     # Update velocities
@@ -448,7 +448,7 @@ end
 
 "Advance system one time step."
 function newton_step!(system::System)
-    clean_forces(system)
+    clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_verlet!(system, calc_forces!)
@@ -456,7 +456,7 @@ function newton_step!(system::System)
 end
 
 function szabo_step!(system::System)
-    clean_forces(system)
+    clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_szabo!(system)
@@ -464,7 +464,7 @@ function szabo_step!(system::System)
 end
 
 function rtp_step!(system::System)
-    clean_forces(system)
+    clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
     update_rtp!(system)

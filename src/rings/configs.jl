@@ -1,6 +1,6 @@
 module Configs
 
-export RingsCfg, num_max_particles, has_types_cfg
+export RingsCfg, has_types_cfg
 export HarmTruncCfg
 export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
 export IntCfg
@@ -91,14 +91,6 @@ function RingsCfg(;
         p0, relax_time, vo, mobility, rot_diff, 
         k_area, k_spring, l_spring, num_particles, num_types, interaction_finder,
     )
-end
-
-@inline function num_max_particles(dynamic_cfg::RingsCfg{U, T, F}) where {U<:AbstractVector, T, F}
-    maximum(dynamic_cfg.num_particles)
-end
-
-@inline function num_max_particles(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F}
-    dynamic_cfg.num_particles
 end
 
 @inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F} = false

@@ -35,27 +35,27 @@ function update_graph_data(cfg::MainGraph, system, state::RingsState)
     end
 end
 
-function get_graph_data(system, state::RingsState)
-    info = system.debug_info
-    pos, radius, color = info.graph_pos, info.graph_radius, info.graph_color
+# function get_graph_data(system, state::RingsState)
+#     info = system.debug_info
+#     pos, radius, color = info.graph_pos, info.graph_radius, info.graph_color
 
-    colors = [:red, :blue]
+#     colors = [:red, :blue]
 
-    idx = 1
-    for ring_id in get_active_ids(state)
-        ring_type = state.types[ring_id]
-        for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
-            pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
-            pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
+#     idx = 1
+#     for ring_id in get_active_ids(state)
+#         ring_type = state.types[ring_id]
+#         for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
+#             pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
+#             pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
             
-            radius_i = get_interaction_cfg(ring_type, ring_type, system.dynamic_cfg.interaction_finder).dist_eq / 2.0
-            radius[idx] = radius_i
-            color[idx] = colors[ring_type]
+#             radius_i = get_interaction_cfg(ring_type, ring_type, system.dynamic_cfg.interaction_finder).dist_eq / 2.0
+#             radius[idx] = radius_i
+#             color[idx] = colors[ring_type]
             
-            idx += 1
-        end
-    end
+#             idx += 1
+#         end
+#     end
 
-    count = idx-1
-    return (pos=pos[:, 1:count], radius=radius[1:count], color=color[1:count])    
-end
+#     count = idx-1
+#     return (pos=pos[:, 1:count], radius=radius[1:count], color=color[1:count])    
+# end

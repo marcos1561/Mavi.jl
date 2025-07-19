@@ -5,25 +5,22 @@ export get_num_particles
 
 import Mavi
 
-@kwdef struct RingsInfo{T}
-    continuos_pos::Array{T, 3}
-    areas::Vector{Float64}
-    neighbors_count::Array{Int, 2}
-end
- 
-@kwdef struct DebugInfo{T}
-    graph_pos::Matrix{T}
-    graph_radius::Vector{Float64}
-    graph_color::Vector{Symbol}
-    graph_type::Vector{Int}
-end
-
 include("states.jl")
 include("configs.jl")
+include("neighbors.jl")
 using .States
 using .Configs
+using .NeighborsMod
 
-function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg)
+@kwdef struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}}
+    continuos_pos::Array{T, 3}
+    areas::Vector{T}
+    p_neigh::PN
+    r_neigh::RN
+end
+
+function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothing,
+    r_neighbors=nothing,)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
             error("DynamicCfg has multiple types, but state.types is nothing!")
@@ -32,18 +29,35 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg)
         end
     end
 
+    if !isnothing(r_neighbors) 
+        num_max_neighbors = r_neighbors.only_count == true ? 15 : nothing 
+
+        r_neighbors = Neighbors(
+            num_entities=size(state.ring_pos, 3),
+            num_max_neighbors=num_max_neighbors,
+            device=int_cfg.device,
+        )   
+    end
+
+    if !isnothing(p_neighbors) 
+        num_max_neighbors = p_neighbors.only_count == true ? 15 : nothing 
+
+        neigh = Neighbors(
+            num_entities=size(state.pos, 2),
+            num_max_neighbors=num_max_neighbors,
+            device=int_cfg.device,
+        )   
+        p_neighbors = ParticleNeighbors(
+            neighbors=neigh,
+            type=p_neighbors.type,
+            num_max_particles=num_max_particles(state),
+        )
+    end
+
     info = RingsInfo(
         continuos_pos=similar(state.rings_pos),
         areas=Vector{Float64}(undef, size(state.rings_pos, 3)),
-        neighbors_count=zeros(Int, size(state.pos, 2), Threads.nthreads())
-    )
-
-    num_total_p = length(state.pos)
-    debug_info = DebugInfo(
-        graph_pos = similar(state.pos),
-        graph_radius = Vector{Float64}(undef, num_total_p),
-        graph_color = Vector{Symbol}(undef, num_total_p),
-        graph_type = Vector{Int}(undef, num_total_p),
+        p_neigh=p_neighbors, r_neigh=r_neighbors,
     )
 
     Mavi.System(
@@ -52,7 +66,6 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg)
         dynamic_cfg=dynamic_cfg, 
         int_cfg=int_cfg, 
         info=info, 
-        debug_info=debug_info,
     )
 end
 

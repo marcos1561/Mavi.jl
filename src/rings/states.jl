@@ -1,6 +1,7 @@
 module States
 
 export RingsState, get_active_ids, has_types_func
+export num_max_particles, get_ring_id, get_particle_id, get_particle_ring_id, to_scalar_idx
 
 import Mavi
 
@@ -35,5 +36,24 @@ end
 
 @inline is_variable_number(state::RingsState{U, Nothing}) where U = false
 @inline is_variable_number(state::RingsState{U, Vector{Int}}) where U = true
+
+
+@inline num_max_particles(state::RingsState) = size(state.rings_pos, 2)
+
+@inline function to_scalar_idx(state, ring_id, particle_id)
+    (ring_id - 1) * num_max_particles(state) + particle_id
+end
+
+@inline get_ring_id(idx, num_max_particles) = div(idx-1, num_max_particles) + 1
+
+@inline get_particle_id(idx, num_max_particles) = idx - (get_ring_id(idx, num_max_particles) - 1) * num_max_particles
+@inline get_particle_id(idx, num_max_particles, ring_id) = idx - (ring_id - 1) * num_max_particles
+
+@inline function get_particle_ring_id(idx, num_particles)
+    ring_id = get_ring_id(idx, num_particles)
+    particle_id = get_particle_id(idx, num_particles, ring_id)
+    return particle_id, ring_id
+end
+
 
 end
