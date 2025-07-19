@@ -61,6 +61,7 @@ info_cfg:
     fps = 30
     num_steps_per_frame = 10
     exec_times_size = 100
+    begin_paused = false
     ui_settings = UiSettings()
     fig_kwargs::K=nothing
 end
@@ -131,34 +132,81 @@ function animate(system::System, step!, cfg=nothing)
     if fig_kwargs === nothing
         fig_kwargs = Dict()
     end
-    if !haskey(fig_kwargs, :backgroundcolor)
-        fig_kwargs[:backgroundcolor] = RGBf(0.94, 0.94, 0.94)
-    end
+    # if !haskey(fig_kwargs, :backgroundcolor)
+    #     fig_kwargs[:backgroundcolor] = RGBf(0.94, 0.94, 0.94)
+    # end
 
     fig = Figure(; fig_kwargs...)
 
     ui_settings = anim_cfg.ui_settings
-
+    run_status = Observable(!anim_cfg.begin_paused)
+    run_next_frame = false
+    
     if !is_video
         system_gl = fig[1, 2] = GridLayout()
         system_ax = Axis(system_gl[1, 1], aspect=DataAspect())
 
-        sidebar_gl = fig[1, 1] = GridLayout()
+        main_sidebar_gl = fig[1, 1] = GridLayout()
+
+        sidebar_gl = main_sidebar_gl[1, 1] = GridLayout()
+        Box(sidebar_gl[1, 1], cornerradius=5)
+        Box(sidebar_gl[2, 1], cornerradius=5)
+        
         info_gl = sidebar_gl[1, 1] = GridLayout(
             halign=:left, 
             valign=:top, 
             tellwidth=false,
         )
-
-        rowsize!(sidebar_gl, 1, Relative(1))
-        colsize!(fig.layout, 1, Relative(ui_settings.sidebar_rel_length))
         
-        Box(sidebar_gl[:, 1], cornerradius=5)
+        control_gl = sidebar_gl[2, 1] = GridLayout(
+            halign=:left, 
+            valign=:top, 
+            tellwidth=false,
+        )
+        rowsize!(control_gl, 1, Fixed(1))
+
+        button_label = lift(run_status) do st
+            if st
+                return "Running"
+            else 
+                return "Stopped"
+            end
+        end
+        start_stop_button = control_gl[2, 1] = Button(fig, 
+            label=button_label,
+            width=Relative(0.9),
+        )
+        on(start_stop_button.clicks) do n
+            run_status[] = !run_status[]
+            notify(run_status)
+        end
+        
+        run_next_frame_button = control_gl[3, 1] = Button(fig, 
+            label="Run Next Frame",
+            width=Relative(0.9),
+        )
+        on(run_next_frame_button.clicks) do n
+            if !run_status[]
+                run_next_frame = true
+            end   
+        end
+
+        # Box(main_sidebar_gl[:, 1], cornerradius=5)
+        # Box(sidebar_gl[1, 1], color = (:blue, 0.1), strokecolor = :transparent)
+        # Box(sidebar_gl[2, 1], color = (:red, 0.1), strokecolor = :transparent)
+        Box(sidebar_gl[1, 1], cornerradius=5)
+        # Box(sidebar_gl[2, 1], cornerradius=5)
+
+        colsize!(fig.layout, 1, Relative(ui_settings.sidebar_rel_length))
+        rowsize!(main_sidebar_gl, 1, Relative(1))
+        
+        rowsize!(sidebar_gl, 1, Relative(1/2))
+        rowsize!(sidebar_gl, 2, Relative(1/2))
+        
         
         info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
     else
         system_ax = Axis(fig[1, 1], aspect=DataAspect())
-        # system_ax = fig
     end
 
     graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
@@ -173,6 +221,7 @@ function animate(system::System, step!, cfg=nothing)
         system=system,
         graph=graph,
         exec_info=exec_info,
+        run_status=true,
     )
 
     function make_frame(context)
@@ -200,7 +249,19 @@ function animate(system::System, step!, cfg=nothing)
         time_wait = 1/anim_cfg.fps 
         while isopen(fig.scene) 
             t1 = time()
-            make_frame(context)
+            
+            run_frame = false
+            if run_status[]
+                run_frame = true
+            elseif run_next_frame
+                run_next_frame = false
+                run_frame = true
+            end
+            
+            if run_frame
+                make_frame(context)
+            end
+            
             InfoUIs.update_info_ui(info, exec_info, system)
             time_to_wait = time_wait - (time() - t1)
             if time_to_wait < 0

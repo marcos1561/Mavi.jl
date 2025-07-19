@@ -128,10 +128,10 @@ Truncated harmonic potencial configuration.
 - ra:   
     Maximum distance for which the potential is nonzero
 """
-@kwdef struct HarmTruncCfg <: DynamicCfg 
-    ko::Float64
-    ro::Float64
-    ra::Float64
+@kwdef struct HarmTruncCfg{T<:Number} <: DynamicCfg 
+    ko::T
+    ro::T
+    ra::T
 end
 
 """
@@ -144,27 +144,27 @@ Lennard-Jones potential.
 - epsilon:   
     Depth of the potential well.
 """
-@kwdef struct LenJonesCfg <: DynamicCfg
-    sigma::Float64
-    epsilon::Float64
+@kwdef struct LenJonesCfg{T<:Number} <: DynamicCfg
+    sigma::T
+    epsilon::T
 end
 
-@kwdef struct SzaboCfg <: DynamicCfg
-    vo::Float64
-    mobility::Float64
-    relax_time::Float64
-    k_rep::Float64
-    k_adh::Float64
-    r_eq::Float64
-    r_max::Float64
-    rot_diff::Float64
+@kwdef struct SzaboCfg{T<:Number} <: DynamicCfg
+    vo::T
+    mobility::T
+    relax_time::T
+    k_rep::T
+    k_adh::T
+    r_eq::T
+    r_max::T
+    rot_diff::T
 end
 
-@kwdef struct RunTumbleCfg <: DynamicCfg
-    vo::Float64
-    sigma::Float64
-    epsilon::Float64
-    tumble_rate::Float64
+@kwdef struct RunTumbleCfg{T<:Number} <: DynamicCfg
+    vo::T
+    sigma::T
+    epsilon::T
+    tumble_rate::T
 end
 
 particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2

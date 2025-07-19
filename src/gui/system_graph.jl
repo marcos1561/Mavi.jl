@@ -197,7 +197,7 @@ struct MainGraphCfg{T<:Tuple} <: GraphCfg
     comps_cfgs::T
 end
 function MainGraphCfg(comps::AbstractVector)
-    MainGraphCfg(tuple(comp...))
+    MainGraphCfg(tuple(comps...))
 end
 function MainGraphCfg(comp::GraphCompCfg)
     MainGraphCfg((comp,))
