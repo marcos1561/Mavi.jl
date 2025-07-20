@@ -21,8 +21,6 @@ function update_chunks!(chunks::Chunks{T, StateT, InfoT}) where {T, StateT<:Ring
     end
 end
 
-function calc_num_neighbors(neighbors_count::Nothing, diff_dist, interaction_cfg, state) end
-
 function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     ri = get_ring_id(i, num_max_particles(system.state))
     rj = get_ring_id(j, num_max_particles(system.state))
@@ -32,9 +30,7 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     
     dist = diff_dist[end]
     max_dist = 2 * Configs.particle_radius(interaction_cfg)
-    neigh_update!(system.info.p_neigh, i, j, dist, max_dist)
-    neigh_update!(system.info.r_neigh, i, j, dist, max_dist)
-    # calc_num_neighbors(system.info.neighbors_count, diff_dist, interaction_cfg, system.state) 
+    neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
 
     return calc_interaction_force(i, j, ri, rj, diff_dist, interaction_cfg, system)
 end
@@ -385,7 +381,7 @@ end
 
 function cleaning!(system)
     clean_forces!(system)
-    # neigh_clean!(system.info.p_neigh)
+    neigh_clean!(system.info.p_neigh)
     # neigh_clean!(system.info.r_neigh)
 end
 
@@ -395,7 +391,7 @@ function step!(system)
     
     cleaning!(system)
     forces!(system)
-    # neigh_sum_buffers(system.info.p_neigh)
+    neigh_sum_buffers(system.info.p_neigh)
     # neigh_sum_buffers(system.info.r_neigh)
     
     update!(system)

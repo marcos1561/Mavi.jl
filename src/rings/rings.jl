@@ -12,15 +12,16 @@ using .States
 using .Configs
 using .NeighborsMod
 
-@kwdef struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}}
+@kwdef struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, U}
     continuos_pos::Array{T, 3}
     areas::Vector{T}
     p_neigh::PN
     r_neigh::RN
+    user_data::U
 end
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothing,
-    r_neighbors=nothing,)
+    r_neighbors=nothing, user_data=nothing)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
             error("DynamicCfg has multiple types, but state.types is nothing!")
@@ -30,7 +31,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothin
     end
 
     if !isnothing(r_neighbors) 
-        num_max_neighbors = r_neighbors.only_count == true ? 15 : nothing 
+        num_max_neighbors = r_neighbors.only_count == false ? 15 : nothing 
 
         r_neighbors = Neighbors(
             num_entities=size(state.ring_pos, 3),
@@ -40,7 +41,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothin
     end
 
     if !isnothing(p_neighbors) 
-        num_max_neighbors = p_neighbors.only_count == true ? 15 : nothing 
+        num_max_neighbors = p_neighbors.only_count == false ? 15 : nothing 
 
         neigh = Neighbors(
             num_entities=size(state.pos, 2),
@@ -58,6 +59,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothin
         continuos_pos=similar(state.rings_pos),
         areas=Vector{Float64}(undef, size(state.rings_pos, 3)),
         p_neigh=p_neighbors, r_neigh=r_neighbors,
+        user_data=user_data,
     )
 
     Mavi.System(
