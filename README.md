@@ -21,6 +21,8 @@ Here are some `Mavi.jl` features:
 
 In addition to the core `Mavi` module, there is a module named `Mavi.Rings`, which implements active rings — a model used in this paper: ["Segregation in Binary Mixture with Differential Contraction among Active Rings"](https://link.aps.org/doi/10.1103/PhysRevLett.134.138401) by Teixeira, E., et al (Physical Review Letters, 2025).
 
+Check out `Mavi.jl` examples in [this folder](/examples/). Animations of these examples can be seen [here](https://www.youtube.com/watch?v=VgV9Pwx5TTA).
+
 # Installation
 The easiest way to install Mavi is:
 
@@ -163,7 +165,7 @@ A `System` should be integrated by a function that executes one time step at a t
 
 ```julia
 function step!(system)
-    clean_forces(system) # Sets forces array to zero
+    clean_forces!(system) # Sets forces array to zero
     calc_forces!(system) # Calculates all the forces
     update!(system)      # Integrates equations of motion
     walls!(system)       # Resolves wall collisions
