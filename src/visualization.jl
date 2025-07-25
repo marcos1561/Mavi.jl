@@ -5,6 +5,7 @@ export animate, random_colors
 export AnimationCfg, VideoCfg, UiSettings
 export DefaultInfoUICfg
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
+export drawn_borders
 
 using GLMakie
 using Mavi.States: State

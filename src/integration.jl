@@ -39,25 +39,6 @@ function calc_diff_and_dist(i, j, pos, space_cfg::SpaceCfg{PeriodicWalls, Rectan
     return dx, dy, dist
 end
 
-"Compute the difference and distance between all particles."
-function calc_diffs_and_dists!(system::System, space_cfg)
-    state = system.state
-
-    for i in 1:system.num_p
-        for j in i+1:system.num_p
-            x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
-
-            # Update values
-            system.diffs[1,i,j] = x_ij
-            system.diffs[1,j,i] = -x_ij
-            system.diffs[2,i,j] = y_ij
-            system.diffs[2,j,i] = -y_ij
-            system.dists[i,j] = dist
-            system.dists[j,i] = dist
-        end
-    end
-end
-
 "Return force on particle with id `i` exerted by particle with id `j`."
 function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
     state = system.state

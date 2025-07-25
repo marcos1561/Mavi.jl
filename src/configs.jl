@@ -3,6 +3,7 @@ module Configs
 
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg 
+export get_bounding_box 
 export RigidWalls, PeriodicWalls, SlipperyWalls
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksIntCfg, has_chunks
@@ -24,6 +25,16 @@ function RectangleCfg(;length, height, bottom_left=(0, 0))
     RectangleCfg(args[1:end-2]..., args[end-1:end])
 end
 
+function Base.:+(a::RectangleCfg, b::RectangleCfg)
+    max_x = max(a.bottom_left[1] + a.length, b.bottom_left[1] + b.length)
+    max_y = max(a.bottom_left[2] + a.height, b.bottom_left[2] + b.height)
+    min_x = min(a.bottom_left[1], b.bottom_left[1])
+    min_y = min(a.bottom_left[2], b.bottom_left[2])
+
+    height = max_y - min_y
+    length = max_x - min_x
+    RectangleCfg(length, height, (min_x, min_y))
+end
 
 struct Point2D{T}
     x::T
@@ -58,9 +69,11 @@ end
 
 @kwdef struct LinesCfg{T} <: GeometryCfg
     lines::Vector{Line2D{T}}
+    bbox::Union{RectangleCfg{T}, Nothing}
 end
-LinesCfg(points::AbstractVector) = LinesCfg([Line2D(ps...) for ps in points])
-
+function LinesCfg(lines::AbstractVector; bbox=nothing)
+    LinesCfg([Line2D(ps...) for ps in lines], bbox)
+end
 
 @kwdef struct CircleCfg <: GeometryCfg
     radius::Float64
@@ -79,6 +92,10 @@ function get_bounding_box(space_cfg::RectangleCfg{T}) where T
 end
 
 function get_bounding_box(space_cfg::LinesCfg)
+    if !isnothing(space_cfg.bbox)
+        return space_cfg.bbox
+    end
+
     xs = []
     ys = []
     for line in space_cfg.lines

@@ -33,7 +33,6 @@ function main()
     "Calculates and returns energies formatted for printing"
     function get_energy(system, exec_info)
         energys = []
-        Integration.calc_diffs_and_dists!(system, system.space_cfg)
 
         pe = potential_energy(system, system.dynamic_cfg)
         ke = kinetic_energy(state)

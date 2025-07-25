@@ -2,7 +2,7 @@ module Systems
 
 export System, particles_radius, get_forces, clean_forces!, get_num_total_particles
 
-using Mavi.States: State
+using Mavi.States
 using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
@@ -27,16 +27,6 @@ struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCf
     chunks::Union{Chunks, Nothing}
     
     """
-    Position difference between all particles
-    
-    diffs[d, i, j] = Position of particle i minus particle j in dimension d.
-
-    d=1: x axis
-    d=2: y axis
-    """
-    diffs::Array{T, 3}
-    
-    """
     Total force of all particles. One should use get_forces(system) to
     get a Num "Dimensions X Num Particles" matrix.
 
@@ -45,13 +35,6 @@ struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCf
     forces::Array{T, 3}
     # forces_local::Union{Array{T, 3}, Nothing}
     
-    """
-    Distance between all particles
-
-    dists[i, j] = Distance between particle i and j.
-    """
-    dists::Array{T, 2}
-
     "Number of particles"
     num_p::Int
 
@@ -72,9 +55,7 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
     end
 
     num_p = size(state.pos)[2]
-    diffs = Array{T, 3}(undef, 2, num_p, num_p)
     forces = Array{T, 3}(undef, 2, num_p, num_forces_slices)
-    dists = zeros(T, num_p, num_p)
 
     # forces_local = nothing
     # if int_cfg.device isa Threaded
@@ -95,7 +76,7 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
             chunks_space_cfg, state, minimum(particle_radius(dynamic_cfg)), extra_info=dynamic_cfg)
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p, TimeInfo(0, 0.01), info, debug_info)
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, num_p, TimeInfo(0, 0.01), info, debug_info)
 end
 
 @inline get_forces(system) = @view system.forces[:, :, 1]

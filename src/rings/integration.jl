@@ -60,7 +60,7 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, diff_dist, interaction
 
     if dist < dist_eq
         # compute rep force
-        fmod = -interaction_cfg.k_rep/dist_eq * (dist - dist_eq) # restoring force
+        fmod = -interaction_cfg.k_rep * (dist/dist_eq - 1) # restoring force
         fx = fmod * dx / dist 
         fy = fmod * dy / dist
         
@@ -72,8 +72,8 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, diff_dist, interaction
     end
     
     # compute atr force
-    adh_size = interaction_cfg.dist_max - dist_eq
-    fmod = -interaction_cfg.k_atr/adh_size*(dist - dist_eq) # restoring force
+    # adh_size = interaction_cfg.dist_max - dist_eq
+    fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1) # restoring force
     fx = fmod * dx / dist # unit vector x_ij/dist
     fy = fmod * dy / dist
     

@@ -103,6 +103,8 @@ function update_particle_chunk!(chunks, i)
     bottom_left = chunks.geometry_cfg.bottom_left
     chunk_l, chunk_h = chunks.chunk_length, chunks.chunk_height
 
+    # println(state.pos[:, i])
+
     row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
     col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
     

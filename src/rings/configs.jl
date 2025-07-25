@@ -49,13 +49,9 @@ end
     interaction.matrix[ring_type_1, ring_type_2]
 end
 
-@inline function get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionCfg) 
-    interaction
-end
+@inline get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionCfg) = interaction
 
-@inline function get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionCfg) 
-    interaction
-end
+@inline get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionCfg) = interaction
 
 struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFinderT<:Union{InteractionFinder{T}, T}} <: DynamicCfg
     p0::U

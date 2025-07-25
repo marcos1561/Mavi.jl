@@ -8,9 +8,10 @@ import Mavi
 include("states.jl")
 using .States
 
-@kwdef struct NeighborsCfg 
+@kwdef mutable struct NeighborsCfg 
     only_count::Bool = false
     type::Symbol = :all
+    tol::Float64 = 1.1
 end
 
 abstract type AbstractNeighbors end
@@ -18,9 +19,9 @@ abstract type AbstractNeighbors end
 struct Neighbors{L<:Union{AbstractArray, Nothing}} <: AbstractNeighbors
     list::L
     count::Array{Int, 2}
-    tol::Float64
+    cfg::NeighborsCfg
 end
-function Neighbors(;num_entities, num_max_neighbors, device, tol=1.1)
+function Neighbors(;num_entities, num_max_neighbors, device, cfg)
     num_slices = 1
     if device isa Mavi.Configs.Threaded
         num_slices = Threads.nthreads()
@@ -32,7 +33,7 @@ function Neighbors(;num_entities, num_max_neighbors, device, tol=1.1)
         neigh_array = fill(-1, (num_max_neighbors, num_entities, num_slices))
     end
 
-    Neighbors(neigh_array, neigh_count, tol)
+    Neighbors(neigh_array, neigh_count, cfg)
 end
 
 
@@ -114,7 +115,7 @@ end
 function neigh_update!(neighbors::Nothing, i, j, dist, max_dist) end
 
 function neigh_update!(neighbors::Neighbors, i, j, dist, max_dist)
-    if dist < max_dist * neighbors.tol
+    if dist < max_dist * neighbors.cfg.tol
         neigh_update_data!(neighbors, i, j)    
     end
 end
@@ -126,7 +127,7 @@ function neigh_update!(neighbors::ParticleNeighbors, i, j, ri, rj, dist, max_dis
     t = neighbors.type
     # println("$(dist), $(max_dist), $(inner_neigh.tol)")
 
-    if dist < max_dist * inner_neigh.tol && (t == :all || ri != rj)
+    if dist < max_dist * inner_neigh.cfg.tol && (t == :all || ri != rj)
         neigh_update_data!(inner_neigh, i, j)    
     end
 end

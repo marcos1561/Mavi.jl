@@ -2,6 +2,7 @@ module SystemGraphs
 
 export GraphCfg, MainGraphCfg, CircleCfg, ScatterGraphCfg
 export MainGraph, CircleGraphCfg, ScatterGraphCfg
+export drawn_borders
 
 using GLMakie, ColorSchemes, DataStructures
 using Mavi.Systems
@@ -25,10 +26,15 @@ end
 function drawn_borders(ax, space_cfg::RectangleCfg)
     l, h = space_cfg.length, space_cfg.height
     x, y = space_cfg.bottom_left
-    lines!(ax, [x, y], [x+l, y], color=:black)
-    lines!(ax, [x+l, y], [x+l, y+h], color=:black)
-    lines!(ax, [x+l, y+h], [x, y+h], color=:black)
-    lines!(ax, [y+h, x], [x, y], color=:black)
+    # lines!(ax, [x, y], [x+l, y], color=:black)
+    # lines!(ax, [x+l, y], [x+l, y+h], color=:black)
+    # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
+    # lines!(ax, [y+h, x], [x, y], color=:black)
+    
+    lines!(ax, [x, x+l], [y, y], color=:black)
+    lines!(ax, [x+l, x+l], [y+h, y], color=:black)
+    lines!(ax, [x+l, x], [y+h, y+h], color=:black)
+    lines!(ax, [x, x], [y+h, y], color=:black)
 
     dx = l*0.1
     dy = h*0.1

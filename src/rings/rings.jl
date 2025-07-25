@@ -20,7 +20,7 @@ using .NeighborsMod
     user_data::U
 end
 
-function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothing,
+function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=nothing,
     r_neighbors=nothing, user_data=nothing)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
@@ -40,17 +40,19 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors=nothin
         )   
     end
 
-    if !isnothing(p_neighbors) 
-        num_max_neighbors = p_neighbors.only_count == false ? 15 : nothing 
+    p_neighbors = nothing
+    if !isnothing(p_neighbors_cfg) 
+        num_max_neighbors = p_neighbors_cfg.only_count == false ? 15 : nothing 
 
         neigh = Neighbors(
             num_entities=size(state.pos, 2),
             num_max_neighbors=num_max_neighbors,
             device=int_cfg.device,
+            cfg=p_neighbors_cfg,
         )   
         p_neighbors = ParticleNeighbors(
             neighbors=neigh,
-            type=p_neighbors.type,
+            type=p_neighbors_cfg.type,
             num_max_particles=num_max_particles(state),
         )
     end
