@@ -45,8 +45,6 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, diff_dist, interaction
         return 0.0, 0.0
     end
 
-    # num_max_particles = num_max_particles(state)
-    
     if ring_id1 == ring_id2
         diff = abs(i - j)
         num_p = get_num_particles(dynamic_cfg, state, ring_id1) 
@@ -61,40 +59,33 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, diff_dist, interaction
     if dist < dist_eq
         # compute rep force
         fmod = -interaction_cfg.k_rep * (dist/dist_eq - 1) # restoring force
-        fx = fmod * dx / dist 
-        fy = fmod * dy / dist
-        
-        return fx, fy
+    elseif ring_id1 == ring_id2
+        fmod = 0.0
+    else
+        # compute atr force
+        # adh_size = interaction_cfg.dist_max - dist_eq
+        fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1) # restoring force
     end
-    
-    if ring_id1 == ring_id2
-        return 0.0, 0.0
-    end
-    
-    # compute atr force
-    # adh_size = interaction_cfg.dist_max - dist_eq
-    fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1) # restoring force
-    fx = fmod * dx / dist # unit vector x_ij/dist
+
+    fx = fmod * dx / dist
     fy = fmod * dy / dist
     
     return fx, fy
 end
 
-function springs_force(first_id, second_id, ring_id, state, rings_cfg, space_cfg)
-    p1_id = to_scalar_idx(state, ring_id, first_id)
-    p2_id = to_scalar_idx(state, ring_id, second_id)
+function springs_force(p1_id, p2_id, k, l, state, space_cfg)
     dx, dy, dist = calc_diff_and_dist(p1_id, p2_id, state.pos, space_cfg)
     
     # k = rings_cfg.k_spring
     # l = rings_cfg.l_spring
-    if !has_types_func(state)
-        k = rings_cfg.k_spring
-        l = rings_cfg.l_spring
-    else
-        ring_type = state.types[ring_id]
-        k = rings_cfg.k_spring[ring_type]
-        l = rings_cfg.l_spring[ring_type]
-    end
+    # if !has_types_func(state)
+    #     k = rings_cfg.k_spring
+    #     l = rings_cfg.l_spring
+    # else
+    #     ring_type = state.types[ring_id]
+    #     k = rings_cfg.k_spring[ring_type]
+    #     l = rings_cfg.l_spring[ring_type]
+    # end
 
     fmod = -k * (dist - l)         
 
@@ -221,6 +212,7 @@ function forces!(system)
 
     for ring_id in get_active_ids(state)
         num_particles = get_num_particles(dynamic_cfg, state, ring_id)
+        k, l = get_spring_pars(dynamic_cfg, state, ring_id)
         for spring_id in 1:num_particles
             first_id = spring_id
             second_id = spring_id + 1
@@ -228,10 +220,10 @@ function forces!(system)
                 second_id = 1
             end
 
-            fx, fy = springs_force(first_id, second_id, ring_id, state, dynamic_cfg, space_cfg) 
-            
             p1_id = to_scalar_idx(system.state, ring_id, first_id)
             p2_id = to_scalar_idx(system.state, ring_id, second_id)
+            
+            fx, fy = springs_force(p1_id, p2_id, k, l, state, space_cfg) 
 
             forces[1, p1_id] += fx
             forces[2, p1_id] += fy        

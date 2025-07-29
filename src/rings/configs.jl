@@ -1,6 +1,6 @@
 module Configs
 
-export RingsCfg, has_types_cfg
+export RingsCfg, has_types_cfg, get_spring_pars
 export HarmTruncCfg
 export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
 export IntCfg
@@ -91,6 +91,15 @@ end
 
 @inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F} = false
 @inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:AbstractVector, T, F} = true
+
+function get_spring_pars(dynamic_cfg::RingsCfg{U, T, F}, state=nothing, ring_id=nothing) where {U<:Number, T, F}
+    return dynamic_cfg.k_spring, dynamic_cfg.l_spring
+end
+
+function get_spring_pars(dynamic_cfg::RingsCfg{U, T, F}, state, ring_id) where {U<:AbstractVector, T, F}
+    t = state.types[ring_id]
+    return dynamic_cfg.k_spring[t], dynamic_cfg.l_spring[t]
+end
 
 function MaviCfg.particle_radius(dynamic_cfg::RingsCfg)
     p_radius = Vector{Float64}(undef, dynamic_cfg.num_types)

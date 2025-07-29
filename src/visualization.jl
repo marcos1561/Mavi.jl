@@ -8,16 +8,19 @@ export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
 export drawn_borders
 
 using GLMakie
+using DataStructures
+
 using Mavi.States: State
 using Mavi.Systems
 using Mavi.Configs
-using DataStructures
+using Mavi.Utils.Progress
 
 include("gui/info_ui.jl")
 include("gui/system_graph.jl")
 
 using .InfoUIs 
 using .SystemGraphs 
+
 
 function random_colors(num)
     return [rand(RGBf) for _ in 1:num]
@@ -56,7 +59,7 @@ info_cfg:
 - ui_settings:  
     General settings for the UI window.
 """
-@kwdef struct AnimationCfg{GraphT, InfoT, K<:Union{Dict, Nothing}}
+@kwdef struct AnimationCfg{GraphT, InfoT}
     graph_cfg::GraphT = MainGraphCfg()
     info_cfg::InfoT = DefaultInfoUICfg()
     fps = 30
@@ -64,7 +67,8 @@ info_cfg:
     exec_times_size = 100
     begin_paused = false
     ui_settings = UiSettings()
-    fig_kwargs::K=nothing
+    fig_kwargs::Union{Dict, Nothing} = nothing
+    ax_kwargs::Union{Dict, Nothing} = nothing
 end
 
 """
@@ -129,6 +133,11 @@ function animate(system::System, step!, cfg=nothing)
     is_video = typeof(cfg) <: VideoCfg
     anim_cfg = get_anim_cfg(cfg)
 
+    ax_kwargs = anim_cfg.ax_kwargs
+    if ax_kwargs === nothing
+        ax_kwargs = Dict()
+    end
+
     fig_kwargs = anim_cfg.fig_kwargs
     if fig_kwargs === nothing
         fig_kwargs = Dict()
@@ -145,7 +154,8 @@ function animate(system::System, step!, cfg=nothing)
     
     if !is_video
         system_gl = fig[1, 2] = GridLayout()
-        system_ax = Axis(system_gl[1, 1], aspect=DataAspect())
+        system_ax = Axis(system_gl[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        # system_ax = Axis(system_gl[1, 1]; aspect=DataAspect())
 
         main_sidebar_gl = fig[1, 1] = GridLayout()
 
@@ -207,7 +217,7 @@ function animate(system::System, step!, cfg=nothing)
         
         info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
     else
-        system_ax = Axis(fig[1, 1], aspect=DataAspect())
+        system_ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
     end
 
     graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
@@ -242,8 +252,14 @@ function animate(system::System, step!, cfg=nothing)
     
     if is_video
         num_frames = trunc(Int, anim_cfg.fps * cfg.duration)
-        record(fig, cfg.path, 1:num_frames; framerate=anim_cfg.fps) do frame
-            make_frame(context)
+        prog = ProgContinuos(init=1, final=num_frames)
+        record(fig, cfg.path; framerate=anim_cfg.fps) do io
+            for frame in 1:num_frames
+                make_frame(context)
+                recordframe!(io)
+                show_progress(prog, frame)
+            end
+            show_finish(prog)
         end
     else
         display(fig)
@@ -273,5 +289,7 @@ function animate(system::System, step!, cfg=nothing)
         end
     end
 end
+
+include("rings/view.jl")
 
 end

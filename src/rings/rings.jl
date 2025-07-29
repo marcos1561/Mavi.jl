@@ -116,7 +116,7 @@ end
 include("integration.jl")
 include("utils.jl")
 include("init_states.jl")
-include("view.jl")
+# include("view.jl")
 # include("space_checks.jl")
 
 end
