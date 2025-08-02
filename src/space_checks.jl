@@ -7,9 +7,20 @@ export check_inside
 
 "Return particles indices outside the given geometry configuration."
 function outside_particles(state::State, geometry_cfg::RectangleCfg) 
-    x_out = @. (state.pos[1, :] - geometry_cfg.bottom_left[1] < 0.0) | (state.pos[1, :] - geometry_cfg.bottom_left[1] > geometry_cfg.length)
-    y_out = @. (state.pos[2, :] - geometry_cfg.bottom_left[2] < 0.0) | (state.pos[2, :] - geometry_cfg.bottom_left[2] > geometry_cfg.height)
-    out_ids = findall(x_out .| y_out)
+    bottom_left = geometry_cfg.bottom_left
+    top_right = bottom_left .+ (geometry_cfg.length, geometry_cfg.height)
+    out_ids::Vector{Int} = []
+    for idx in eachindex(state.pos)
+        pos = state.pos[idx]
+        if any(pos .< bottom_left) || any(pos .> top_right)
+            push!(out_ids, idx)
+        end
+    end
+
+    # x_out = @. (state.pos[1, :] - geometry_cfg.bottom_left[1] < 0.0) | (state.pos[1, :] - geometry_cfg.bottom_left[1] > geometry_cfg.length)
+    # y_out = @. (state.pos[2, :] - geometry_cfg.bottom_left[2] < 0.0) | (state.pos[2, :] - geometry_cfg.bottom_left[2] > geometry_cfg.height)
+    # out_ids = findall(x_out .| y_out)
+    
     return out_ids
 end
 

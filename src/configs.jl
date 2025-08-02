@@ -10,19 +10,30 @@ export IntCfg, ChunksIntCfg, has_chunks
 export particle_radius, ChunksCfg
 export DeviceMode, Sequencial, Threaded
 
+using StaticArrays
+
 #
 # Space Configurations 
 #
 abstract type GeometryCfg end
 
-struct RectangleCfg{T<:Number} <: GeometryCfg
+struct RectangleCfg{N, T<:Number} <: GeometryCfg
     length::T
     height::T
-    bottom_left::Tuple{T, T}
+    bottom_left::SVector{N, T}
+    size::SVector{N, T}
 end
-function RectangleCfg(;length, height, bottom_left=(0, 0))
-    args = promote(length, height, bottom_left...)
-    RectangleCfg(args[1:end-2]..., args[end-1:end])
+function RectangleCfg(;length, height, bottom_left=0, num_dims=2)
+    if bottom_left === 0
+        length, height = promote(length, height)
+        bottom_left = SVector{num_dims, typeof(length)}(fill(0, num_dims))
+    else
+        length, height, bottom_left_correct_type... = promote(length, height, bottom_left...)
+        num_dims = length(bottom_left)
+        bottom_left = SVector(bottom_left_correct_type)
+    end
+
+    RectangleCfg(length, height, bottom_left, SVector(length, height))
 end
 
 function Base.:+(a::RectangleCfg, b::RectangleCfg)
@@ -33,7 +44,7 @@ function Base.:+(a::RectangleCfg, b::RectangleCfg)
 
     height = max_y - min_y
     length = max_x - min_x
-    RectangleCfg(length, height, (min_x, min_y))
+    RectangleCfg(length, height, SVector(min_x, min_y))
 end
 
 struct Point2D{T}

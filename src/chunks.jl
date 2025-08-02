@@ -5,12 +5,12 @@ export Chunks, update_chunks!
 using Mavi.States: State
 using Mavi.Configs
 
-struct Chunks{T, StateT<:State{T}, InfoT, RT}
+struct Chunks{N, T, StateT<:State, InfoT}
     num_cols::Int
     num_rows::Int
     chunk_length::Float64
     chunk_height::Float64
-    geometry_cfg::RectangleCfg{RT}
+    geometry_cfg::RectangleCfg{N, T}
     steps_to_update::Int
 
     state::StateT
@@ -21,7 +21,7 @@ struct Chunks{T, StateT<:State{T}, InfoT, RT}
     chunk_particles::Array{Int, 3}
     num_particles_in_chunk::Array{Int, 2}
 end
-function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{T}}, state, particle_r; extra_info=nothing) where {W, T}
+function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, state, particle_r; extra_info=nothing) where {W, N, T}
     neighbors = get_neighbors(num_rows, num_cols, space_cfg.wall_type)
     
     chunk_length = space_cfg.geometry_cfg.length / num_cols
@@ -105,20 +105,24 @@ function update_particle_chunk!(chunks, i)
 
     # println(state.pos[:, i])
 
-    row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
-    col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
-    
+    pos = state.pos[i]
+    @inbounds row_id = trunc(Int, div(-pos[2] + bottom_left[2] + space_h, chunk_h)) + 1
+    @inbounds col_id = trunc(Int, div(pos[1] - bottom_left[1], chunk_l)) + 1
+    # row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
+    # col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
+
     row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
     col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
 
-    p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
-    chunks.chunk_particles[p_i, row_id, col_id] = i 
-    chunks.num_particles_in_chunk[row_id, col_id] += 1
+    @inbounds p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
+    @inbounds chunks.chunk_particles[p_i, row_id, col_id] = i 
+    @inbounds chunks.num_particles_in_chunk[row_id, col_id] += 1
 end
 
 "Update particles chunk positions."
 function update_chunks!(chunks::Chunks)
-    num_p = size(chunks.state.pos)[2]
+    # num_p = size(chunks.state.pos)[2]
+    num_p = length(chunks.state.pos)
     chunks.num_particles_in_chunk .= 0
     for i in 1:num_p
         update_particle_chunk!(chunks, i)

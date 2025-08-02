@@ -167,6 +167,7 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
 
     data = get_graph_data(cfg, system, system.state)
     colors = Vector{RGBf}(undef, size(system.state.pos, 2))
+    # colors = Vector{RGBf}(undef, length(system.state.pos))
 
     types_obs = Observable(data.types)
     colors_obs = lift(types_obs) do types
@@ -174,7 +175,8 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     end
 
     function points_to_circle(pos)
-        [Circle(Point2f(pos[1, i], pos[2, i]), radius[i]) for i in axes(pos, 2)]
+        # [Circle(Point2f(pos[1, i], pos[2, i]), radius[i]) for i in axes(pos, 2)]
+        [Circle(Point2f(pos[i]), radius[i]) for i in eachindex(pos)]
     end
 
     poly!(ax,
@@ -212,9 +214,9 @@ function MainGraphCfg()
     MainGraphCfg(CircleGraphCfg())
 end
 
-struct MainGraph{A, T<:Number, O, C<:Tuple} <: Graph
+struct MainGraph{A, P, O, C<:Tuple} <: Graph
     ax::A
-    pos::Matrix{T}
+    pos::P
     pos_obs::O
     components::C
     cfg::MainGraphCfg
@@ -270,7 +272,8 @@ update_graph_data(graph::Graph, system, state::State) = DefaultDict{Symbol, Bool
 "Build the Graph respective to `cfg` using the given `grid_layout` from Makie."
 function get_graph(ax, system, cfg::MainGraphCfg)
     data = get_graph_data(cfg, system, system.state)    
-    pos_view = @view data.pos[:, 1:data.num_p]
+    # pos_view = @view data.pos[:, 1:data.num_p]
+    pos_view = @view data.pos[1:data.num_p]
     pos_obs = Observable(pos_view)
 
     drawn_borders(ax, system.space_cfg.geometry_cfg)
