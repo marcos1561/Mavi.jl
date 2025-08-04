@@ -14,9 +14,9 @@ using Mavi.Visualization
 function create_system(;num_particles, num_cols, num_rows)
     interaction_cfg = Configs.HarmTruncCfg(
         k_rep=20,
-        k_atr=1,
+        k_atr=4,
         dist_eq=1,
-        dist_max=1 + 0.1,
+        dist_max=1 + 0.2,
     )
 
     dynamic_cfg = Configs.RingsCfg(

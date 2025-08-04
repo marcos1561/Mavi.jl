@@ -14,42 +14,16 @@ using Mavi.Configs
 using Mavi.ChunksMod
 
 "Position difference (i - j) and distance between particle with id `i` and `j`"
-function calc_diff_and_dist(i, j, pos::Matrix, space_cfg)
-    dx = pos[1, i] - pos[1, j]
-    dy = pos[2, i] - pos[2, j]
-    dist = sqrt(dx^2 + dy^2)
-    return SVector(dx, dy), dist
-end
-
 @inline function calc_diff_and_dist(i, j, pos::Vector, space_cfg)
     @inbounds dr = pos[i] - pos[j]
     dist = sqrt(sum(abs2, dr))
     return dr, dist
 end
 
-function calc_diff_and_dist(i, j, pos::Matrix, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <: RectangleCfg
-    dx = pos[1, i] - pos[1, j]
-    dy = pos[2, i] - pos[2, j]
-    
-    geometry_cfg = space_cfg.geometry_cfg
-    length, height = geometry_cfg.length, geometry_cfg.height 
-    
-    if (abs(dx) > length * 0.5)
-        dx -= copysign(length, dx)
-    end
-
-    if (abs(dy) > height * 0.5)
-        dy -= copysign(height, dy)
-    end
-
-    dist = sqrt(dx^2 + dy^2)
-    return (dx, dy), dist
-end
-
 @inline function calc_diff_and_dist(i, j, pos::Vector, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <: RectangleCfg
     size_vec = space_cfg.geometry_cfg.size
     dr = pos[i] - pos[j]
-    dr = dr - (abs.(dr) .> size_vec / 2) .* copysign.(size_vec, dr)
+    dr = dr - (abs.(dr) .> (size_vec / 2)) .* copysign.(size_vec, dr)
     dist = sqrt(sum(abs2, dr))
     return dr, dist
 end
@@ -173,6 +147,11 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
                     # nei_chunk = @view chunks.chunk_particles[1:nei_np, neighbor_id]
                     nei_chunk = @view chunks.chunk_particles[:, neighbor_id]
                     
+                    # println("num: ", nei_np)
+                    # println("vec: ", chunks.chunk_particles[:, neighbor_id])
+                    # println("vec slice: ", chunks.chunk_particles[1:nei_np, neighbor_id])
+                    # println("====")
+
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
                         f1 = calc_interaction(p1_id, nei_chunk[j], 
@@ -199,7 +178,7 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
         forces = system.forces[Threads.threadid()]
         for row in 1:chunks.num_rows
             np = chunks.num_particles_in_chunk[row, col]
-            chunk = @view chunks.chunk_particles[1:np, row, col]
+            chunk = @view chunks.chunk_particles[:, row, col]
             neighbors = chunks.neighbors[row, col]
             
             for i in 1:np
@@ -210,7 +189,7 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
                         system.dynamic_cfg, system)
                     
                     forces[p1_id] += f1
-                    forces[p1_id] -= f1
+                    forces[p2_id] -= f1
                     # forces[1, p1_id] += fx
                     # forces[2, p1_id] += fy
                     # forces[1, p2_id] -= fx
@@ -218,7 +197,7 @@ function calc_forces!(system::System, chunks::Chunks, device::Threaded)
                 end
                 for neighbor_id in neighbors
                     nei_np = chunks.num_particles_in_chunk[neighbor_id]
-                    nei_chunk = @view chunks.chunk_particles[1:nei_np, neighbor_id]
+                    nei_chunk = @view chunks.chunk_particles[:, neighbor_id]
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
                         f1 = calc_interaction(p1_id, nei_chunk[j], 
@@ -302,14 +281,12 @@ function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
     N = system.num_p
     for i in 1:N
         for j in i+1:N
+            if !is_valid_pair(system.state, system.dynamic_cfg, i, j)
+                continue
+            end
             f = calc_interaction(i, j, system.dynamic_cfg, system)
-            
             forces[i] += f
             forces[j] -= f
-            # forces[1, i] +=  fx
-            # forces[2, i] +=  fy
-            # forces[1, j] -= fx
-            # forces[2, j] -= fy   
         end
     end
 end

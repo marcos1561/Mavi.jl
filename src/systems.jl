@@ -1,6 +1,6 @@
 module Systems
 
-export System, particles_radius, get_forces, clean_forces!, get_num_total_particles
+export System, particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair
 
 using StaticArrays
 
@@ -104,4 +104,6 @@ end
 
 @inline get_num_total_particles(system) = get_num_total_particles(system, system.state)
     
+@inline is_valid_pair(state, dynamic_cfg, i, j) = true
+
 end

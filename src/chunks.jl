@@ -106,17 +106,17 @@ function update_particle_chunk!(chunks, i)
     # println(state.pos[:, i])
 
     pos = state.pos[i]
-    @inbounds row_id = trunc(Int, div(-pos[2] + bottom_left[2] + space_h, chunk_h)) + 1
-    @inbounds col_id = trunc(Int, div(pos[1] - bottom_left[1], chunk_l)) + 1
+    row_id = trunc(Int, div(-pos[2] + bottom_left[2] + space_h, chunk_h)) + 1
+    col_id = trunc(Int, div(pos[1] - bottom_left[1], chunk_l)) + 1
     # row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
     # col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
 
     row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
     col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
 
-    @inbounds p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
-    @inbounds chunks.chunk_particles[p_i, row_id, col_id] = i 
-    @inbounds chunks.num_particles_in_chunk[row_id, col_id] += 1
+    p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
+    chunks.chunk_particles[p_i, row_id, col_id] = i 
+    chunks.num_particles_in_chunk[row_id, col_id] += 1
 end
 
 "Update particles chunk positions."

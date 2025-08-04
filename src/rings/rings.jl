@@ -1,9 +1,12 @@
 module Rings
 
 export RingsSystem, RingsState, Configs, InitStates, Integration
-export get_num_particles
+export get_num_particles, get_num_total_particles
+
+using StaticArrays
 
 import Mavi
+import Mavi.Systems: get_num_total_particles
 
 include("states.jl")
 include("configs.jl")
@@ -13,7 +16,7 @@ using .Configs
 using .NeighborsMod
 
 @kwdef struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, U}
-    continuos_pos::Array{T, 3}
+    continuos_pos::Matrix{SVector{2, T}}
     areas::Vector{T}
     p_neigh::PN
     r_neigh::RN
@@ -45,7 +48,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         num_max_neighbors = p_neighbors_cfg.only_count == false ? 15 : nothing 
 
         neigh = Neighbors(
-            num_entities=size(state.pos, 2),
+            num_entities=length(state.pos),
             num_max_neighbors=num_max_neighbors,
             device=int_cfg.device,
             cfg=p_neighbors_cfg,
@@ -59,7 +62,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
 
     info = RingsInfo(
         continuos_pos=similar(state.rings_pos),
-        areas=Vector{Float64}(undef, size(state.rings_pos, 3)),
+        areas=Vector{Float64}(undef, size(state.rings_pos, 2)),
         p_neigh=p_neighbors, r_neigh=r_neighbors,
         user_data=user_data,
     )
@@ -73,22 +76,22 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
     )
 end
 
+@inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}) where {U<:Number, T, I}
+    return dynamic_cfg.num_particles
+end
+
 @inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}, state, ring_id) where {U<:AbstractVector, T, I}
     return dynamic_cfg.num_particles[state.types[ring_id]]
 end
 
 @inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}, state, ring_id) where {U<:Number, T, I}
-    return dynamic_cfg.num_particles
-end
-
-@inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}) where {U<:Number, T, I}
-    return dynamic_cfg.num_particles
+    return get_num_particles(dynamic_cfg)
 end
 
 function Mavi.Systems.get_num_total_particles(system, state::RingsState)
     num_p = 0
     if state.types === nothing
-        num_p = size(state.pos, 2)
+        num_p = length(state.pos)
     else
         for t in state.types
             num_p += system.dynamic_cfg.num_particles[t]
@@ -111,6 +114,18 @@ function Mavi.Systems.particles_radius(system, dynamic_cfg::RingsCfg)
     end
 
     return p_radius
+end
+
+function Mavi.Systems.is_valid_pair(state::RingsState, dynamic_cfg::RingsCfg, i, j)
+    num_max = num_max_particles(state)
+    for idx in (i, j)
+        p_id, ring_id = get_particle_ring_id(idx, num_max)
+        num_ring_particles = get_num_particles(dynamic_cfg, state, ring_id)
+        if p_id > num_ring_particles
+            return false
+        end
+    end
+    return true
 end
 
 include("integration.jl")

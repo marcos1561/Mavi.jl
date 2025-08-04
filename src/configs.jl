@@ -29,7 +29,7 @@ function RectangleCfg(;length, height, bottom_left=0, num_dims=2)
         bottom_left = SVector{num_dims, typeof(length)}(fill(0, num_dims))
     else
         length, height, bottom_left_correct_type... = promote(length, height, bottom_left...)
-        num_dims = length(bottom_left)
+        num_dims = Base.length(bottom_left)
         bottom_left = SVector(bottom_left_correct_type)
     end
 
@@ -44,43 +44,49 @@ function Base.:+(a::RectangleCfg, b::RectangleCfg)
 
     height = max_y - min_y
     length = max_x - min_x
-    RectangleCfg(length, height, SVector(min_x, min_y))
+    RectangleCfg(length, height, SVector(min_x, min_y), SVector(length, height))
 end
 
-struct Point2D{T}
-    x::T
-    y::T
-end
-Point2D(x, y) = Point2D(promote(x, y)...)
-Point2D(p) = Point2D(p...)
+# struct Point2D{T}
+#     x::T
+#     y::T
+# end
+# Point2D(x, y) = Point2D(promote(x, y)...)
+# Point2D(p) = Point2D(p...)
 
 struct Line2D{T}
-    p1::Point2D{T}
-    p2::Point2D{T}
-    normal::Point2D{T}
-    tangent::Point2D{T}
+    p1::SVector{2, T}
+    p2::SVector{2, T}
+    normal::SVector{2, T}
+    tangent::SVector{2, T}
     length::T
 end
 function Line2D(p1, p2) 
-    if !(isa(p1, Point2D))
-        p1 = Point2D(p1...)
+    if !(isa(p1, SVector))
+        p1 = SVector(p1...)
     end
-    if !(isa(p2, Point2D))
-        p2 = Point2D(p2...)
+    if !(isa(p2, SVector))
+        p2 = SVector(p2...)
     end
     
-    dx = p2.x - p1.x
-    dy = p2.y - p1.y
-    norm = sqrt(dx^2 + dy^2)
+    # dx = p2.x - p1.x
+    # dy = p2.y - p1.y
+    # norm = sqrt(dx^2 + dy^2)
+    dr = p2 - p1
+    norm = sqrt(sum(abs2, dr))
 
-    n = [-dy, dx] / norm
-    t = [dx, dy] / norm
-    return Line2D(p1, p2, Point2D(n), Point2D(t), norm)
+    # n = [-dy, dx] / norm
+    # t = [dx, dy] / norm
+
+    n = SVector(-dr.y, dr.x) / norm
+    t = dr / norm
+
+    return Line2D(p1, p2, n, t, norm)
 end
 
 @kwdef struct LinesCfg{T} <: GeometryCfg
     lines::Vector{Line2D{T}}
-    bbox::Union{RectangleCfg{T}, Nothing}
+    bbox::Union{RectangleCfg{2, T}, Nothing}
 end
 function LinesCfg(lines::AbstractVector; bbox=nothing)
     LinesCfg([Line2D(ps...) for ps in lines], bbox)
@@ -94,8 +100,9 @@ end
 function get_bounding_box(space_cfg::CircleCfg)
     r = space_cfg.radius
     length = 2 * r
-    bottom_left = (-r, -r)
-    return RectangleCfg(length, length, bottom_left)
+    bottom_left = SVector(-r, -r)
+    size_vec = SVector(length, length) 
+    return RectangleCfg(length, length, bottom_left, size_vec)
 end
 
 function get_bounding_box(space_cfg::RectangleCfg{T}) where T

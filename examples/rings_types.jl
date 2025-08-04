@@ -34,11 +34,12 @@ function create_system(;num_cols, num_rows)
         dist_max = 0.8 * 1.1,
     )
 
+    pair_dist_eq = interaction_cfg_1.dist_eq/2 + interaction_cfg_2.dist_eq/2
     interaction_cfg_pair = HarmTruncCfg(
         k_rep = 13,
-        k_atr = 3,
-        dist_eq = 1,
-        dist_max = 1 + 0.1,
+        k_atr = 10,
+        dist_eq = pair_dist_eq,
+        dist_max = pair_dist_eq * 1.2,
     )
     
     interaction_finder = InteractionMatrix([
@@ -123,7 +124,7 @@ function main()
     colors_map = ColorSchemes.bam
     # colors_map = ColorSchemes.vik
     colors::Vector{RGBf} = []
-    for ring_id in 1:size(system.state.rings_pos, 3)
+    for ring_id in 1:size(system.state.rings_pos, 2)
         t = system.state.types[ring_id]
         if t == 1
             c = rand(Float64)/4 + 3/4

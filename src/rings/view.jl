@@ -4,7 +4,7 @@ using Mavi.Rings.Configs: get_interaction_cfg
 import Mavi.Visualization.SystemGraphs: MainGraph, MainGraphCfg, Graph, GraphCfg, get_graph_data, update_graph_data
 
 function get_graph_data(cfg::GraphCfg, system, state::RingsState)
-    num_p = size(state.pos, 2)
+    num_p = length(state.pos)
 
     types = Vector{Int}(undef, num_p)
     pos = similar(state.pos)
@@ -12,7 +12,7 @@ function get_graph_data(cfg::GraphCfg, system, state::RingsState)
     idx = 1
     for ring_id in get_active_ids(state)
         for p_id in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
-            pos[:, idx] .= state.rings_pos[:, p_id, ring_id] 
+            pos[idx] = state.rings_pos[p_id, ring_id] 
             types[idx] = ring_id
             idx += 1
         end
@@ -29,7 +29,7 @@ function update_graph_data(cfg::MainGraph, system, state::RingsState)
     idx = 1
     for ring_id in get_active_ids(state)
         for p_id in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
-            pos[:, idx] .= state.rings_pos[:, p_id, ring_id] 
+            pos[idx] = state.rings_pos[p_id, ring_id] 
             idx += 1
         end
     end

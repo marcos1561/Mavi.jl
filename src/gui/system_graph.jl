@@ -109,14 +109,18 @@ end
 
 function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     data = get_graph_data(cfg, system, system.state)
-    colors = Vector{RGBf}(undef, size(system.state.pos, 2))
+    colors = Vector{RGBf}(undef, length(system.state.pos))
 
     types_obs = Observable(data.types)
     colors_obs = lift(types_obs) do types
         get_colors(cfg.colors_map, colors, types)
     end
+
+    pos_points_obs = lift(pos_obs) do pos
+        [Point2f(p) for p in pos]
+    end
     
-    scatter!(ax, pos_obs; color=colors_obs, cfg.kwargs...)
+    scatter!(ax, pos_points_obs; color=colors_obs, cfg.kwargs...)
         
     ScatterGraph(data.types, (types_obs=types_obs,), cfg)
 end
@@ -166,8 +170,8 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     end
 
     data = get_graph_data(cfg, system, system.state)
-    colors = Vector{RGBf}(undef, size(system.state.pos, 2))
-    # colors = Vector{RGBf}(undef, length(system.state.pos))
+    # colors = Vector{RGBf}(undef, size(system.state.pos, 2))
+    colors = Vector{RGBf}(undef, length(system.state.pos))
 
     types_obs = Observable(data.types)
     colors_obs = lift(types_obs) do types
