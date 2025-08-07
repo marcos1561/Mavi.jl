@@ -6,11 +6,11 @@ using Mavi.Configs
 export check_inside
 
 "Return particles indices outside the given geometry configuration."
-function outside_particles(state::State, geometry_cfg::RectangleCfg) 
+function outside_particles(state::State, geometry_cfg::RectangleCfg, particle_ids) 
     bottom_left = geometry_cfg.bottom_left
     top_right = bottom_left .+ (geometry_cfg.length, geometry_cfg.height)
     out_ids::Vector{Int} = []
-    for idx in eachindex(state.pos)
+    for idx in particle_ids
         pos = state.pos[idx]
         if any(pos .< bottom_left) || any(pos .> top_right)
             push!(out_ids, idx)
@@ -24,13 +24,13 @@ function outside_particles(state::State, geometry_cfg::RectangleCfg)
     return out_ids
 end
 
-function outside_particles(state::State, geometry_cfg::CircleCfg)
+function outside_particles(state::State, geometry_cfg::CircleCfg, particle_ids)
     r2 = @. state.pos[1, :]^2 + state.pos[2, :]^2
     out_ids = findall(r2 .> geometry_cfg.radius^2)
     return out_ids
 end
 
-function outside_particles(state::State, geometry_cfg)
+function outside_particles(state::State, geometry_cfg, particle_ids)
     return []
 end
 
@@ -44,9 +44,9 @@ Checks if all particles are inside the given geometry configuration.
 - out_ids::Vector{Int} 
     Indices of outside particles.
 """
-function check_inside(state::State, geometry_cfg::GeometryCfg)
+function check_inside(state::State, geometry_cfg::GeometryCfg, particle_ids)
     all_inside = true
-    out_ids = outside_particles(state, geometry_cfg)
+    out_ids = outside_particles(state, geometry_cfg, particle_ids)
     if length(out_ids) != 0
         all_inside = false
     end

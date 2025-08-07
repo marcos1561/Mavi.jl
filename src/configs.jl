@@ -3,7 +3,7 @@ module Configs
 
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg 
-export get_bounding_box 
+export get_bounding_box, check_intersection, is_inside
 export RigidWalls, PeriodicWalls, SlipperyWalls
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksIntCfg, has_chunks
@@ -45,6 +45,22 @@ function Base.:+(a::RectangleCfg, b::RectangleCfg)
     height = max_y - min_y
     length = max_x - min_x
     RectangleCfg(length, height, SVector(min_x, min_y), SVector(length, height))
+end
+
+function check_intersection(r1::RectangleCfg, r2::RectangleCfg)
+    intersect_x1 = r2.bottom_left[1] <= r1.bottom_left[1] <= r2.bottom_left[1] + r2.length
+    intersect_x2 = r2.bottom_left[1] <= r1.bottom_left[1] + r1.length <= r2.bottom_left[1] + r2.length
+    
+    intersect_y1 = r2.bottom_left[2] <= r1.bottom_left[2] <= r2.bottom_left[2] + r2.height
+    intersect_y2 = r2.bottom_left[2] <= r1.bottom_left[2] + r1.height <= r2.bottom_left[2] + r2.height
+
+    return (intersect_x1 || intersect_x2) && (intersect_y1 || intersect_y2)
+end
+
+function is_inside(point, r::RectangleCfg; pad=0)
+    is_x = r.bottom_left[1] - pad <= point[1] <= r.bottom_left[1] + r.length + pad
+    is_y = r.bottom_left[2] - pad <= point[2] <= r.bottom_left[2] + r.height + pad
+    return is_x && is_y
 end
 
 # struct Point2D{T}

@@ -1,6 +1,7 @@
 module Systems
 
-export System, particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair
+export System, particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius
+export get_particles_ids
 
 using StaticArrays
 
@@ -8,6 +9,23 @@ using Mavi.States
 using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
+
+function get_chunks(int_cfg::IntCfg, space_cfg::SpaceCfg, state, dynamic_cfg)
+    if !has_chunks(int_cfg)
+        return nothing
+    end
+
+    chunks_cfg = int_cfg.chunks_cfg
+    bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
+    chunks_space_cfg = SpaceCfg(
+        wall_type=space_cfg.wall_type,
+        geometry_cfg=bounding_box,
+    )
+
+    Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
+        chunks_space_cfg, state, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=dynamic_cfg,
+    )  
+end
 
 mutable struct TimeInfo
     num_steps::Int
@@ -45,8 +63,8 @@ struct System{T, ND, NT, StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT
     info::InfoT
     debug_info::DebugT
 end
-function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, info=nothing, debug_info=nothing) where {ND, T}
-    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg)
+function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, chunks=nothing, info=nothing, debug_info=nothing) where {ND, T}
+    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state, dynamic_cfg))
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
     end
@@ -69,18 +87,12 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, info=noth
     #     forces_local =  Array{T, 3}(undef, 2, num_p, num_forces_slices)
     # end
 
-    chunks = nothing
-    # if typeof(int_cfg) == ChunksIntCfg
-    if has_chunks(int_cfg)
-        chunks_cfg = int_cfg.chunks_cfg
-        bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
-        chunks_space_cfg = SpaceCfg(
-            wall_type=space_cfg.wall_type,
-            geometry_cfg=bounding_box,
-        )
+    if isnothing(chunks)
+        chunks = get_chunks(int_cfg, space_cfg, state, dynamic_cfg) 
+    end
 
-        chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-            chunks_space_cfg, state, minimum(particle_radius(dynamic_cfg)), extra_info=dynamic_cfg)
+    if !isnothing(chunks)
+        update_chunks!(chunks)
     end
 
     System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, num_p, TimeInfo(0, 0.01), info, debug_info)
@@ -95,15 +107,22 @@ end
     end
 end
 
-function particles_radius(system, dynamic_cfg)
+function particles_radius(dynamic_cfg, state)
     p_radius = particle_radius(dynamic_cfg)
-    fill(p_radius, system.num_p)
+    fill(p_radius, get_num_total_particles(state))
 end
+particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.state)
 
-@inline get_num_total_particles(system, state) = length(state.pos)
+get_particle_radius(dynamic_cfg, state, idx) = particle_radius(dynamic_cfg)
+get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cfg, system.state, idx)
 
-@inline get_num_total_particles(system) = get_num_total_particles(system, system.state)
-    
-@inline is_valid_pair(state, dynamic_cfg, i, j) = true
+@inline get_num_total_particles(state::State, dynamic_cfg=nothing) = length(state.pos)
+@inline get_num_total_particles(system::System) = get_num_total_particles(system.dynamic_cfg, system.state)
+
+@inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
+@inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
+
+@inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
+@inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
 
 end

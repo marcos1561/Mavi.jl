@@ -10,6 +10,7 @@ using Mavi.Rings.NeighborsMod
 using Mavi.Systems
 using Mavi.Rings.Configs
 using Mavi.Rings.States
+using Mavi.Rings.Sources
 using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls
 
 export step!
@@ -389,6 +390,10 @@ function update!(system)
     end
 end
 
+function update_sources!(system)
+    process_source!(system.info.sources, system.state)
+end
+
 function cleaning!(system)
     clean_forces!(system)
     neigh_clean!(system.info.p_neigh)
@@ -396,9 +401,13 @@ function cleaning!(system)
 end
 
 function step!(system)
+    update_sources!(system)
+    
     update_chunks!(system.chunks)
     update_continuos_pos!(system, system.space_cfg.wall_type)
     
+    calc_active_ids!(system.state.active)
+
     cleaning!(system)
     forces!(system)
     neigh_sum_buffers(system.info.p_neigh)

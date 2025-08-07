@@ -1,7 +1,7 @@
 using Mavi.Rings
 using Mavi.Rings.States
-using Mavi.Rings.Configs: get_interaction_cfg
-import Mavi.Visualization.SystemGraphs: MainGraph, MainGraphCfg, Graph, GraphCfg, get_graph_data, update_graph_data
+using Mavi.Rings.Configs: get_interaction_cfg, get_num_particles
+import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, get_graph_data, update_graph_data
 
 function get_graph_data(cfg::GraphCfg, system, state::RingsState)
     num_p = length(state.pos)
@@ -27,12 +27,34 @@ end
 function update_graph_data(cfg::MainGraph, system, state::RingsState)
     pos = cfg.pos
     idx = 1
+    num_total_particles = 0
     for ring_id in get_active_ids(state)
-        for p_id in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
+        num_p = get_num_particles(system.dynamic_cfg, state, ring_id)
+        num_total_particles += num_p
+        for p_id in 1:num_p
             pos[idx] = state.rings_pos[p_id, ring_id] 
             idx += 1
         end
     end
+
+    cfg.pos_obs[] = @view pos[1:num_total_particles]
+end
+
+function get_graph_data(cfg::GraphCompCfg, system, state::RingsState)
+    types = Vector{Int}(undef, length(state.pos))
+    # for ring_id in get_active_ids(state)
+    #     num_p = get_num_particles(system.dynamic_cfg, state, ring_id)
+    #     for particle_id in 1:num_p
+    #         types[to_scalar_idx(state, ring_id, particle_id)] = ring_id
+    #     end
+    # end
+    num_max_p = num_max_particles(state)
+    for ring_id in axes(state.rings_pos, 2)
+        for particle_id in 1:num_max_p
+            types[to_scalar_idx(state, ring_id, particle_id)] = ring_id
+        end
+    end
+    return types
 end
 
 # function get_graph_data(system, state::RingsState)
