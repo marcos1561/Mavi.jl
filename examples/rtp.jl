@@ -39,7 +39,7 @@ function main()
     system = System(
         state=SelfPropelledState(
             pos=pos,
-            pol_angle=rand(Float64, size(pos)[2])*2*π,
+            pol_angle=rand(Float64, length(pos))*2*π,
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,

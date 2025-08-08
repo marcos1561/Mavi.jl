@@ -6,12 +6,14 @@ a step function with constant velocity and rigid walls.
 """
 module Example
 
+using StaticArrays
+
 using Mavi
 using Mavi.Visualization
 using Mavi.Configs
 
 function main()
-    state = Mavi.States.SecondLawState{Float64}(
+    state = Mavi.States.SecondLawState(
         pos=[1 2; 1 2],
         vel=[0.3 2; 1 0]
     )
@@ -42,20 +44,19 @@ function main()
         geometry_cfg = system.space_cfg.geometry_cfg
         r = system.dynamic_cfg.ro/2
         for i in 1:system.num_p
-            if ((state.pos[1, i]+r) > geometry_cfg.length) || ((state.pos[1, i]-r) < 0)
-                state.vel[1, i] *= -1.
+            if ((state.pos[i].x+r) > geometry_cfg.length) || ((state.pos[i].x-r) < 0)
+                state.vel[i] = state.vel[i] .* SVector(-1, 1)
             end
-            if ((state.pos[2, i]+r) > geometry_cfg.height) || ((state.pos[2, i]-r) < 0)
-                state.vel[2, i] *= -1.
+            if ((state.pos[i].y+r) > geometry_cfg.height) || ((state.pos[i].y-r) < 0)
+                state.vel[i] = state.vel[i] .* SVector(1, -1)
             end
         end
     end
 
     anim_cfg = AnimationCfg(
-        fps = 60,    
-        num_steps_per_frame = 1,
+        num_steps_per_frame=1,
+        fps=60,
     )
-
     animate(system, step!, anim_cfg)
 end
 

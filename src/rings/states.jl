@@ -19,9 +19,9 @@ get_active_mask(active_state::ActiveState{T}, num_rings=nothing) where T <: Abst
 @kwdef mutable struct ActiveRings
     mask::Vector{Bool}
     ids::Vector{Int}
-    particles_ids::Vector{Int}
     uids::Vector{Int}
     num_active::Int
+    num_particles_active::Int
 end
 
 function calc_active_ids!(active) end
@@ -60,14 +60,12 @@ function RingsState(;rings_pos, pol, types=nothing, active_state=nothing)
     if !isnothing(active_state)
         active_rings = ActiveRings(
             mask=get_active_mask(active_state, num_rings), 
-            particles_ids=Vector(1:length(pos)),
             ids=Vector(1:num_rings),
             uids=Vector(1:num_rings),
             num_active=0,
+            num_particles_active=0,
         )
         calc_active_ids!(active_rings)
-
-        println(active_rings.mask)
     end
 
     RingsState(rings_pos, pos, pol, types, active_rings)

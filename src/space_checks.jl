@@ -25,8 +25,14 @@ function outside_particles(state::State, geometry_cfg::RectangleCfg, particle_id
 end
 
 function outside_particles(state::State, geometry_cfg::CircleCfg, particle_ids)
-    r2 = @. state.pos[1, :]^2 + state.pos[2, :]^2
-    out_ids = findall(r2 .> geometry_cfg.radius^2)
+    out_ids = Int[]
+    for idx in particle_ids
+        pos = state.pos[idx]
+        r2 = sum(abs2, pos)
+        if r2 > geometry_cfg.radius^2
+            push!(out_ids, idx)
+        end
+    end
     return out_ids
 end
 

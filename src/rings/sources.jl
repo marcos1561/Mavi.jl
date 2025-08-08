@@ -6,7 +6,7 @@ export update_area_empty!, process_source!
 using StaticArrays
 
 import Mavi.Configs: RectangleCfg, check_intersection, is_inside
-import Mavi.Systems: get_num_particles
+import Mavi.Rings: get_num_particles, get_ids
 
 using Mavi.Rings.States
 using Mavi.Rings.Configs
@@ -45,9 +45,9 @@ struct ChunksChecker{C} <: Checker
     ids::Vector{Vector{CartesianIndex{2}}}
 end
 
-struct PosChecker{S<:RingsState, D<:RingsCfg} <: Checker
-    state::S
-    dynamic_cfg::D
+struct PosChecker{P, PIDS} <: Checker
+    pos::P
+    part_ids::PIDS
 end
 
 struct Source{T<:AbstractFloat, C<:Checker}
@@ -165,32 +165,37 @@ end
 
 function update_area_empty!(source::Source{T, C}) where {T, C<:PosChecker}
     checker = source.checker
-    state = checker.state
-    dynamic_cfg = checker.dynamic_cfg
+    pos = checker.pos
+    p_ids = get_ids(checker.part_ids)
     for idx in eachindex(source.bbox)
         source.is_empty[idx] = true
         bbox = source.bbox[idx]
-        found = false
-        for ring_id in get_active_ids(checker.state)
-            for p_id in 1:get_num_particles(dynamic_cfg, state, ring_id)
-                p_scalar_idx = to_scalar_idx(state, ring_id, p_id)
-                if is_inside(state.pos[p_scalar_idx], bbox, pad=source.cfg.pad)
-                    source.is_empty[idx] = false
-                    found = true
-                    break
-                end
-            end
-            if found
+        for p_idx in p_ids
+            if is_inside(pos[p_idx], bbox, pad=source.cfg.pad)
+                source.is_empty[idx] = false
                 break
             end
         end
-        # for p in checker.pos
-        #     if is_inside(p, bbox, pad=source.cfg.pad)
-        #         source.is_empty[idx] = false
-        #         break
-        #     end
-        # end
     end
+
+    # for idx in eachindex(source.bbox)
+    #     source.is_empty[idx] = true
+    #     bbox = source.bbox[idx]
+    #     found = false
+    #     for ring_id in get_active_ids(checker.state)
+    #         for p_id in 1:get_num_particles(dynamic_cfg, state, ring_id)
+    #             p_scalar_idx = to_scalar_idx(state, ring_id, p_id)
+    #             if is_inside(state.pos[p_scalar_idx], bbox, pad=source.cfg.pad)
+    #                 source.is_empty[idx] = false
+    #                 found = true
+    #                 break
+    #             end
+    #         end
+    #         if found
+    #             break
+    #         end
+    #     end
+    # end
 end
 
 function update_area_empty!(source::Source{T, C}) where {T, C<:ChunksChecker}
@@ -220,5 +225,7 @@ function process_source!(source, state)
         add_ring(state, source.bbox_spawn_pos[idx], get_spawn_pol(source.cfg.spawn_pol))
     end
 end
+
+
 
 end

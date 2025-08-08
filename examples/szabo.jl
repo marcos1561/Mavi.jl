@@ -18,12 +18,12 @@ function main()
     num_p_y = trunc(Int, sqrt(num_particles))
 
     dynamic_cfg = SzaboCfg(
-        vo=1,
-        mobility=1,
-        relax_time=1,
-        k_rep=10,
+        vo=1.,
+        mobility=1.,
+        relax_time=1.,
+        k_rep=10.,
         k_adh=0.75,
-        r_eq=1,
+        r_eq=1.,
         r_max=1+0.1,
         rot_diff=0.01,
     )
@@ -43,7 +43,7 @@ function main()
     system = System(
         state=SelfPropelledState(
             pos=pos,
-            pol_angle=rand(Float64, size(pos)[2])*2*π,
+            pol_angle=rand(Float64, length(pos))*2*π,
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,

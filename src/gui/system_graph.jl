@@ -178,7 +178,7 @@ abstract type Graph end
 function get_graph_data(graph_cfg::GraphCfg, system, state::State)
     return (pos=state.pos, types=Vector(1:system.num_p), num_p=system.num_p)
 end
-@inline get_graph_data(graph::Graph, system) = get_graph_data(graph, system, system.state)
+@inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system, system.state)
 
 update_graph_data(graph::Graph, system, state::State) = DefaultDict{Symbol, Bool}(false)
 @inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system, system.state)
@@ -188,7 +188,7 @@ abstract type GraphCompCfg <: GraphCfg end
 abstract type GraphComp <: Graph end
 abstract type GraphCompDebug <: GraphComp end
 
-get_graph_data(graph_cfg::GraphComp, system, state::State) = collect(1:length(state.pos))
+get_graph_data(graph_cfg::GraphCompCfg, system, state::State) = collect(1:length(state.pos))
 
 get_comp_update_data(c::GraphComp) = c.cfg.update_data
 get_comp_update_data(c::GraphCompDebug) = (_, _) -> DefaultDict{Symbol, Bool}(false)
@@ -282,7 +282,7 @@ function update_graph(comp::ScatterGraph, system)
     update_list = get_comp_update_data(comp)(comp, system)
     notify_comp_observables(comp, update_list)
 
-    particles_ids = get_particles_ids(system.state, system.dynamic_cfg)
+    particles_ids = get_particles_ids(system, system.state)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
     pos = comp.pos_obs[]
     points = [Point2f(p) for p in pos]
@@ -358,7 +358,7 @@ function update_graph(comp::CircleGraph, system)
     update_list = get_comp_update_data(comp)(comp, system)
     notify_comp_observables(comp, update_list)
 
-    particles_ids = get_particles_ids(system.state, system.dynamic_cfg)
+    particles_ids = get_particles_ids(system, system.state)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
     radius = get_radius!(comp.radius, system.dynamic_cfg, system.state, particles_ids)
     pos = comp.pos_obs[]

@@ -17,11 +17,14 @@ export step!
     
 function update_chunks!(chunks::Chunks{N, T, StateT, InfoT}) where {N, T, StateT<:RingsState, InfoT}
     chunks.num_particles_in_chunk .= 0
-    for ring_id in get_active_ids(chunks.state)
-        for p_id in 1:get_num_particles(chunks.extra_info, chunks.state, ring_id)
-            update_particle_chunk!(chunks, to_scalar_idx(chunks.state, ring_id, p_id))
-        end
+    for idx in Rings.get_ids(chunks.extra_info)
+        update_particle_chunk!(chunks, idx)
     end
+    # for ring_id in get_active_ids(chunks.state)
+    #     for p_id in 1:get_num_particles(chunks.extra_info, chunks.state, ring_id)
+    #         update_particle_chunk!(chunks, to_scalar_idx(chunks.state, ring_id, p_id))
+    #     end
+    # end
 end
 
 function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
@@ -233,27 +236,30 @@ function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{
     center = geometry_cfg.bottom_left + geometry_cfg.size / 2
     half_size = geometry_cfg.size / 2
 
-    for ring_id in get_active_ids(system.state)
-        for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
-            pos = state.rings_pos[i, ring_id]
-            diff = pos - center
-            
-            out_bounds = abs.(diff) .> half_size
-            if any(out_bounds)
-                state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
-            end
-
-            # pos_i = @view state.rings_pos[:, i, ring_id] 
-            # diff = pos_i[1] - center[1]  
-            # if abs(diff) > geometry_cfg.length/2
-            #     pos_i[1] -= sign(diff) * geometry_cfg.length
-            # end
-
-            # diff = pos_i[2] - center[2]  
-            # if abs(diff) > geometry_cfg.height/2
-            #     pos_i[2] -= sign(diff) * geometry_cfg.height
-            # end
+    # for ring_id in get_active_ids(system.state)
+    #     for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
+    #         pos = state.rings_pos[i, ring_id]
+    for idx in get_particles_ids(system, state)
+        pos = state.pos[idx]
+        diff = pos - center
+        
+        out_bounds = abs.(diff) .> half_size
+        if any(out_bounds)
+            state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
         end
+
+        # pos_i = @view state.rings_pos[:, i, ring_id] 
+        # diff = pos_i[1] - center[1]  
+        # if abs(diff) > geometry_cfg.length/2
+        #     pos_i[1] -= sign(diff) * geometry_cfg.length
+        # end
+
+        # diff = pos_i[2] - center[2]  
+        # if abs(diff) > geometry_cfg.height/2
+        #     pos_i[2] -= sign(diff) * geometry_cfg.height
+        # end
+
+        # end
     end
 end
 
@@ -390,6 +396,16 @@ function update!(system)
     end
 end
 
+function update_active_particles_ids!(part_ids, state, dynamic_cfg) end
+function update_active_particles_ids!(part_ids, state::RingsState{T, ActiveRings}, dynamic_cfg) where T
+    update_part_ids!(part_ids, state, dynamic_cfg)
+end
+
+function update_ids!(system)
+    calc_active_ids!(system.state.active)
+    update_active_particles_ids!(system.info.particles_ids, system.state, system.dynamic_cfg)
+end
+
 function update_sources!(system)
     process_source!(system.info.sources, system.state)
 end
@@ -403,11 +419,11 @@ end
 function step!(system)
     update_sources!(system)
     
+    update_ids!(system)
+
     update_chunks!(system.chunks)
     update_continuos_pos!(system, system.space_cfg.wall_type)
     
-    calc_active_ids!(system.state.active)
-
     cleaning!(system)
     forces!(system)
     neigh_sum_buffers(system.info.p_neigh)

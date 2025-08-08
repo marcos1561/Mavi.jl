@@ -79,6 +79,7 @@ function main()
     anim_cfg = AnimationCfg(
         num_steps_per_frame=15,
         graph_cfg=CircleGraphCfg(),
+        # begin_paused=true,
         # graph_cfg=ScatterGraphCfg(),
     )
     

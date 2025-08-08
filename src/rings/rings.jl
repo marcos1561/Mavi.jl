@@ -1,7 +1,7 @@
 module Rings
 
 export RingsSystem, RingsState, ActiveState, Configs, InitStates, Integration
-export get_num_total_particles
+export get_num_total_particles, update_active_particles_ids!, update_part_ids!
 export NeighborsCfg
 
 using StaticArrays
@@ -29,20 +29,7 @@ end
 end
 @inline Configs.get_num_particles(system, ring_id) = Configs.get_num_particles(system.dynamic_cfg, system.state, ring_id)
 
-function Mavi.Systems.get_num_total_particles(state::RingsState, dynamic_cfg)
-    num_p = 0
-    if state.types === nothing
-        num_p = length(state.pos)
-    else
-        for t in state.types
-            num_p += dynamic_cfg.num_particles[t]
-        end
-    end
-
-    return num_p
-end
-
-@inline function Mavi.Systems.get_particle_radius(dynamic_cfg::RingsCfg, state, idx)
+@inline function Mavi.Systems.get_particle_radius(dynamic_cfg::RingsCfg{U, T, I}, state::RingsState, idx) where {U<:Number, T, I}
     return Configs.particle_radius(dynamic_cfg.interaction_finder)
 end
 
@@ -82,33 +69,59 @@ function Mavi.Systems.is_valid_pair(state::RingsState, dynamic_cfg::RingsCfg, i,
     return true
 end
 
-function Mavi.Systems.get_particles_ids(state::RingsState{T, ActiveRings}, dynamic_cfg::RingsCfg) where T
+Mavi.Systems.get_particles_ids(system::System, state::RingsState) = get_ids(system.info.particles_ids) 
+
+Mavi.Systems.get_num_total_particles(system::System, state::RingsState) = get_num(system.info.part_ids)
+
+@kwdef mutable struct ParticleIds
+    ids::Vector{Int}
+    num::Int
+end
+
+get_ids(part_ids) = part_ids
+function get_ids(part_ids::ParticleIds)
+    ids = @view part_ids.ids[1:part_ids.num]
+    return ids
+end
+
+get_num(part_ids) = length(part_ids)
+get_num(part_ids::ParticleIds) = part_ids.num
+
+function update_part_ids!(part_ids, state, dynamic_cfg) end
+function update_part_ids!(part_ids::ParticleIds, state, dynamic_cfg)
     count = 1
-    pids = state.active.particles_ids
     for ring_id in get_active_ids(state)
         first_id = to_scalar_idx(state, ring_id, 1)
         for i in 1:get_num_particles(dynamic_cfg, state, ring_id)
-            pids[count] = first_id +  i - 1
+            part_ids.ids[count] = first_id +  i - 1
             count += 1
         end
     end
-
-    pids = @view pids[1:count-1]
-    return pids
+    part_ids.num = count - 1
 end
 
+function get_particles_ids_obj(state)
+    if isnothing(state.types) && isnothing(state.active)
+        return eachindex(state.pos)
+    end
+
+   ParticleIds(collect(1:length(state.pos)), 0)
+end
 
 include("sources.jl")
 using .Sources
 
-@kwdef struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, S, U}
+
+@kwdef struct RingsInfo{T, PIDS, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, S, U}
     continuos_pos::Matrix{SVector{2, T}}
     areas::Vector{T}
+    particles_ids::PIDS
     p_neigh::PN
     r_neigh::RN
     sources::S
     user_data::U
 end
+Mavi.Systems.get_particles_ids(state::RingsState, info::RingsInfo) = get_ids(info.particles_ids)
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=nothing,
     r_neighbors=nothing, source_cfg::Union{SourceCfg, Nothing}=nothing, user_data=nothing)
@@ -147,7 +160,11 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         )
     end
 
-    chunks = get_chunks(int_cfg, space_cfg, state, dynamic_cfg)
+    
+    parts_ids = get_particles_ids_obj(state)
+    update_part_ids!(parts_ids, state, dynamic_cfg)
+    
+    chunks = get_chunks(int_cfg, space_cfg, state, dynamic_cfg, parts_ids)
 
     sources = nothing
     if !isnothing(source_cfg)
@@ -157,12 +174,13 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         end
 
         # sources = Source(source_cfg, chunks, source_pos)
-        sources = Source(source_cfg, nothing, (state, dynamic_cfg))
+        sources = Source(source_cfg, nothing, (state.pos, parts_ids))
     end
 
     info = RingsInfo(
         continuos_pos=similar(state.rings_pos),
         areas=Vector{Float64}(undef, size(state.rings_pos, 2)),
+        particles_ids=parts_ids,
         p_neigh=p_neighbors, r_neigh=r_neighbors,
         sources=sources,
         user_data=user_data,

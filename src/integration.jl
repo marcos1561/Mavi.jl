@@ -37,7 +37,7 @@ function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
 
     # Check interaction range
     if dist > dynamic_cfg.ra
-        return SVector(0.0, 0.0)
+        return zero(dr)
     end
 
     fmod = -dynamic_cfg.ko*(dist - dynamic_cfg.ro) # restoring force
@@ -70,10 +70,10 @@ function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
     state = system.state
     space_cfg = system.space_cfg
 
-    dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     if dist > dynamic_cfg.r_max
-        return 0, 0
+        return zero(dr)
     end
 
     if dist > dynamic_cfg.r_eq
@@ -83,15 +83,15 @@ function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
     end
 
     r = dist - dynamic_cfg.r_eq
-    fx, fy = -f_mod * dx * r, -f_mod * dy * r
-    return fx, fy
+    # fx, fy = -f_mod * dx * r, -f_mod * dy * r
+    return -f_mod * r * dr
 end
 
 function calc_interaction(i, j, dynamic_cfg::RunTumbleCfg, system::System)
     state = system.state
     space_cfg = system.space_cfg
 
-    x_ij, y_ij, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -99,17 +99,17 @@ function calc_interaction(i, j, dynamic_cfg::RunTumbleCfg, system::System)
 
     # Distant particles
     if dist > cutoff
-        return 0.0, 0.0
+        return zero(dr)
     end
 
     # Force modulus
     fmod = -4*epsilon*(-12*sigma^12/dist^13 + 6*sigma^6/dist^7)
 
     # Force components
-    fx = fmod*x_ij/dist
-    fy = fmod*y_ij/dist
+    # fx = fmod*x_ij/dist
+    # fy = fmod*y_ij/dist
 
-    return fx, fy
+    return fmod / dist * dr 
 end
 
 "Compute total forces on particles using chucks."
@@ -332,15 +332,29 @@ end
 function walls!(system::System, space_cfg::SpaceCfg{RigidWalls, CircleCfg})
     state = system.state
     max_r2 = (space_cfg.geometry_cfg.radius - particle_radius(system.dynamic_cfg))^2
-    for i in 1:system.num_p
-        x, y = state.pos[1, i], state.pos[2, i]
-        x2, y2 = x^2, y^2
-        if (x2 + y2) > max_r2
-            r2 = x2 + y2
-            vx, vy = state.vel[1, i], state.vel[2, i]
-            state.vel[1, i] = (vx*(y2 - x2) - 2*vy*x*y) / r2
-            state.vel[2, i] = (-vy*(y2 - x2) - 2*vx*x*y) / r2
+    for idx in get_particles_ids(system)
+        pos = state.pos[idx]
+        x2, y2 = abs2.(pos)
+        r2 = x2 + y2
+        if r2 <= max_r2
+            continue
         end
+
+        vel = state.vel[idx]
+        new_vel = SVector(
+            (vel.x*(y2 - x2) - 2*vel.y*pos.x*pos.y) / r2,
+            (-vel.y*(y2 - x2) - 2*vel.x*pos.x*pos.y) / r2
+        )
+        state.vel[idx] = new_vel
+
+        # x, y = state.pos[1, i], state.pos[2, i]
+        # x2, y2 = x^2, y^2
+        # if (x2 + y2) > max_r2
+        #     r2 = x2 + y2
+        #     vx, vy = state.vel[1, i], state.vel[2, i]
+        #     state.vel[1, i] = (vx*(y2 - x2) - 2*vy*x*y) / r2
+        #     state.vel[2, i] = (-vy*(y2 - x2) - 2*vx*x*y) / r2
+        # end
     end
 end
 
@@ -386,8 +400,7 @@ end
 function update_verlet!(system::System, calc_forces_in!)
     state = system.state
     forces = get_forces(system)
-    # old_forces = copy(forces)
-    old_forces = forces
+    old_forces = copy(forces)
 
     dt = system.int_cfg.dt
 
@@ -413,22 +426,20 @@ function update_szabo!(system::System)
 
     for i in 1:system.num_p
         theta = state.pol_angle[i]
-        pol_x, pol_y = cos(theta), sin(theta) 
+        pol = SVector(cos(theta), sin(theta) )
 
-        vel_x = vo * pol_x + mu * forces[1, i]
-        vel_y = vo * pol_y + mu * forces[2, i]
+        vel = vo * pol + mu * forces[i]
         
-        speed = sqrt(vel_x^2 + vel_y^2)
+        speed = sqrt(sum(abs, vel))
     
-        cross_prod = (pol_x * vel_y - pol_y * vel_x) / speed 
+        cross_prod = (pol.x * vel.y - pol.y * vel.x) / speed 
         if abs(cross_prod) > 1
             cross_prod = sign(cross_prod)
         end
 
         d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
         
-        state.pos[1, i] += vel_x * dt
-        state.pos[2, i] += vel_y * dt
+        state.pos[i] += vel * dt
         state.pol_angle[i] += d_theta
     end
 end
@@ -444,16 +455,19 @@ function update_rtp!(system::System)
 
     for i in 1:system.num_p
         theta = state.pol_angle[i]
-        pol_x, pol_y = cos(theta), sin(theta) 
+        pol = SVector(cos(theta), sin(theta))
 
-        vel_x = vo * pol_x + forces[1, i]
-        vel_y = vo * pol_y + forces[2, i]
+        vel = vo * pol + forces[i]
+        # vel_x = vo * pol_x + forces[1, i]
+        # vel_y = vo * pol_y + forces[2, i]
         
-        speed = sqrt(vel_x^2 + vel_y^2)
+        # speed = sqrt(vel_x^2 + vel_y^2)
+        speed = sqrt(sum(abs2, vel))
         
         # Update positions
-        state.pos[1, i] += vel_x * dt
-        state.pos[2, i] += vel_y * dt
+        state.pos[i] += vel * dt
+        # state.pos[1, i] += vel_x * dt
+        # state.pos[2, i] += vel_y * dt
 
         # Update director
         u = rand()

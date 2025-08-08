@@ -10,7 +10,11 @@ export kinetic_energy, potential_energy
 
 "Return system's kinetic energy."
 function kinetic_energy(state::State)
-    return sum(state.vel.^2)/2
+    ke = 0
+    for vel in state.vel
+        ke += sum(abs2, vel)
+    end
+    return ke / 2
 end
 
 "Return system's potential energy."
@@ -27,7 +31,7 @@ function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            _, _, dist = calc_diff_and_dist(i, j, state, space_cfg)
+            _, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
 
             if dist <= ra
                 pot += (dist-ro)^2
@@ -50,7 +54,7 @@ function potential_energy(system::System, dynamic_cfg::LenJonesCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            _, _, dist = calc_diff_and_dist(i, j, pos, space_cfg)
+            _, dist = calc_diff_and_dist(i, j, pos, space_cfg)
             pot += ((sigma/dist)^12 - (sigma/dist)^6)
         end
     end

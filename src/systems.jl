@@ -10,7 +10,7 @@ using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
 
-function get_chunks(int_cfg::IntCfg, space_cfg::SpaceCfg, state, dynamic_cfg)
+function get_chunks(int_cfg::IntCfg, space_cfg::SpaceCfg, state, dynamic_cfg, extra_info=nothing)
     if !has_chunks(int_cfg)
         return nothing
     end
@@ -23,7 +23,7 @@ function get_chunks(int_cfg::IntCfg, space_cfg::SpaceCfg, state, dynamic_cfg)
     )
 
     Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-        chunks_space_cfg, state, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=dynamic_cfg,
+        chunks_space_cfg, state, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=extra_info,
     )  
 end
 
@@ -64,7 +64,7 @@ struct System{T, ND, NT, StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT
     debug_info::DebugT
 end
 function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, chunks=nothing, info=nothing, debug_info=nothing) where {ND, T}
-    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state, dynamic_cfg))
+    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state, info))
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
     end
@@ -116,13 +116,15 @@ particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.s
 get_particle_radius(dynamic_cfg, state, idx) = particle_radius(dynamic_cfg)
 get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cfg, system.state, idx)
 
-@inline get_num_total_particles(state::State, dynamic_cfg=nothing) = length(state.pos)
-@inline get_num_total_particles(system::System) = get_num_total_particles(system.dynamic_cfg, system.state)
+@inline get_num_total_particles(state::State, info=nothing) = length(state.pos)
+@inline get_num_total_particles(system::System, state::State) = get_num_total_particles(state, system.info)
+@inline get_num_total_particles(system::System) = get_num_total_particles(system.state, system.info)
 
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
 @inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
+@inline get_particles_ids(system::System, state) = get_particles_ids(state, system.dynamic_cfg)
 @inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
 
 end
