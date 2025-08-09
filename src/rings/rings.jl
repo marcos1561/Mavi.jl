@@ -115,6 +115,7 @@ using .Sources
 @kwdef struct RingsInfo{T, PIDS, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, S, U}
     continuos_pos::Matrix{SVector{2, T}}
     areas::Vector{T}
+    cms::Vector{SVector{2, T}}
     particles_ids::PIDS
     p_neigh::PN
     r_neigh::RN
@@ -124,7 +125,7 @@ end
 Mavi.Systems.get_particles_ids(state::RingsState, info::RingsInfo) = get_ids(info.particles_ids)
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=nothing,
-    r_neighbors=nothing, source_cfg::Union{SourceCfg, Nothing}=nothing, user_data=nothing)
+    r_neighbors=nothing, source_cfg=nothing, calc_cms=false, user_data=nothing)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
             error("DynamicCfg has multiple types, but state.types is nothing!")
@@ -163,23 +164,40 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
     
     parts_ids = get_particles_ids_obj(state)
     update_part_ids!(parts_ids, state, dynamic_cfg)
+    cms = [zero(state.pos[1]) for _ in 1:size(state.rings_pos, 2)]
     
     chunks = get_chunks(int_cfg, space_cfg, state, dynamic_cfg, parts_ids)
 
     sources = nothing
     if !isnothing(source_cfg)
-        source_pos = nothing
-        if isnothing(chunks)
-            source_pos = state.pos
+        if !(typeof(source_cfg) <: AbstractArray)
+            source_cfg = [source_cfg]
         end
 
-        # sources = Source(source_cfg, chunks, source_pos)
-        sources = Source(source_cfg, nothing, (state.pos, parts_ids))
+        sources = [] 
+        for s_cfg in source_cfg
+            s = nothing
+            if s_cfg isa SourceCfg
+                if !isnothing(chunks)
+                    s = Source(s_cfg, (state.pos, chunks), nothing)
+                else
+                    s = Source(s_cfg, nothing, (state.pos, parts_ids))
+                end
+            elseif s_cfg isa SinkCfg
+                s = Sink(s_cfg, cms)
+            else
+                error("Unknown source configuration type: $(typeof(s_cfg))")
+            end
+
+            push!(sources, s)
+        end
+        sources = Tuple(sources)
     end
 
     info = RingsInfo(
         continuos_pos=similar(state.rings_pos),
         areas=Vector{Float64}(undef, size(state.rings_pos, 2)),
+        cms=cms,
         particles_ids=parts_ids,
         p_neigh=p_neighbors, r_neigh=r_neighbors,
         sources=sources,

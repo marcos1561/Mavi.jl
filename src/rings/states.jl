@@ -1,6 +1,6 @@
 module States
 
-export RingsState, ActiveState, ActiveRings, get_active_ids, has_types_func, add_ring
+export RingsState, ActiveState, ActiveRings, get_active_ids, has_types_func, add_ring!, remove_ring!
 export num_max_particles, get_ring_id, get_particle_id, get_particle_ring_id, to_scalar_idx, get_inner_neigh_ids, calc_active_ids!
 export get_num_active
 
@@ -21,7 +21,6 @@ get_active_mask(active_state::ActiveState{T}, num_rings=nothing) where T <: Abst
     ids::Vector{Int}
     uids::Vector{Int}
     num_active::Int
-    num_particles_active::Int
 end
 
 function calc_active_ids!(active) end
@@ -63,7 +62,6 @@ function RingsState(;rings_pos, pol, types=nothing, active_state=nothing)
             ids=Vector(1:num_rings),
             uids=Vector(1:num_rings),
             num_active=0,
-            num_particles_active=0,
         )
         calc_active_ids!(active_rings)
     end
@@ -90,6 +88,7 @@ end
 end
 
 @inline get_ring_id(idx, num_max_particles) = div(idx-1, num_max_particles) + 1
+@inline get_ring_id(state::RingsState, idx) = get_ring_id(idx, num_max_particles(state))
 
 @inline get_particle_id(idx, num_max_particles) = idx - (get_ring_id(idx, num_max_particles) - 1) * num_max_particles
 @inline get_particle_id(idx, num_max_particles, ring_id) = idx - (ring_id - 1) * num_max_particles
@@ -117,7 +116,7 @@ end
     return particle_id, ring_id
 end
 
-function add_ring(state, pos, pol)
+function add_ring!(state, pos, pol)
     active = state.active
     for i in eachindex(active.mask)
         if !active.mask[i]
@@ -126,11 +125,17 @@ function add_ring(state, pos, pol)
             active.mask[i] = true
             active.uids[i] = maximum(active.uids) + 1
             active.num_active += 1
-            return
+            return i
         end
     end
-
+    return nothing
     # @warn "Space not found to add a new Ring!"
+end
+
+function remove_ring!(state, ring_id)
+    active = state.active
+    active.mask[ring_id] = false
+    active.num_active -= 1
 end
 
 end

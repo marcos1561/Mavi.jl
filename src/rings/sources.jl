@@ -1,11 +1,12 @@
 module Sources
 
 export SourceCfg, Source
-export update_area_empty!, process_source!
+export SinkCfg, Sink
+export update_area_empty!, process_sink_source!
 
 using StaticArrays
 
-import Mavi.Configs: RectangleCfg, check_intersection, is_inside
+import Mavi.Configs: GeometryCfg, RectangleCfg, check_intersection, is_inside
 import Mavi.Rings: get_num_particles, get_ids
 
 using Mavi.Rings.States
@@ -40,9 +41,73 @@ zero_offset(::Type{T}) where {T} = (zero(T), zero(T))
 
 abstract type Checker end
 
-struct ChunksChecker{C} <: Checker 
+struct ChunksChecker{P, C} <: Checker 
+    pos::P
     chunks::C
     ids::Vector{Vector{CartesianIndex{2}}}
+end
+function ChunksChecker(pos, chunks, bbox_vec::Vector{G}) where G <: RectangleCfg 
+    global_bbox = sum(bbox_vec)
+    # global_bbox = RectangleCfg(
+    #     length=global_bbox.length + cfg.pad*2,
+    #     height=global_bbox.height + cfg.pad*2,
+    #     bottom_left=global_bbox.bottom_left - SVector(cfg.pad, cfg.pad),
+    # )
+    bbox_ids = [CartesianIndex{2}[] for _ in 1:length(bbox_vec)]
+
+    up = SVector(0, 1)
+    chunk_tl = chunks.geometry_cfg.bottom_left + up * chunks.geometry_cfg.height
+
+    found_start = false
+    start_x_id, end_x_id = 0, 0
+    for i in 1:chunks.num_cols
+        x1 = chunk_tl[1] + (i-1) * chunks.chunk_length
+        x2 = x1 + chunks.chunk_length
+        if !found_start && x1 <= global_bbox.bottom_left[1] <= x2
+            found_start = true
+            start_x_id = i
+        end
+
+        if found_start && x1 >= global_bbox.bottom_left[1] + global_bbox.length
+            end_x_id = i - 1
+            break
+        end
+    end
+
+    found_start = false
+    start_y_id, end_y_id = 0, 0       
+    for i in 1:chunks.num_rows
+        y2 = chunk_tl[2] - (i-1) * chunks.chunk_height
+        y1 = y2 - chunks.chunk_height
+        if !found_start && y1 <= global_bbox.bottom_left[2] + global_bbox.height  <= y2
+            found_start = true
+            start_y_id = i
+        end
+
+        if found_start && y2 <= global_bbox.bottom_left[2]
+            end_y_id = i - 1
+            break
+        end
+    end
+
+    for col in start_x_id:end_x_id
+        for row in start_y_id:end_y_id
+            rect = get_chunk_rect(chunks, row, col) 
+            # RectangleCfg(
+            #     length=chunks.chunk_length,
+            #     height=chunks.chunk_height,
+            #     bottom_left=chunk_tl - col*up + (row-1)*right,
+            # )
+
+            for (bbox, chunks_ids) in zip(bbox_vec, bbox_ids)
+                if check_intersection(rect, bbox)
+                    push!(chunks_ids, CartesianIndex(row, col))
+                end
+            end
+        end
+    end
+
+    ChunksChecker(pos, chunks, bbox_ids)
 end
 
 struct PosChecker{P, PIDS} <: Checker
@@ -50,14 +115,14 @@ struct PosChecker{P, PIDS} <: Checker
     part_ids::PIDS
 end
 
-struct Source{T<:AbstractFloat, C<:Checker}
-    cfg::SourceCfg
+struct Source{T<:AbstractFloat, C<:Checker, Cfg<:SourceCfg}
+    cfg::Cfg
     checker::C
     is_empty::Vector{Bool}
     bbox::Vector{RectangleCfg{2, T}}
     bbox_spawn_pos::Vector{Vector{SVector{2, T}}}
 end
-function Source(cfg::SourceCfg{T, S}, chunks::Union{Chunks, Nothing}=nothing, pos_checker_args=nothing) where {T, S}
+function Source(cfg::SourceCfg{T, S}, chunks_checker_args=nothing, pos_checker_args=nothing) where {T, S}
     xs = [pos[1] for pos in cfg.spawn_pos]
     ys = [pos[2] for pos in cfg.spawn_pos]
     min_x = minimum(xs)
@@ -77,6 +142,7 @@ function Source(cfg::SourceCfg{T, S}, chunks::Union{Chunks, Nothing}=nothing, po
     right = SVector{2, T}(1, 0)
     up = SVector{2, T}(0, 1)
     bbox_vec::Vector{RectangleCfg{2, T}} = []
+    bbox_pad_vec::Vector{RectangleCfg{2, T}} = []
     for i in 1:cfg.size[1]
         for j in 1:cfg.size[2]
             bl_i = bl + ((i-1)*bbox_length + i*cfg.offset[1]) * right  + ((j-1)*bbox_height + j*cfg.offset[2]) * up        
@@ -85,68 +151,18 @@ function Source(cfg::SourceCfg{T, S}, chunks::Union{Chunks, Nothing}=nothing, po
                 height=bbox_height, 
                 bottom_left=bl_i,
             )
+            bbox_pad = RectangleCfg(
+                length=bbox_length+2*cfg.pad, 
+                height=bbox_height+2*cfg.pad, 
+                bottom_left=bl_i - SVector(cfg.pad, cfg.pad),
+            )
             push!(bbox_vec, bbox)
+            push!(bbox_pad_vec, bbox_pad)
         end
     end
 
-    if !isnothing(chunks)
-        global_bbox = sum(bbox_vec)
-        global_bbox = RectangleCfg(
-            length=global_bbox.length + cfg.pad*2,
-            height=global_bbox.height + cfg.pad*2,
-            bottom_left=global_bbox.bottom_left - SVector(cfg.pad, cfg.pad),
-        )
-        bbox_ids = [CartesianIndex{2}[] for _ in 1:length(bbox_vec)]
-
-        chunk_tl = chunks.geometry_cfg.bottom_left + up * chunks.geometry_cfg.height
-
-        found_start = false
-        for i in 1:chunks.num_cols
-            x1 = chunk_tl[1] + (i-1) * chunks.chunk_length
-            x2 = x1 + chunks.chunk_length
-            if !found_start && x1 <= global_bbox.bottom_left[1] <= x2
-                found_start = true
-                start_x_id = i
-            end
-
-            if found_start && x1 > global_bbox.bottom_left[1] + global_bbox.length
-                end_x_id = i - 1
-                break
-            end
-        end
-
-        found_start = false
-        for i in 1:chunks.num_rows
-            y1 = chunk_tl[2] + (i-1) * chunks.chunk_height
-            y2 = y1 + chunks.chunk_height
-            if !found_start && y1 <= global_bbox.bottom_left[2] + global_bbox.height  <= y2
-                found_start = true
-                start_y_id = i
-            end
-
-            if found_start && y1 > global_bbox.bottom_left[2]
-                end_y_id = i - 1
-                break
-            end
-        end
-
-        for col in start_x_id:end_x_id
-            for row in start_y_id:end_y_id
-                rect = RectangleCfg(
-                    length=chunks.length,
-                    height=chunks.height,
-                    bottom_left=chunk_tl - col*up + (row-1)*right,
-                )
-
-                for (_, bbox, chunks_ids) in zip(bbox_vec, bbox_ids)
-                    if check_intersection(rect, bbox)
-                        push!(chunks_ids, CartesianIndex(row, col))
-                    end
-                end
-            end
-        end
-
-        checker = ChunksChecker(chunks, chunks_ids)
+    if !isnothing(chunks_checker_args)
+        checker = ChunksChecker(chunks_checker_args..., bbox_pad_vec)
     elseif !isnothing(pos_checker_args)
         checker = PosChecker(pos_checker_args...)
     else
@@ -163,7 +179,7 @@ function Source(cfg::SourceCfg{T, S}, chunks::Union{Chunks, Nothing}=nothing, po
     return Source(cfg, checker, fill(false, num_spawn), bbox_vec, spawn_pos)
 end
 
-function update_area_empty!(source::Source{T, C}) where {T, C<:PosChecker}
+function update_area_empty!(source::Source{T, C, Cfg}) where {T, C<:PosChecker, Cfg}
     checker = source.checker
     pos = checker.pos
     p_ids = get_ids(checker.part_ids)
@@ -198,34 +214,62 @@ function update_area_empty!(source::Source{T, C}) where {T, C<:PosChecker}
     # end
 end
 
-function update_area_empty!(source::Source{T, C}) where {T, C<:ChunksChecker}
+function update_area_empty!(source::Source{T, C, Cfg}) where {T, C<:ChunksChecker, Cfg}
     checker = source.checker 
     chunks = checker.chunks
+    pos = checker.pos
     for (i, chunks_ids) in enumerate(checker.ids)
-        is_empty = true
-        source.is_empty[i] = is_empty
+        bbox = source.bbox[i]
+        source.is_empty[i] = true
         for chunk_id in chunks_ids
-            if chunks.num_particles_in_chunk[chunk_id] != 0
-                is_empty = false
+            for p_idx in get_chunk_particles(chunks, chunk_id)
+                if is_inside(pos[p_idx], bbox, pad=source.cfg.pad)
+                    source.is_empty[i] = false
+                    break
+                end
+            end
+            if !source.is_empty[i]
                 break
             end
         end
-        source.is_empty[i] = is_empty
     end
 end
 
 function process_source!(source::Nothing, state=nothing) end
 
-function process_source!(source, state)
+function process_source!(source, state, system=nothing)
     update_area_empty!(source)
     for idx in eachindex(source.is_empty)
         if !source.is_empty[idx]
             continue
         end
-        add_ring(state, source.bbox_spawn_pos[idx], get_spawn_pol(source.cfg.spawn_pol))
+        ring_id = add_ring!(state, source.bbox_spawn_pos[idx], get_spawn_pol(source.cfg.spawn_pol))
+        if !isnothing(system) && !isnothing(ring_id)
+            num_p = get_num_particles(system, ring_id)
+            system.info.cms[ring_id] = sum(state.rings_pos[1:num_p, ring_id]) / num_p
+        end
     end
 end
 
+struct SinkCfg{G<:GeometryCfg}
+    geometry_cfg::G
+end
 
+struct Sink{N, T, G}
+    cfg::SinkCfg{G}
+    pos::Vector{SVector{N, T}}
+end
+
+function process_sink!(sink::Sink, state)
+    box = sink.cfg.geometry_cfg
+    for ring_id in get_active_ids(state)
+        if is_inside(sink.pos[ring_id], box)
+            remove_ring!(state, ring_id)
+        end
+    end
+end
+
+process_sink_source!(sink_source::Sink, state, system=nothing) = process_sink!(sink_source, state)
+process_sink_source!(sink_source::Source, state, system) = process_source!(sink_source, state, system)
 
 end

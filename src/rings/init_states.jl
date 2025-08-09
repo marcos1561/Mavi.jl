@@ -1,5 +1,7 @@
 module InitStates
 
+export rectangular_grid, random_pol, create_circle
+
 using Mavi.Configs
 using Mavi.Rings.Utils
 

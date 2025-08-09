@@ -1,6 +1,8 @@
 module ChunksMod
 
-export Chunks, update_chunks!
+export Chunks, update_chunks!, get_chunk_particles, get_chunk_rect
+
+using StaticArrays
 
 using Mavi.States: State
 using Mavi.Configs
@@ -35,6 +37,25 @@ function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, 
 
     Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg.geometry_cfg, 1, 
         state, extra_info, neighbors, chunk_particles, num_particles_in_chunk)
+end
+
+get_chunk_particles(chunks::Chunks, id) = get_chunk_particles(chunks, Tuple(id)...)
+function get_chunk_particles(chunks::Chunks, row_id, col_id)
+    num_p = chunks.num_particles_in_chunk[row_id, col_id]
+    pids = @view chunks.chunk_particles[1:num_p, row_id, col_id]
+    return pids
+end
+
+get_chunk_rect(chunks::Chunks, id) = get_chunk_rect(chunks, Tuple(id)...)
+function get_chunk_rect(chunks::Chunks, row_id, col_id)
+    up, right = SVector(0, 1), SVector(1, 0) 
+    tl = chunks.geometry_cfg.bottom_left + chunks.geometry_cfg.height * up
+    l, h = chunks.chunk_length, chunks.chunk_height
+    return RectangleCfg(
+        length=l,
+        height=h,
+        bottom_left=tl - row_id * h * up + (col_id - 1) * l * right 
+    )
 end
 
 function get_neighbors(num_rows, num_cols, wall_type::PeriodicWalls)

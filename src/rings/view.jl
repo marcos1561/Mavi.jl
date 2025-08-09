@@ -3,6 +3,15 @@ using Mavi.Rings.States
 using Mavi.Rings.Configs: get_interaction_cfg, get_num_particles
 import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, get_graph_data, update_graph_data
 
+function update_types_to_ring_id!(types, system)
+    for ring_id in axes(system.rings_pos, 2)
+        for p_id in 1:get_num_particles(system, ring_id)
+            idx = to_scalar_idx(system.state, ring_id, p_id)
+            types[idx] = ring_id
+        end
+    end
+end
+
 function get_graph_data(cfg::GraphCfg, system, state::RingsState)
     num_p = length(state.pos)
 

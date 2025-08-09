@@ -2,7 +2,7 @@ module SystemGraphs
 
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
-export drawn_borders
+export drawn_borders, colors_from_cmap
 
 using GLMakie, ColorSchemes, DataStructures
 using Mavi.Systems
@@ -23,7 +23,7 @@ function get_circle(radius, resolution=20)
     return circle
 end
 
-function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true)
+function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true, color=:black)
     l, h = space_cfg.length, space_cfg.height
     x, y = space_cfg.bottom_left
     # lines!(ax, [x, y], [x+l, y], color=:black)
@@ -31,10 +31,10 @@ function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true)
     # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
     # lines!(ax, [y+h, x], [x, y], color=:black)
     
-    lines!(ax, [x, x+l], [y, y], color=:black)
-    lines!(ax, [x+l, x+l], [y+h, y], color=:black)
-    lines!(ax, [x+l, x], [y+h, y+h], color=:black)
-    lines!(ax, [x, x], [y+h, y], color=:black)
+    lines!(ax, [x, x+l], [y, y], color=color)
+    lines!(ax, [x+l, x+l], [y+h, y], color=color)
+    lines!(ax, [x+l, x], [y+h, y+h], color=color)
+    lines!(ax, [x, x], [y+h, y], color=color)
 
     if adjust_lims
         dx = l*0.1
@@ -44,10 +44,10 @@ function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true)
     end
 end
 
-function drawn_borders(ax, space_cfg::LinesCfg)
+function drawn_borders(ax, space_cfg::LinesCfg; color=:black)
     for line in space_cfg.lines
         p1, p2 = line.p1, line.p2
-        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=:black)
+        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color)
         # l, h = space_cfg.length, space_cfg.height
         # x, y = space_cfg.bottom_left
         # lines!(ax, [x, y], [x+l, y], color=:black)
@@ -77,6 +77,20 @@ function update_circles!(circle_points, circle_base, pos)
     end
 end
 
+function get_num_types(types, cmap)
+    if typeof(cmap) <: AbstractArray
+        return max(length(types), length(cmap))
+    else
+        return length(types)
+    end
+end
+
+function colors_from_cmap(cmap, num)
+    if cmap isa Symbol
+        cmap = colorschemes[cmap]
+    end
+    return Vector{Any}([cmap[rand(Float64)] for _ in 1:num])
+end
 
 function get_color_map(cmap::AbstractVector, num_types) 
     cmap_out = Vector{RGBf}(undef, num_types)
@@ -246,7 +260,7 @@ function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     num_total_particles = length(system.state.pos)
     
     types = get_graph_data(cfg, system, system.state)
-    cmap = get_color_map(cfg.colors_map, length(types))
+    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map))
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     scatter_plot = scatter!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
@@ -341,7 +355,7 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     end
 
     types = get_graph_data(cfg, system, system.state)
-    cmap = get_color_map(cfg.colors_map, length(types))
+    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map))
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     circles_plot = poly!(ax,

@@ -406,8 +406,11 @@ function update_ids!(system)
     update_active_particles_ids!(system.info.particles_ids, system.state, system.dynamic_cfg)
 end
 
-function update_sources!(system)
-    process_source!(system.info.sources, system.state)
+function update_sources!(system, sources::Nothing) end
+function update_sources!(system, sources)
+    for sink_source in sources
+        process_sink_source!(sink_source, system.state, system)
+    end
 end
 
 function cleaning!(system)
@@ -416,8 +419,17 @@ function cleaning!(system)
     # neigh_clean!(system.info.r_neigh)
 end
 
+function update_cms!(system)
+    wall_type = system.space_cfg.wall_type
+    for ring_id in get_active_ids(system.state)
+        rings_pos = get_continuos_pos(ring_id, system, wall_type)
+        system.info.cms[ring_id] = sum(rings_pos) / length(rings_pos)
+    end
+end
+
 function step!(system)
-    update_sources!(system)
+    update_cms!(system)
+    update_sources!(system, system.info.sources)
     
     update_ids!(system)
 

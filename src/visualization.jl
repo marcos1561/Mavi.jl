@@ -5,7 +5,7 @@ export animate, random_colors
 export AnimationCfg, VideoCfg, UiSettings
 export DefaultInfoUICfg
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
-export drawn_borders
+export drawn_borders, colors_from_cmap
 
 using GLMakie
 using DataStructures
