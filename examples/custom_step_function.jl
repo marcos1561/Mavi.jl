@@ -8,7 +8,7 @@ module Example
 
 using StaticArrays
 
-using Mavi
+using Mavi.Systems
 using Mavi.Visualization
 using Mavi.Configs
 
@@ -43,7 +43,7 @@ function main()
         # Rigid walls collisions
         geometry_cfg = system.space_cfg.geometry_cfg
         r = system.dynamic_cfg.ro/2
-        for i in 1:system.num_p
+        for i in 1:get_num_total_particles(system)
             if ((state.pos[i].x+r) > geometry_cfg.length) || ((state.pos[i].x-r) < 0)
                 state.vel[i] = state.vel[i] .* SVector(-1, 1)
             end

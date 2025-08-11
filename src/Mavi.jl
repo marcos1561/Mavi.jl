@@ -15,7 +15,7 @@ include("integration.jl")
 include("quantities.jl")
 
 using .Systems
-export System
+export System, save, load_system
 
 using .States
 

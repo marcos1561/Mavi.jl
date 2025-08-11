@@ -7,7 +7,7 @@ export HarmTruncCfg
 export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
 export IntCfg
 
-using NLsolve
+using NLsolve, StructTypes, JSON3
 
 import Mavi.Configs as MaviCfg
 # import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius

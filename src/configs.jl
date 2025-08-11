@@ -10,7 +10,7 @@ export IntCfg, ChunksIntCfg, has_chunks
 export particle_radius, ChunksCfg
 export DeviceMode, Sequencial, Threaded
 
-using StaticArrays
+using StaticArrays, StructTypes
 
 #
 # Space Configurations 
@@ -151,6 +151,7 @@ end
 # Wall Type
 #
 abstract type WallType end
+StructTypes.StructType(::Type{W}) where W <: WallType = StructTypes.Struct()
 
 struct RigidWalls <: WallType end  
 struct PeriodicWalls <: WallType end  
@@ -229,6 +230,8 @@ particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 abstract type AbstractIntCfg end
 
 abstract type DeviceMode end
+StructTypes.StructType(::Type{D}) where D <: DeviceMode = StructTypes.Struct()
+
 struct Threaded <: DeviceMode end
 struct Sequencial <: DeviceMode end
 

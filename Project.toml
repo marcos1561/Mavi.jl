@@ -7,17 +7,23 @@ version = "1.0.0-DEV"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [compat]
+JSON3 = "1.14.3"
 NLsolve = "4.5.1"
 Random = "1.11.0"
+Serialization = "1.11.0"
 StaticArrays = "1.9.14"
+StructTypes = "1.11.0"
 julia = "1"
 
 [extras]

@@ -36,7 +36,7 @@ This will install Mavi in the currently active environment, placing its files in
 Note: If you just want to use Mavi (not modify it), use `add` instead of `dev`.
 
 # Quick Start
-Let's create a gas of particles. The first thing we need to to is create the system's state: The particles' positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potencial between particles (in this example we will use a Lennard-Jones potencial). The particle radius can be accessed via the `particle_radius()` function:  
+Let's create a gas of particles. The first thing we need to to is create the system's state: The particles' positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potential between them (in this example we will use a Lennard-Jones potential). The particle radius can be accessed via the `particle_radius()` function:  
 
 ```julia
 using Mavi.Configs
@@ -50,7 +50,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction Potencial Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
@@ -79,7 +79,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction Potencial Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
@@ -116,7 +116,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potencial between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and

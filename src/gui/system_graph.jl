@@ -4,7 +4,7 @@ export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
 export drawn_borders, colors_from_cmap
 
-using GLMakie, ColorSchemes, DataStructures
+using GLMakie, ColorSchemes, DataStructures, Random
 using Mavi.Systems
 using Mavi.States: State
 using Mavi.Configs
@@ -119,6 +119,9 @@ function get_color_map(cmap::Symbol, num_types)
 
     if cmap == :random
         return [rand(RGBf) for _ in 1:num_types]
+    elseif cmap == :ids
+        rng = MersenneTwister(31415)
+        return [rand(rng, RGBf) for _ in 1:num_types]
     elseif cmap isa ColorScheme
         return [cmap[rand(Float32)] for _ in 1:num_types]            
     else
@@ -190,7 +193,8 @@ abstract type GraphCfg end
 abstract type Graph end
 
 function get_graph_data(graph_cfg::GraphCfg, system, state::State)
-    return (pos=state.pos, types=Vector(1:system.num_p), num_p=system.num_p)
+    num_p = get_num_total_particles(system)
+    return (pos=state.pos, types=Vector(1:num_p), num_p=num_p)
 end
 @inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system, system.state)
 

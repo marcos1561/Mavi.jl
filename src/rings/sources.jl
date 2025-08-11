@@ -4,7 +4,7 @@ export SourceCfg, Source
 export SinkCfg, Sink
 export update_area_empty!, process_sink_source!
 
-using StaticArrays
+using StaticArrays, StructTypes
 
 import Mavi.Configs: GeometryCfg, RectangleCfg, check_intersection, is_inside
 import Mavi.Rings: get_num_particles, get_ids
@@ -14,6 +14,7 @@ using Mavi.Rings.Configs
 using Mavi.ChunksMod
 
 struct RandomPol{T} end
+StructTypes.StructType(::Type{RandomPol{T}}) where T = StructTypes.Struct()
 
 get_spawn_pol(spawn_pol) = spawn_pol 
 get_spawn_pol(spawn_pol::RandomPol{T}) where T = rand(T) * 2 * π 

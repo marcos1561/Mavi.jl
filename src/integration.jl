@@ -278,7 +278,7 @@ end
 function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
     forces = get_forces(system)
 
-    N = system.num_p
+    N = get_num_total_particles(system)
     for i in 1:N
         for j in i+1:N
             if !is_valid_pair(system.state, system.dynamic_cfg, i, j)
@@ -375,22 +375,6 @@ function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <
             state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
         end
     end
-
-    # context = (center, geometry_cfg)
-    # iterate_particles(state, context, resolve_wall!)
-
-    # for i in 1:system.num_p
-    #     pos_i = @view state.pos[:, i] 
-    #     diff = pos_i[1] - center[1]  
-    #     if abs(diff) > geometry_cfg.length/2
-    #         pos_i[1] -= sign(diff) * geometry_cfg.length
-    #     end
-
-    #     diff = pos_i[2] - center[2]  
-    #     if abs(diff) > geometry_cfg.height/2
-    #         pos_i[2] -= sign(diff) * geometry_cfg.height
-    #     end
-    # end
 end
 
 @inline walls!(system::System) = walls!(system, system.space_cfg, system.dynamic_cfg)
@@ -424,7 +408,7 @@ function update_szabo!(system::System)
     vo, relax_time = dynamic_cfg.vo, dynamic_cfg.relax_time
     mu, dr = dynamic_cfg.mobility, dynamic_cfg.rot_diff 
 
-    for i in 1:system.num_p
+    for i in 1:get_num_total_particles(system)
         theta = state.pol_angle[i]
         pol = SVector(cos(theta), sin(theta) )
 
@@ -453,7 +437,7 @@ function update_rtp!(system::System)
     dynamic_cfg = system.dynamic_cfg
     vo, sigma, epsilon, tumble_rate = dynamic_cfg.vo, dynamic_cfg.sigma, dynamic_cfg.epsilon, dynamic_cfg.tumble_rate
 
-    for i in 1:system.num_p
+    for i in 1:get_num_total_particles(system)
         theta = state.pol_angle[i]
         pol = SVector(cos(theta), sin(theta))
 
