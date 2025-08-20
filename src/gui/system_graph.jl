@@ -307,14 +307,21 @@ function update_graph(comp::ScatterGraph, system)
     Makie.update!(comp.plot, points; color=colors)
 end
 
-struct CircleGraphCfg{C, F} <: GraphCompCfg
+@kwdef struct StrokeCfg{C}
+    color::C = "black"
+    width::Float64 = 0.5
+end
+
+struct CircleGraphCfg{C, S<:Union{StrokeCfg, Nothing}, F} <: GraphCompCfg
     circle_radius::Float64
+    stroke_cfg::S
     circle_rel::Int
     colors_map::C
     update_data::F
 end
-function CircleGraphCfg(;circle_radius=-1.0, circle_rel=20, colors_map=:random, 
+function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, colors_map=:random, 
     update_data=nothing)
+    
     # if colors_map === nothing
     #     colors_map = RGBf(GLMakie.to_color(:black))
     # end
@@ -327,7 +334,7 @@ function CircleGraphCfg(;circle_radius=-1.0, circle_rel=20, colors_map=:random,
         update_data = update_graph_data
     end
 
-    CircleGraphCfg(circle_radius, circle_rel, colors_map, update_data)
+    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, colors_map, update_data)
 end
 
 struct CircleGraph{C, P, O, PosObs} <: GraphComp
@@ -362,11 +369,16 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map))
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
-    circles_plot = poly!(ax,
-        [Circle(Point2f(0, 0), 1)],
-        strokecolor=:black,
-        strokewidth=0.5,
-    )
+    if isnothing(cfg.stroke_cfg)
+        circles_plot = poly!(ax, [Circle(Point2f(0, 0), 1)])
+    else
+        circles_plot = poly!(ax,
+            [Circle(Point2f(0, 0), 1)],
+            strokecolor=cfg.stroke_cfg.color,
+            strokewidth=cfg.stroke_cfg.width,
+        )
+    end
+    
     comp = CircleGraph(types, colors, radius, cmap, circles_plot, (), pos_obs, cfg)
     update_graph(comp, system)
     return comp

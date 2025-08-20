@@ -254,6 +254,7 @@ function animate(system::System, step!, cfg=nothing)
         num_frames = trunc(Int, anim_cfg.fps * cfg.duration)
         prog = ProgContinuos(init=1, final=num_frames)
         record(fig, cfg.path; framerate=anim_cfg.fps) do io
+            recordframe!(io)
             for frame in 1:num_frames
                 make_frame(context)
                 recordframe!(io)
