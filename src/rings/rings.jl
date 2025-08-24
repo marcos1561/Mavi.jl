@@ -3,11 +3,11 @@ module Rings
 export RingsSystem, RingsState, ActiveState, Configs, InitStates, Integration
 export get_num_total_particles, update_active_particles_ids!, update_part_ids!
 export NeighborsCfg
-export save, load_system
+export save_system, load_system
 
 using StaticArrays
 
-import Mavi
+using Mavi
 import Mavi.Systems: System, SystemType, get_num_total_particles, get_chunks
 
 include("states.jl")

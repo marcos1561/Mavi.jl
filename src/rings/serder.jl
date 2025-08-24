@@ -36,7 +36,7 @@ function MaviSerder.get_obj_save_data(info::RingsInfo)
     
     p_neigh_cfg = nothing
     if !isnothing(info.p_neigh)
-        p_neigh_cfg = info.p_neigh.cfg
+        p_neigh_cfg = info.p_neigh.neighbors.cfg
     end
     # serialize(joinpath(info_root, "p_neighbors_cfg.bin"), p_neigh_cfg)
     

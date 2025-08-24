@@ -1,6 +1,6 @@
 module MaviSerder
 
-export save, load_system
+export save_system, load_system
 
 using Serialization, JSON3
 using StaticArrays
@@ -32,7 +32,7 @@ get_obj_save_data_json(obj) = (type=string(typeof(obj)), data=get_obj_save_data(
 get_obj_save_data_json(obj::Tuple) = [get_obj_save_data_json(x) for x in obj]
 
 "Save a system in the path `root`."
-function save(system::System, root)
+function save_system(system::System, root)
     mkpath(root)
     
     configs_data = Dict(

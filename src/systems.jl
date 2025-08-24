@@ -1,8 +1,7 @@
 module Systems
 
-export System, particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius
-export get_particles_ids
-export save, load_system, StandardSys
+export System, StandardSys
+export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius, get_particles_ids
 
 using StaticArrays, Serialization, JSON3, StructTypes
 
