@@ -110,11 +110,13 @@ Information about the state of execution.
     Buffer with the execution time of the last performed time steps.   
 """
 mutable struct ExecInfo 
-    sym_time::Float64
-    sym_time_count::Int
     times::CircularBuffer{Float64}
     times_ui::CircularBuffer{Float64}
 end
+ExecInfo(buffer_size) = ExecInfo(
+    CircularBuffer{Float64}(buffer_size), 
+    CircularBuffer{Float64}(buffer_size),
+)
 
 get_anim_cfg(cfg::AnimationCfg) = cfg
 get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
@@ -152,6 +154,8 @@ function animate(system::System, step!, cfg=nothing)
     run_status = Observable(!anim_cfg.begin_paused)
     run_next_frame = false
     
+    exec_info = ExecInfo(anim_cfg.exec_times_size)
+
     if !is_video
         system_gl = fig[1, 2] = GridLayout()
         system_ax = Axis(system_gl[1, 1]; aspect=DataAspect(), ax_kwargs...)
@@ -216,16 +220,13 @@ function animate(system::System, step!, cfg=nothing)
         
         
         info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
+        InfoUIs.update_info_ui(info, exec_info, system)
     else
         system_ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
     end
 
     graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
 
-    exec_info = ExecInfo(0, 0, 
-        CircularBuffer{Float64}(anim_cfg.exec_times_size), 
-        CircularBuffer{Float64}(anim_cfg.exec_times_size),
-    )
 
     context = (
         anim_cfg=anim_cfg,
@@ -244,7 +245,6 @@ function animate(system::System, step!, cfg=nothing)
         for _ in 1:anim_cfg.num_steps_per_frame
             step_info = @timed step!(system)
             push!(exec_info.times, step_info.time)
-            exec_info.sym_time += system.int_cfg.dt
         end
         
         SystemGraphs.update_graph(graph, system)

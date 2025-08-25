@@ -63,7 +63,7 @@ end
 function update_info_ui(info::DefaultInfoUI, exec_info, system)
     exec_times = exec_info.times
     exec_times_ui = exec_info.times_ui
-    sym_time = exec_info.sym_time
+    sym_time = system.time_info.time
 
     mean_exec_time = sum(exec_times)/length(exec_times) * 1000
     mean_exec_time_ui = sum(exec_times_ui)/length(exec_times_ui)
