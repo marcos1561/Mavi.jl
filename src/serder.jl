@@ -1,6 +1,6 @@
 module MaviSerder
 
-export save_system, load_system
+export save_system, save_system_configs, load_system, save_component_serial
 
 using Serialization, JSON3
 using StaticArrays
@@ -31,10 +31,8 @@ get_obj_save_data(obj) = obj
 get_obj_save_data_json(obj) = (type=string(typeof(obj)), data=get_obj_save_data(obj))
 get_obj_save_data_json(obj::Tuple) = [get_obj_save_data_json(x) for x in obj]
 
-"Save a system in the path `root`."
-function save_system(system::System, root)
+function save_system_configs(system::System, root)
     mkpath(root)
-    
     configs_data = Dict(
         "sys_type" => system.type,
         "space_cfg" => get_obj_save_data_json(system.space_cfg),
@@ -48,6 +46,11 @@ function save_system(system::System, root)
     open(joinpath(root, "configs.json"), "w") do io
         JSON3.pretty(io, configs_data)
     end
+end
+
+"Save a system in the path `root`."
+function save_system(system::System, root)
+    save_system_configs(system, root)
     save_component_serial(system.state, root, "state")
 end
 
@@ -107,14 +110,16 @@ function load_system(configs, ::StandardSys)
     )
 end
 
-function load_system(root)
-    configs = JSON3.read(joinpath(root, "configs.json"))
+function load_system(configs_path::String, state_path::String)
+    configs = JSON3.read(configs_path)
     configs = convert(Dict{Symbol, Any}, configs)
-    configs[:state] = get_load_info_serial(joinpath(root, "state"))
+    configs[:state] = get_load_info_serial(state_path)
     sys_type = eval(Meta.parse(configs[:sys_type]))
     # sys_type = deserialize(joinpath(root, "sys_type.bin"))
     
     load_system(configs, sys_type)
 end
+
+load_system(root) = load_system(joinpath(root, "configs.json"), joinpath(root, "state"))
 
 end # MaviSerder
