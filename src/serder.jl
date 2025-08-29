@@ -1,6 +1,7 @@
 module MaviSerder
 
-export save_system, save_system_configs, load_system, save_component_serial
+export save_system, save_system_configs, save_component_serial, get_obj_save_data_json
+export load_system, load_dic_configs, load_component, load_component_serial
 
 using Serialization, JSON3
 using StaticArrays
@@ -85,6 +86,11 @@ function load_component(T::Type{Nothing}, data::JSON3.Array)
     return Tuple(data_loaded)
 end
 
+function load_component_serial(root)
+   load_info = get_load_info_serial(root)
+   load_component(get_saved_type(load_info), get_saved_data(load_info)) 
+end
+
 "Load dictionary of object with load information in `configs`."
 function load_dic_configs(configs)
     configs_loaded = Dict()
@@ -110,12 +116,16 @@ function load_system(configs, ::StandardSys)
     )
 end
 
-function load_system(configs_path::String, state_path::String)
+function load_system(configs_path::String, state_path::String, time_info_path=nothing)
     configs = JSON3.read(configs_path)
     configs = convert(Dict{Symbol, Any}, configs)
     configs[:state] = get_load_info_serial(state_path)
     sys_type = eval(Meta.parse(configs[:sys_type]))
     # sys_type = deserialize(joinpath(root, "sys_type.bin"))
+    
+    if !isnothing(time_info_path)
+        configs[:time_info] = get_load_info_serial(time_info_path)
+    end
     
     load_system(configs, sys_type)
 end
