@@ -98,6 +98,9 @@ function load_dic_configs(configs)
         if name == :sys_type
             continue
         end
+        # println("Type: ", get_saved_type(load_info))
+        # println("Data: ", JSON3.write(get_saved_data(load_info)))
+        # println("================")
         configs_loaded[name] = load_component(get_saved_type(load_info), get_saved_data(load_info))
     end
     return configs_loaded

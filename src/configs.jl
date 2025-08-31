@@ -6,9 +6,9 @@ export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg
 export get_bounding_box, check_intersection, is_inside
 export RigidWalls, PeriodicWalls, SlipperyWalls
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
-export IntCfg, ChunksIntCfg, has_chunks
-export particle_radius, ChunksCfg
+export IntCfg, ChunksCfg, has_chunks
 export DeviceMode, Sequencial, Threaded
+export particle_radius
 
 using StaticArrays, StructTypes
 
@@ -240,13 +240,14 @@ struct Sequencial <: DeviceMode end
     num_rows::Int
 end
 
-@kwdef struct IntCfg{T<:Number, ChunkT<:Union{ChunksCfg, Nothing}, Device<:DeviceMode} <: AbstractIntCfg 
+@kwdef struct IntCfg{T<:Number, ChunkT<:Union{ChunksCfg, Nothing}, Device<:DeviceMode, ExtraT} <: AbstractIntCfg 
     dt::T
     chunks_cfg::ChunkT = nothing
     device::Device = Sequencial()
+    extra::ExtraT = nothing
 end
 
-has_chunks(int_cfg::IntCfg{T, Nothing, D}) where {T, D} = false
-has_chunks(int_cfg::IntCfg{T, ChunksCfg, D}) where {T, D} = true
+has_chunks(int_cfg::IntCfg{T, Nothing, D, E}) where {T, D, E} = false
+has_chunks(int_cfg::IntCfg{T, ChunksCfg, D, E}) where {T, D, E} = true
 
 end

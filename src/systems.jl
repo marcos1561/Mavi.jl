@@ -11,12 +11,11 @@ using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
 
-function get_chunks(int_cfg::IntCfg, space_cfg::SpaceCfg, state, dynamic_cfg, extra_info=nothing)
-    if !has_chunks(int_cfg)
+function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, state, dynamic_cfg, extra_info=nothing)
+    if isnothing(chunks_cfg)
         return nothing
     end
 
-    chunks_cfg = int_cfg.chunks_cfg
     bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
     chunks_space_cfg = SpaceCfg(
         wall_type=space_cfg.wall_type,
@@ -43,13 +42,15 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T, ND, NT, StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
-    SysT<:SystemType, InfoT, DebugT}
+struct System{T, ND, NT, 
+    StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
+    ChunksT<:Union{Nothing, Chunks}, SysT<:SystemType, 
+    InfoT, DebugT}
     state::StateT
     space_cfg::SpaceCfg{WallTypeT, GeometryCfgT}
     dynamic_cfg::DynamicCfgT
     int_cfg::IntCfgT
-    chunks::Union{Chunks, Nothing}
+    chunks::ChunksT
     
     """
     Total force of all particles. One should use get_forces(system) to
@@ -100,7 +101,7 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
     # end
 
     if isnothing(chunks)
-        chunks = get_chunks(int_cfg, space_cfg, state, dynamic_cfg) 
+        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state, dynamic_cfg) 
     end
 
     if !isnothing(chunks)

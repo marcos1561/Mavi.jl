@@ -1,11 +1,11 @@
 module Configs
 
-export RingsCfg, has_types_cfg, get_spring_pars
+export RingsIntCfg, RingsCfg, has_types_cfg, get_spring_pars
 export get_num_particles, get_area0, get_equilibrium_p0, get_particle_radius
 export get_equilibrium_area, get_particles_area_contribution, get_ring_radius
 export HarmTruncCfg
 export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
-export IntCfg
+export IntCfg, InvasionsCfg
 
 using NLsolve, StructTypes, JSON3
 
@@ -15,6 +15,9 @@ import Mavi.Configs as MaviCfg
 using Reexport
 @reexport using Mavi.Configs
 
+# =
+# Pairwise interactions
+# = 
 
 abstract type InteractionCfg end
 
@@ -60,6 +63,10 @@ end
 @inline get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionCfg) = interaction
 
 @inline get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionCfg) = interaction
+
+# =
+# Rings Configs
+# = 
 
 struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFinderT<:Union{InteractionFinder{T}, T}} <: DynamicCfg
     p0::U
@@ -143,19 +150,7 @@ end
     return particle_radius(inter)
 end
 
-function MaviCfg.particle_radius(dynamic_cfg::RingsCfg)
-    return get_rings_property(dynamic_cfg, get_particle_radius)
-    # for i in 1:dynamic_cfg.num_types
-    #     inter = get_interaction_cfg(i, i, dynamic_cfg.interaction_finder)
-    #     p_radius[i] = particle_radius(inter) 
-    # end
-    
-    # if length(p_radius) == 1
-    #     p_radius = p_radius[1]
-    # end
-
-    # return p_radius
-end
+MaviCfg.particle_radius(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, get_particle_radius)
 
 """
 Returns the equilibrium area of the area force for
@@ -221,13 +216,19 @@ function get_equilibrium_area(dynamic_cfg::RingsCfg, type=nothing)
     end
 
     function func!(F, f)
-        F[1] = get_fa(f[1]) - get_fm_total(f[1])
+        F[1] = get_fa(f[1]^2) - get_fm_total(f[1]^2)
     end
 
-    sol = nlsolve(func!, [0.5])
-    f_sol = sol.zero[1]
+    sol = nlsolve(func!, [sqrt(0.5)])
+    f_sol = sol.zero[1]^2
 
-    return f_sol * a0
+    a0_sol = f_sol * a0 
+
+    if a0_sol < a0
+        return a0
+    else
+        return a0_sol
+    end
 end
 get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_equilibrium_area)
 
@@ -262,5 +263,28 @@ function get_ring_radius(dynamic_cfg::RingsCfg, type=nothing)
     return radius_to_particle + p_radius
 end
 get_ring_radius(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_ring_radius)
+
+# =
+# Integration Configs
+# = 
+
+struct InvasionsCfg
+    steps_to_update::Int
+end
+
+struct IntCfgExtra{RC<:Union{ChunksCfg, Nothing}, InvT<:Union{InvasionsCfg, Nothing}}
+    r_chunks_cfg::RC
+    invasions_cfg::InvT
+end
+StructTypes.StructType(::Type{D}) where D <: IntCfgExtra = StructTypes.Struct()
+
+function RingsIntCfg(; dt, p_chunks_cfg=nothing, r_chunks_cfg=nothing, 
+    invasions_cfg=nothing, device=nothing) 
+    if isnothing(device)
+        device = MaviCfg.IntCfg(dt=dt).device
+    end
+
+    MaviCfg.IntCfg(dt, p_chunks_cfg, device, IntCfgExtra(r_chunks_cfg, invasions_cfg))
+end
 
 end

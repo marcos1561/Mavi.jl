@@ -154,7 +154,7 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
 
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
-                        f1 = calc_interaction(p1_id, nei_chunk[j], 
+                        f1 = calc_interaction(p1_id, p2_id, 
                             system.dynamic_cfg, system)
                         
                         forces[p1_id] +=  f1

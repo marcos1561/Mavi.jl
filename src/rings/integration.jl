@@ -15,16 +15,18 @@ using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWal
 
 export step!
     
-function update_chunks!(chunks::Chunks{N, T, StateT, InfoT}) where {N, T, StateT<:RingsState, InfoT}
+function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.ParticleIds}
     chunks.num_particles_in_chunk .= 0
     for idx in Rings.get_ids(chunks.extra_info)
         update_particle_chunk!(chunks, idx)
     end
-    # for ring_id in get_active_ids(chunks.state)
-    #     for p_id in 1:get_num_particles(chunks.extra_info, chunks.state, ring_id)
-    #         update_particle_chunk!(chunks, to_scalar_idx(chunks.state, ring_id, p_id))
-    #     end
-    # end
+end
+
+function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:RingsState}
+    chunks.num_particles_in_chunk .= 0
+    for idx in get_active_ids(chunks.extra_info)
+        update_particle_chunk!(chunks, idx)
+    end
 end
 
 function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
@@ -129,16 +131,6 @@ function update_continuos_pos!(system, wall_type::PeriodicWalls)
             # continuos_pos[2, i, ring_id] = continuos_pos[2, i-1, ring_id] + dy
         end
     end
-end
-
-function get_continuos_pos(ring_id, system, wall_type)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
-    return @view system.state.rings_pos[1:num_particles, ring_id]
-end
-
-function get_continuos_pos(ring_id, system, wall_type::PeriodicWalls)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
-    return @view system.info.continuos_pos[1:num_particles, ring_id]
 end
 
 function area_forces!(system)
@@ -427,15 +419,164 @@ function update_cms!(system)
     end
 end
 
+function update_chunks_all!(system)
+    update_chunks!(system.chunks)
+    update_chunks!(system.info.r_chunks)
+end
+
+function point_line_intersect(p, line)
+    dx = line[2].x - line[1].x
+    dy = line[2].y - line[1].y
+    if dx == 0
+        x_inter = line[1].x
+        
+        check1 = x_inter > p.x
+        
+        y_id1, y_id2 = 1, 2
+        if dy < 0
+            y_id1, y_id2 = 2, 1
+        end
+        check2 = line[y_id1].y < p.y < line[y_id2].y  
+
+        return check1 & check2
+    else
+        if dy == 0
+            return false
+        end
+        
+        c = dy * line[1].x - dx * line[1].y
+        x_inter = (c + dx * p.y) / dy 
+    end
+
+    check1 = x_inter > p.x
+    
+    y_id1, y_id2 = 1, 2
+    if dy < 0
+        y_id1, y_id2 = 2, 1
+    end
+    
+    x_id1, x_id2 = 1, 2
+    if dx < 0
+        x_id1, x_id2 = 2, 1
+    end
+
+    check2 = (line[x_id1].x < x_inter < line[x_id2].x) & (line[y_id1].y < p.y < line[y_id2].y)
+
+    return check1 & check2
+end
+
+function polygons_intersect(poly1, poly2)
+    num_poly2 = length(poly2)
+    intersections = Int[]
+    for (id, p1) in enumerate(poly1)
+        count = 0
+        for idx1 in eachindex(poly2)
+            idx2 = idx1 + 1
+            if idx1 == num_poly2
+                idx2 = 1
+            end
+
+            if point_line_intersect(p1, (poly2[idx1], poly2[idx2]))
+                count += 1
+            end
+        end
+        if count % 2 != 0
+            push!(intersections, id)
+        end
+    end
+
+    return intersections
+end
+
+function find_invasions!(system, r1_id, r2_id)
+    invasions = system.info.invasions.list
+    state = system.state
+    r1 = ring_points(system, r1_id)
+    r2 = ring_points(system, r2_id)
+
+    particles_inv1 = polygons_intersect(r1, r2)
+    particles_inv2 = polygons_intersect(r2, r1)
+
+    pairs = (
+        (particles_inv1, r1_id, r2_id),
+        (particles_inv2, r2_id, r1_id),
+    )
+
+    for (p_ids, invasor_id, invaded_id) in pairs
+        for pi_id in p_ids
+            push!(invasions,
+                Invasion(
+                    invasor=invasor_id,
+                    invaded=invaded_id,
+                    p_id=to_scalar_idx(state, invasor_id, pi_id),
+                )
+            )
+        end
+    end
+end
+
+function check_invasions!(system, chunks::Chunks)
+    empty!(system.info.invasions.list)
+
+    for col in 1:chunks.num_cols, row in 1:chunks.num_rows
+        np = chunks.num_particles_in_chunk[row, col]
+        chunk = @view chunks.chunk_particles[:, row, col]
+        neighbors = chunks.neighbors[row, col]
+
+        for i in 1:np
+            r1_id = chunk[i]
+            for j in (i+1):np
+                r2_id = chunk[j]
+                find_invasions!(system, r1_id, r2_id)
+            end
+
+            for neighbor_id in neighbors
+                nei_np = chunks.num_particles_in_chunk[neighbor_id]
+                nei_chunk = @view chunks.chunk_particles[:, neighbor_id]
+                
+                for j in 1:nei_np
+                    r2_id = nei_chunk[j]
+                    find_invasions!(system, r1_id, r2_id)
+                end
+            end
+        end
+    end 
+end
+
+function check_invasions!(system, chunks::Nothing)
+    rings_ids = get_active_ids(system.state)
+    num_rings = length(rings_ids)
+
+    for r1_id in 1:num_rings
+        for r2_id in (r1_id+1):num_rings
+            find_invasions!(system, r1_id, r2_id)
+        end
+    end
+end
+
+check_invasions!(system) = check_invasions!(system, system.info.r_chunks)
+
+function update_invasions!(system, inv_cfg::Nothing) end
+function update_invasions!(system, inv_cfg::InvasionsCfg)
+    num_steps = system.time_info.num_steps
+    if num_steps - system.info.invasions.last_check < inv_cfg.steps_to_update
+        return
+    end
+    system.info.invasions.last_check = num_steps
+    check_invasions!(system)
+end
+update_invasions!(system) = update_invasions!(system, system.int_cfg.extra.invasions_cfg)
+
 function step!(system)
     update_cms!(system)
     update_sources!(system, system.info.sources)
     
     update_ids!(system)
-
-    update_chunks!(system.chunks)
-    update_continuos_pos!(system, system.space_cfg.wall_type)
     
+    update_chunks_all!(system)
+    update_continuos_pos!(system, system.space_cfg.wall_type)
+    update_invasions!(system)
+
     cleaning!(system)
     forces!(system)
     neigh_sum_buffers(system.info.p_neigh)

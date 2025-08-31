@@ -90,9 +90,9 @@ function create_system(;num_particles=10)
         state = state,
         space_cfg = space_cfg,
         dynamic_cfg = dynamic_cfg,
-        int_cfg = Configs.IntCfg(
+        int_cfg = Configs.RingsIntCfg(
             dt=0.01,
-            chunks_cfg=Configs.ChunksCfg(
+            p_chunks_cfg=Configs.ChunksCfg(
                 num_x_chunks, num_y_chunks,
             ),
             device=Configs.Threaded(),

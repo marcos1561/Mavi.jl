@@ -7,7 +7,7 @@ using StaticArrays
 using Mavi.States: State
 using Mavi.Configs
 
-struct Chunks{N, T, StateT<:State, InfoT}
+struct Chunks{N, T, P, InfoT}
     num_cols::Int
     num_rows::Int
     chunk_length::Float64
@@ -15,7 +15,7 @@ struct Chunks{N, T, StateT<:State, InfoT}
     geometry_cfg::RectangleCfg{N, T}
     steps_to_update::Int
 
-    state::StateT
+    pos::P
     extra_info::InfoT
 
     neighbors::Matrix{Vector{CartesianIndex{2}}}
@@ -23,7 +23,7 @@ struct Chunks{N, T, StateT<:State, InfoT}
     chunk_particles::Array{Int, 3}
     num_particles_in_chunk::Array{Int, 2}
 end
-function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, state, particle_r; extra_info=nothing) where {W, N, T}
+function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, pos, particle_r; extra_info=nothing) where {W, N, T}
     neighbors = get_neighbors(num_rows, num_cols, space_cfg.wall_type)
     
     chunk_length = space_cfg.geometry_cfg.length / num_cols
@@ -36,7 +36,7 @@ function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, 
     num_particles_in_chunk = zeros(Int, num_rows, num_cols)
 
     Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg.geometry_cfg, 1, 
-        state, extra_info, neighbors, chunk_particles, num_particles_in_chunk)
+        pos, extra_info, neighbors, chunk_particles, num_particles_in_chunk)
 end
 
 get_chunk_particles(chunks::Chunks, id) = get_chunk_particles(chunks, Tuple(id)...)
@@ -118,19 +118,24 @@ function get_neighbors(num_rows, num_cols, wall_type::Union{RigidWalls, Slippery
 end
 
 function update_particle_chunk!(chunks, i)
-    state = chunks.state
+    pos = chunks.pos
 
     space_h = chunks.geometry_cfg.height
     bottom_left = chunks.geometry_cfg.bottom_left
     chunk_l, chunk_h = chunks.chunk_length, chunks.chunk_height
 
-    # println(state.pos[:, i])
-
-    pos = state.pos[i]
-    row_id = trunc(Int, div(-pos[2] + bottom_left[2] + space_h, chunk_h)) + 1
-    col_id = trunc(Int, div(pos[1] - bottom_left[1], chunk_l)) + 1
-    # row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
-    # col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
+    
+    pos_i = pos[i]
+    row_id = trunc(Int, div(-pos_i[2] + bottom_left[2] + space_h, chunk_h)) + 1
+    col_id = trunc(Int, div(pos_i[1] - bottom_left[1], chunk_l)) + 1
+    # row_id = trunc(Int, div(-pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
+    # col_id = trunc(Int, div(pos[1, i] - bottom_left[1], chunk_l)) + 1
+    
+    # if occursin("RingsState", string(typeof(chunks.extra_info)))
+    #     println(pos_i)
+    #     println(row_id, ", ", col_id)
+    #     println("====")
+    # end
 
     row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
     col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
@@ -142,8 +147,8 @@ end
 
 "Update particles chunk positions."
 function update_chunks!(chunks::Chunks)
-    # num_p = size(chunks.state.pos)[2]
-    num_p = length(chunks.state.pos)
+    # num_p = size(chunks.pos)[2]
+    num_p = length(chunks.pos)
     chunks.num_particles_in_chunk .= 0
     for i in 1:num_p
         update_particle_chunk!(chunks, i)
@@ -153,7 +158,7 @@ end
 function update_chunks!(chunks::Nothing) end
 
 # function update_chunks!(chunks::Chunks)
-#     state = chunks.state
+#     pos = chunks.pos
 
 #     space_h = chunks.geometry_cfg.height
 #     bottom_left = chunks.geometry_cfg.bottom_left
@@ -161,10 +166,10 @@ function update_chunks!(chunks::Nothing) end
 
 #     chunks.num_particles_in_chunk .= 0
 
-#     num_p = size(state.pos)[2]
+#     num_p = size(pos)[2]
 #     for i in 1:num_p
-#         row_id = trunc(Int, div(-state.pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
-#         col_id = trunc(Int, div(state.pos[1, i] - bottom_left[1], chunk_l)) + 1
+#         row_id = trunc(Int, div(-pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
+#         col_id = trunc(Int, div(pos[1, i] - bottom_left[1], chunk_l)) + 1
         
 #         row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
 #         col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0

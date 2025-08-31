@@ -69,10 +69,14 @@ function Experiment(
     Experiment(cfg, get_collector(col_cfg, cfg, system), system, custom_step, checkpoint)
 end
 
-function run_experiment(experiment::Experiment)
+function run_experiment(experiment::Experiment, stop_func=nothing)
     system = experiment.system
     col = experiment.col
     cfg = experiment.cfg
+
+    if isnothing(stop_func)
+        stop_func = (system) -> false
+    end
 
     save_system_configs(system, cfg.root)
 
@@ -103,6 +107,10 @@ function run_experiment(experiment::Experiment)
         collect(col, system)
         check_checkpoint(cfg.checkpoint_cfg, experiment)
         show_progress(prog, system.time_info.time)
+
+        if stop_func(system)
+            break
+        end
     end
     save_data(col, col_path)
     
@@ -131,8 +139,12 @@ struct DelayedCol{S} <: Collector
     cfg::DelayedCfg
     state::DelayedState{S}
 end
-function get_collector(cfg::DelayedCfg, exp_cfg::ExperimentCfg, system::System)
-    DelayedCol(cfg, DelayedState(system.time_info.time, deepcopy(system.state)))
+function get_collector(cfg::DelayedCfg, exp_cfg::ExperimentCfg, system::System, state=nothing)
+    if isnothing(state)
+        state = DelayedState(system.time_info.time, deepcopy(system.state))
+    end
+
+    DelayedCol(cfg, state)
 end
 
 function collect(col::DelayedCol, system::System)
@@ -208,8 +220,7 @@ function load_experiment(root, custom_step=nothing)
     system = load_system(joinpath(root, "configs.json"), joinpath(path, "sys_state"), joinpath(path, "time_info"))
     col_state = load_component_serial(joinpath(path, "col_state"))
 
-    col = get_collector(col_cfg, exp_cfg, system)
-    col = @set col.state = col_state
+    col = get_collector(col_cfg, exp_cfg, system, col_state)
 
     return Experiment(exp_cfg, col, system, custom_step, cp_info)
 end
