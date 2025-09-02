@@ -168,7 +168,7 @@ struct RingsInfo{T, PIDS, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neigh
     user_data::U
 end
 function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_ids,
-    chunks=nothing, r_neighbors_cfg=nothing, p_neighbors_cfg=nothing, r_chunks_cfg=nothing, source_cfg=nothing, user_data=nothing)
+    chunks=nothing, r_neighbors_cfg=nothing, p_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing)
     r_neighbors = nothing
     if !isnothing(r_neighbors_cfg) 
         num_max_neighbors = r_neighbors_cfg.only_count == false ? 15 : nothing 
@@ -227,7 +227,9 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_i
     end
 
     rings_chunks = nothing
-    if !isnothing(r_chunks_cfg)
+    if !isnothing(int_cfg.extra.r_chunks_cfg)
+        r_chunks_cfg = int_cfg.extra.r_chunks_cfg
+
         bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
         chunks_space_cfg = SpaceCfg(
             wall_type=space_cfg.wall_type,
@@ -291,7 +293,6 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         chunks=chunks,
         r_neighbors_cfg=r_neighbors_cfg,
         p_neighbors_cfg=p_neighbors_cfg,
-        r_chunks_cfg=int_cfg.extra.r_chunks_cfg,
         source_cfg=source_cfg,
         user_data=user_data,
     )

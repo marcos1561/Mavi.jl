@@ -1,7 +1,7 @@
 module MaviSerder
 
-export save_system, save_system_configs, save_component_serial, get_obj_save_data_json
-export load_system, load_dic_configs, load_component, load_component_serial
+export save_system, save_system_configs, save_component_serial, save_component_json, get_obj_save_data_json
+export load_system, load_dic_configs, load_component, load_component_serial, load_component_json
 
 using Serialization, JSON3
 using StaticArrays
@@ -31,6 +31,12 @@ get_obj_save_data(obj) = obj
 "Returns data to be saved inside `obj` in the `json` format."
 get_obj_save_data_json(obj) = (type=string(typeof(obj)), data=get_obj_save_data(obj))
 get_obj_save_data_json(obj::Tuple) = [get_obj_save_data_json(x) for x in obj]
+
+function save_component_json(obj, root, name)
+    open(joinpath(root, "$name.json"), "w") do io
+        JSON3.pretty(io, get_obj_save_data_json(obj))
+    end
+end
 
 function save_system_configs(system::System, root)
     mkpath(root)
@@ -86,8 +92,13 @@ function load_component(T::Type{Nothing}, data::JSON3.Array)
     return Tuple(data_loaded)
 end
 
-function load_component_serial(root)
-   load_info = get_load_info_serial(root)
+function load_component_serial(path)
+   load_info = get_load_info_serial(path)
+   load_component(get_saved_type(load_info), get_saved_data(load_info)) 
+end
+
+function load_component_json(path)
+   load_info = JSON3.read(path)
    load_component(get_saved_type(load_info), get_saved_data(load_info)) 
 end
 

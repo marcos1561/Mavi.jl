@@ -6,6 +6,7 @@ version = "1.0.0-DEV"
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
@@ -19,6 +20,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [compat]
+Dates = "1.11.0"
 JSON3 = "1.14.3"
 NLsolve = "4.5.1"
 Random = "1.11.0"

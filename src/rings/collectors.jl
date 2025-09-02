@@ -3,7 +3,7 @@ module Collectors
 export ExperimentCfg, CheckpointCfg, Experiment, run_experiment, load_experiment
 export DelayedCfg
 
-using Serialization, JSON3, Setfield
+using Serialization, JSON3, Setfield, DataStructures, Dates
 
 using Mavi.Systems
 using Mavi.MaviSerder
@@ -120,6 +120,12 @@ function run_experiment(experiment::Experiment, stop_func=nothing)
     end
 
     show_finish(prog)
+
+    open(joinpath(cfg.root, ".done"), "w") do f
+        write(f, "Experiment concluded on $(Dates.now())\n")
+    end
+    
+    return
 end
 
 # =
@@ -132,7 +138,7 @@ end
 
 mutable struct DelayedState{S} <: ColState 
     last_save_time::Float64
-    sys_state::S
+    sys_states::CircularBuffer{S}
 end
 
 struct DelayedCol{S} <: Collector 
@@ -141,7 +147,10 @@ struct DelayedCol{S} <: Collector
 end
 function get_collector(cfg::DelayedCfg, exp_cfg::ExperimentCfg, system::System, state=nothing)
     if isnothing(state)
-        state = DelayedState(system.time_info.time, deepcopy(system.state))
+        item = (deepcopy(system.time_info), deepcopy(system.state))
+        past_states = CircularBuffer{typeof(item)}(2)
+        push!(past_states, item)
+        state = DelayedState(system.time_info.time, past_states)
     end
 
     DelayedCol(cfg, state)
@@ -153,12 +162,17 @@ function collect(col::DelayedCol, system::System)
     time_to_last_save = t - col_state.last_save_time
     if time_to_last_save > col.cfg.delay_time
         col_state.last_save_time = t
-        col_state.sys_state = deepcopy(system.state)
+        push!(col_state.sys_states,
+            (deepcopy(system.time_info), deepcopy(system.state))
+        ) 
     end
 end
 
 function save_data(col::DelayedCol, path)
-    save_component_serial(col.state.sys_state, path, "state")
+    times = [time_info.time for (time_info, _) in col.state.sys_states]
+    idx = argmin(times)
+    save_component_json(col.state.sys_states[idx][1], path, "time_info")
+    save_component_serial(col.state.sys_states[idx][2], path, "state")
 end
 
 # =
