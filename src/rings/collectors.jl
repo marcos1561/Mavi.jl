@@ -1,7 +1,8 @@
 module Collectors
 
 export ExperimentCfg, CheckpointCfg, Experiment, run_experiment, load_experiment
-export DelayedCfg
+export DelayedCfg, ManyColsCfg
+export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
 
@@ -23,9 +24,10 @@ abstract type ColCfg end
 abstract type ColState end
 abstract type Collector end
 
-function get_collector(col_cfg::ColCfg, exp_cfg, system) end
+function get_collector(col_cfg::ColCfg, exp_cfg, system, state=nothing) end
 function collect(col::Collector, system) end
 function save_data(col::Collector, path) end
+function load_data(::Type{ColCfg}, path) end
 
 # = 
 # Experiment
@@ -126,6 +128,53 @@ function run_experiment(experiment::Experiment, stop_func=nothing)
     end
     
     return
+end
+
+# = 
+# Collectors Manager
+# = 
+
+@kwdef struct ManyColsCfg{C<:NamedTuple} <: ColCfg
+    cfgs::C
+end
+
+struct ManyColsState{S<:NamedTuple} <: ColState
+    states::S
+end
+
+struct ManyCols{C, S, ColT<:NamedTuple} <: Collector
+    cfg::ManyColsCfg{C}
+    state::ManyColsState{S}
+    cols::ColT
+end
+
+function get_collector(cfg::ManyColsCfg, exp_cfg::ExperimentCfg, system::System, state=nothing)
+    cols = []
+    cols_states = []
+    for (col_name, col_cfg) in pairs(cfg.cfgs)
+        col_state = nothing
+        if !isnothing(state)
+            col_state = state.states[col_name]
+        end
+        
+        col = get_collector(col_cfg, exp_cfg, system, col_state)
+        push!(cols, (col_name, col))
+        push!(cols_states, (col_name, col.state))
+    end
+
+    ManyCols(cfg, ManyColsState(NamedTuple(cols_states)), NamedTuple(cols))
+end
+
+function collect(col::ManyCols, system::System)
+    for col in values(col.cols)
+        collect(col, system)
+    end
+end
+
+function save_data(col::ManyCols, path)
+    for col in values(col.cols)
+        save_data(col, path)
+    end
 end
 
 # =
