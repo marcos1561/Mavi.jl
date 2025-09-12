@@ -24,7 +24,7 @@ struct Chunks{N, T, P, InfoT}
     num_particles_in_chunk::Array{Int, 2}
 end
 function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, pos, particle_r; extra_info=nothing) where {W, N, T}
-    neighbors = get_neighbors(num_rows, num_cols, space_cfg.wall_type)
+    neighbors = get_neighbors(num_rows, num_cols, get_main_wall(space_cfg.wall_type))
     
     chunk_length = space_cfg.geometry_cfg.length / num_cols
     chunk_height = space_cfg.geometry_cfg.height / num_rows

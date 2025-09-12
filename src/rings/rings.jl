@@ -11,7 +11,7 @@ using StaticArrays
 
 using Mavi
 import Mavi.Systems: System, SystemType, get_num_total_particles, get_chunks
-import Mavi.Configs: SpaceCfg, PeriodicWalls
+import Mavi.Configs: SpaceCfg, PeriodicWalls, ManyWalls
 import Mavi.ChunksMod: Chunks, update_chunks!
 
 include("states.jl")
@@ -45,6 +45,8 @@ function get_continuos_pos(ring_id, system, wall_type::PeriodicWalls)
     num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
     return @view system.info.continuos_pos[1:num_particles, ring_id]
 end
+
+get_continuos_pos(ring_id, system, wall_type::ManyWalls) = get_continuos_pos(ring_id, system, wall_type.list[1])
 
 ring_points(system, ring_id) = get_continuos_pos(ring_id, system, system.space_cfg.wall_type)
 

@@ -11,7 +11,7 @@ using Mavi.Systems
 using Mavi.Rings.Configs
 using Mavi.Rings.States
 using Mavi.Rings.Sources
-using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls
+using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls, ManyWalls
 
 export step!
     
@@ -62,15 +62,12 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, dr, dist, interaction_
     dist_eq = interaction_cfg.dist_eq
 
     if dist < dist_eq
-        # compute rep force
-        fmod = -interaction_cfg.k_rep * (dist/dist_eq - 1) # restoring force
+        fmod = -interaction_cfg.k_rep * (dist/dist_eq - 1)
     else
         if ring_id1 == ring_id2
             fmod = 0.0
         else
-            # compute atr force
-            # adh_size = interaction_cfg.dist_max - dist_eq
-            fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1) # restoring force
+            fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1)
         end
     end
 
@@ -132,6 +129,8 @@ function update_continuos_pos!(system, wall_type::PeriodicWalls)
         end
     end
 end
+
+update_continuos_pos!(system, wall_type::ManyWalls) = update_continuos_pos!(system, wall_type.list[1]) 
 
 function area_forces!(system)
     has_types = has_types_func(system.state)
@@ -221,107 +220,76 @@ function forces!(system)
 end
 
 "Periodic walls"
-function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}, dynamic_cfg::RingsCfg) where T 
-    state = system.state
-    geometry_cfg = space_cfg.geometry_cfg
-    # center = (geometry_cfg.bottom_left[1] + geometry_cfg.length/2, geometry_cfg.bottom_left[2] + geometry_cfg.height/2)
-    center = geometry_cfg.bottom_left + geometry_cfg.size / 2
-    half_size = geometry_cfg.size / 2
+# function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}, ::RingsSys) where T 
+#     state = system.state
+#     geometry_cfg = space_cfg.geometry_cfg
+#     center = geometry_cfg.bottom_left + geometry_cfg.size / 2
+#     half_size = geometry_cfg.size / 2
 
-    # for ring_id in get_active_ids(system.state)
-    #     for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
-    #         pos = state.rings_pos[i, ring_id]
-    for idx in get_particles_ids(system, state)
-        pos = state.pos[idx]
-        diff = pos - center
+#     for idx in get_particles_ids(system, state)
+#         pos = state.pos[idx]
+#         diff = pos - center
         
-        out_bounds = abs.(diff) .> half_size
-        if any(out_bounds)
-            state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
-        end
+#         out_bounds = abs.(diff) .> half_size
+#         if any(out_bounds)
+#             state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
+#         end
+#     end
+# end
 
-        # pos_i = @view state.rings_pos[:, i, ring_id] 
-        # diff = pos_i[1] - center[1]  
-        # if abs(diff) > geometry_cfg.length/2
-        #     pos_i[1] -= sign(diff) * geometry_cfg.length
-        # end
-
-        # diff = pos_i[2] - center[2]  
-        # if abs(diff) > geometry_cfg.height/2
-        #     pos_i[2] -= sign(diff) * geometry_cfg.height
-        # end
-
-        # end
-    end
-end
-
-function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}, dynamic_cfg::RingsCfg) where T
-    state = system.state
-    lines = space_cfg.geometry_cfg.lines
-    p_radius = Configs.particle_radius(system.dynamic_cfg)
-    for ring_id in get_active_ids(system.state)
-        for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id) 
-            # pos_i = @view state.rings_pos[:, i, ring_id] 
-            pos_i = state.rings_pos[i, ring_id] 
+# function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}, ::RingsSys) where T
+#     state = system.state
+#     lines = space_cfg.geometry_cfg.lines
+#     p_radius = Configs.particle_radius(system.dynamic_cfg)
+#     for ring_id in get_active_ids(system.state)
+#         for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id) 
+#             pos_i = state.rings_pos[i, ring_id] 
             
-            for line in lines
-                point = line.p1
-                # point_x = line.p1.x #+ line.normal.x * p_radius
-                # point_y = line.p1.y #+ line.normal.y * p_radius
+#             for line in lines
+#                 point = line.p1
                 
+#                 dr = pos_i - point
+#                 delta_s = sum(dr .* line.normal)
                 
-                # x, y = pos_i[1] - point_x, pos_i[2] - point_y
-                # delta_s = x * line.normal.x + y * line.normal.y   
-                dr = pos_i - point
-                delta_s = sum(dr .* line.normal)
+#                 if abs(delta_s) > p_radius
+#                     continue
+#                 end
                 
-                if abs(delta_s) > p_radius
-                    continue
-                end
+#                 delta_t = sum(dr .* line.tangent)
                 
-                # delta_t = x * line.tangent.x + y * line.tangent.y   
-                delta_t = sum(dr .* line.tangent)
+#                 is_corner = false
+#                 if delta_t > 0
+#                     if delta_t > line.length
+#                         if delta_t > (line.length + p_radius)
+#                             continue
+#                         end
+#                         is_corner = true
+#                         corner_p = line.p2
+#                     end
+#                 elseif delta_t > -p_radius    
+#                     is_corner = true
+#                     corner_p = line.p1
+#                 else
+#                     continue
+#                 end
                 
-                is_corner = false
-                if delta_t > 0
-                    if delta_t > line.length
-                        if delta_t > (line.length + p_radius)
-                            continue
-                        end
-                        is_corner = true
-                        corner_p = line.p2
-                    end
-                elseif delta_t > -p_radius    
-                    is_corner = true
-                    corner_p = line.p1
-                else
-                    continue
-                end
-                
-                if is_corner 
-                    # dx = pos_i[1] - corner_p.x
-                    # dy = pos_i[2] - corner_p.y
-                    # norm = sqrt(dx^2 + dy^2)
-                    dr = pos_i - corner_p
-                    norm = sqrt(sum(abs2, dr))
-                    if norm > p_radius
-                        continue
-                    end
-                    alpha = p_radius / norm - 1
-                    # pos_i[1] += alpha * dx
-                    # pos_i[2] += alpha * dy
-                    state.rings_pos[i, ring_id] += alpha * dr
-                else
-                    sgn = sign(delta_s)
-                    alpha = sgn * (p_radius - sgn * delta_s) 
-                    # pos_i[1] += alpha * line.normal.x
-                    # pos_i[2] += alpha * line.normal.y
-                    state.rings_pos[i, ring_id] += alpha * line.normal
-                end
-            end
-        end
-    end
-end
+#                 if is_corner 
+#                     dr = pos_i - corner_p
+#                     norm = sqrt(sum(abs2, dr))
+#                     if norm > p_radius
+#                         continue
+#                     end
+#                     alpha = p_radius / norm - 1
+#                     state.rings_pos[i, ring_id] += alpha * dr
+#                 else
+#                     sgn = sign(delta_s)
+#                     alpha = sgn * (p_radius - sgn * delta_s) 
+#                     state.rings_pos[i, ring_id] += alpha * line.normal
+#                 end
+#             end
+#         end
+#     end
+# end
 
 function update!(system)
     state = system.state

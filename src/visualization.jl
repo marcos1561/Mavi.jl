@@ -21,7 +21,6 @@ include("gui/system_graph.jl")
 using .InfoUIs 
 using .SystemGraphs 
 
-
 function random_colors(num)
     return [rand(RGBf) for _ in 1:num]
 end
@@ -36,15 +35,15 @@ end
 end
 
 """
-Animation configurations
+Animation configurations.
 
 # Arguments
 - graph_cfg:  
-    Configuration for the part where the system is rendered.
+    Configuration for how the system is rendered.
     More info in "gui/system_graph.jl".
 
 info_cfg:  
-    Configuration for the information UI part.
+    Configuration for the information UI.
     More info in "gui/info_ui.jl".
 
 - fps:  
@@ -53,8 +52,14 @@ info_cfg:
 - num_steps_per_frame:  
     How many time steps are done in a single frame.
 
+- slider_spf_range:
+    Value range used by the slider to control `num_steps_per_frame`.
+
 - exec_times_size:  
     Circular buffer length that stores step time execution.
+
+- begin_paused:
+    If `True` the animation starts paused.
 
 - ui_settings:  
     General settings for the UI window.
@@ -64,6 +69,7 @@ info_cfg:
     info_cfg::InfoT = DefaultInfoUICfg()
     fps = 30
     num_steps_per_frame = 10
+    slider_spf_range = nothing
     exec_times_size = 100
     begin_paused = false
     ui_settings = UiSettings()
@@ -153,6 +159,7 @@ function animate(system::System, step!, cfg=nothing)
     ui_settings = anim_cfg.ui_settings
     run_status = Observable(!anim_cfg.begin_paused)
     run_next_frame = false
+    num_steps_per_frame = anim_cfg.num_steps_per_frame
     
     exec_info = ExecInfo(anim_cfg.exec_times_size)
 
@@ -164,8 +171,6 @@ function animate(system::System, step!, cfg=nothing)
         main_sidebar_gl = fig[1, 1] = GridLayout()
 
         sidebar_gl = main_sidebar_gl[1, 1] = GridLayout()
-        Box(sidebar_gl[1, 1], cornerradius=5)
-        Box(sidebar_gl[2, 1], cornerradius=5)
         
         info_gl = sidebar_gl[1, 1] = GridLayout(
             halign=:left, 
@@ -180,6 +185,9 @@ function animate(system::System, step!, cfg=nothing)
         )
         rowsize!(control_gl, 1, Fixed(1))
 
+        Box(sidebar_gl[1, 1], cornerradius=5, color="#8d8d8dff")
+        Box(sidebar_gl[2, 1], cornerradius=5, color="#8d8d8dff")
+
         button_label = lift(run_status) do st
             if st
                 return "Running"
@@ -187,13 +195,24 @@ function animate(system::System, step!, cfg=nothing)
                 return "Stopped"
             end
         end
+        
+        function start_stop_func()
+            run_status[] = !run_status[]
+            notify(run_status)
+        end
+        
+        function run_next_frame_func()
+            if !run_status[]
+                run_next_frame = true
+            end
+        end
+
         start_stop_button = control_gl[2, 1] = Button(fig, 
             label=button_label,
             width=Relative(0.9),
         )
         on(start_stop_button.clicks) do n
-            run_status[] = !run_status[]
-            notify(run_status)
+            start_stop_func()
         end
         
         run_next_frame_button = control_gl[3, 1] = Button(fig, 
@@ -201,15 +220,61 @@ function animate(system::System, step!, cfg=nothing)
             width=Relative(0.9),
         )
         on(run_next_frame_button.clicks) do n
-            if !run_status[]
-                run_next_frame = true
-            end   
+            run_next_frame_func()   
+        end
+
+        spf_range = anim_cfg.slider_spf_range
+        num_steps_per_frame = anim_cfg.num_steps_per_frame
+        if isnothing(spf_range)
+            spf_range = 1:2*num_steps_per_frame
+        end
+
+        sliders = SliderGrid(
+            control_gl[4, 1],
+            (label = "Speed", range = spf_range, startvalue = num_steps_per_frame),
+            # (label = "Current", range = 0:0.1:20, format = "{:.1f}A", startvalue = 10.2),
+            # (label = "Resistance", range = 0:0.1:30, format = "{:.1f}Ω", startvalue = 15.9),
+            width=Relative(0.9),
+            # tellheight = true,
+        )
+
+        on(sliders.sliders[1].value) do speed
+            num_steps_per_frame = speed
+        end
+
+        on(events(fig).keyboardbutton) do event
+            if event.action == Keyboard.press
+                key = event.key
+                if key == Keyboard.right
+                    run_next_frame_func()
+                elseif key == Keyboard.space
+                    start_stop_func()
+                elseif key == Keyboard.h
+                    reset_limits!(system_ax)
+                elseif key == Keyboard.escape
+                    GLMakie.close(display(fig))
+                end
+            end
+
+             if event.action == Keyboard.press || event.action == Keyboard.repeat
+                if event.key in (Keyboard.up, Keyboard.down)
+                    step_size = 1
+                    if Keyboard.left_shift in events(fig).keyboardstate
+                        step_size = (maximum(spf_range) - minimum(spf_range))/5 
+                    end
+                    
+                    step_sing = event.key == Keyboard.up ? 1 : -1 
+
+                    slider = sliders.sliders[1]
+                    set_close_to!(slider, num_steps_per_frame + step_sing*step_size)
+                end
+            end
         end
 
         # Box(main_sidebar_gl[:, 1], cornerradius=5)
         # Box(sidebar_gl[1, 1], color = (:blue, 0.1), strokecolor = :transparent)
         # Box(sidebar_gl[2, 1], color = (:red, 0.1), strokecolor = :transparent)
-        Box(sidebar_gl[1, 1], cornerradius=5)
+        # Box(sidebar_gl[1, 1], cornerradius=5)
         # Box(sidebar_gl[2, 1], cornerradius=5)
 
         colsize!(fig.layout, 1, Relative(ui_settings.sidebar_rel_length))
@@ -242,7 +307,7 @@ function animate(system::System, step!, cfg=nothing)
         exec_info = context.exec_info
         graph = context.graph
 
-        for _ in 1:anim_cfg.num_steps_per_frame
+        for _ in 1:num_steps_per_frame
             step_info = @timed step!(system)
             push!(exec_info.times, step_info.time)
         end

@@ -9,11 +9,12 @@ module Example
 using StaticArrays
 
 using Mavi.Systems
+using Mavi.States
 using Mavi.Visualization
 using Mavi.Configs
 
 function main()
-    state = Mavi.States.SecondLawState(
+    state = SecondLawState(
         pos=[1 2; 1 2],
         vel=[0.3 2; 1 0]
     )

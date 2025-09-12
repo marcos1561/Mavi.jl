@@ -172,8 +172,9 @@ function collect(col::ManyCols, system::System)
 end
 
 function save_data(col::ManyCols, path)
-    for col in values(col.cols)
-        save_data(col, path)
+    for (col_name, col) in pairs(col.cols)
+        col_path = mkpath(joinpath(path, string(col_name)))
+        save_data(col, col_path)
     end
 end
 

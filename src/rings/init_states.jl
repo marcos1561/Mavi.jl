@@ -2,17 +2,23 @@ module InitStates
 
 export rectangular_grid, random_pol, create_circle
 
+using StaticArrays
+
 using Mavi.Configs
 using Mavi.Rings.Utils
 
-function create_circle(center, radius, num_p)
+function create_circle(center, radius, num_p; dtype=Float64, to_svector=false)
     radius = radius
-    pos = Matrix(undef, 2, num_p)
+    pos = Matrix{dtype}(undef, 2, num_p)
 
     theta = 2 * π / num_p
     for i in 1:num_p
         pos[1, i] = radius * cos((i - 1)* theta) + center[1]
         pos[2, i] = radius * sin((i - 1)* theta) + center[2]
+    end
+
+    if to_svector
+        pos = copy(reinterpret(SVector{2, eltype(pos)}, vec(pos)))
     end
 
     return pos

@@ -23,9 +23,9 @@ function get_circle(radius, resolution=20)
     return circle
 end
 
-function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true, color=:black)
-    l, h = space_cfg.length, space_cfg.height
-    x, y = space_cfg.bottom_left
+function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
+    l, h = geometry_cfg.length, geometry_cfg.height
+    x, y = geometry_cfg.bottom_left
     # lines!(ax, [x, y], [x+l, y], color=:black)
     # lines!(ax, [x+l, y], [x+l, y+h], color=:black)
     # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
@@ -44,26 +44,21 @@ function drawn_borders(ax, space_cfg::RectangleCfg; adjust_lims=true, color=:bla
     end
 end
 
-function drawn_borders(ax, space_cfg::LinesCfg; color=:black)
-    for line in space_cfg.lines
+function drawn_borders(ax, geometry_cfg::LinesCfg; color=:black)
+    for line in geometry_cfg.lines
         p1, p2 = line.p1, line.p2
         lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color)
-        # l, h = space_cfg.length, space_cfg.height
-        # x, y = space_cfg.bottom_left
-        # lines!(ax, [x, y], [x+l, y], color=:black)
-        # lines!(ax, [x+l, y], [x+l, y+h], color=:black)
-        # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
-        # lines!(ax, [y+h, x], [x, y], color=:black)
-
-        # dx = l*0.1
-        # dy = h*0.1
-        # xlims!(ax, x - dx, x + l + dx)
-        # ylims!(ax, y - dy, y + h + dy)
     end
 end
 
-function drawn_borders(ax, space_cfg::CircleCfg)
-    arc!(ax, Point2f(0), space_cfg.radius, -π, π, color=:black)
+function drawn_borders(ax, geometry_cfg::CircleCfg)
+    arc!(ax, geometry_cfg.center, geometry_cfg.radius, -π, π, color=:black)
+end
+
+function drawn_borders(ax, geometry_cfg::ManyGeometries)
+    for g in geometry_cfg.list
+        drawn_borders(ax, g)
+    end
 end
 
 function update_circles!(circle_points, circle_base, pos)

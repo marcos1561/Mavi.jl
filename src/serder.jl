@@ -1,7 +1,7 @@
 module MaviSerder
 
 export save_system, save_system_configs, save_component_serial, save_component_json, get_obj_save_data_json
-export load_system, load_dic_configs, load_component, load_component_serial, load_component_json
+export load_system, load_dic_configs, load_component, load_component_serial, load_component_json, load_configs
 
 using Serialization, JSON3
 using StaticArrays
@@ -115,6 +115,12 @@ function load_dic_configs(configs)
         configs_loaded[name] = load_component(get_saved_type(load_info), get_saved_data(load_info))
     end
     return configs_loaded
+end
+
+function load_configs(path) 
+    configs = JSON3.read(path)
+    configs = convert(Dict{Symbol, Any}, configs)
+    load_dic_configs(configs)
 end
 
 function load_system(configs, ::StandardSys)

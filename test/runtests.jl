@@ -42,3 +42,7 @@ using Test
     #     space_cfg = RectangleCfg(3, 5)
     # )
 end
+
+@testset "Rings" begin
+    @test 1 == 1
+end

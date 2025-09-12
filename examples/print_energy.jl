@@ -24,7 +24,10 @@ function main()
         state=state, 
         space_cfg=SpaceCfg(
             wall_type=RigidWalls(),
-            geometry_cfg=CircleCfg(radius=10),
+            geometry_cfg=CircleCfg(
+                radius=10,
+                center=[0, 0],
+            ),
         ), 
         dynamic_cfg=LenJonesCfg(sigma=2, epsilon=4),
         int_cfg=IntCfg(dt=0.01),

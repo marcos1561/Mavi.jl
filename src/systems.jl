@@ -11,7 +11,7 @@ using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
 
-function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, state, dynamic_cfg, extra_info=nothing)
+function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, pos, dynamic_cfg, extra_info=nothing)
     if isnothing(chunks_cfg)
         return nothing
     end
@@ -23,7 +23,7 @@ function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, 
     )
 
     Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-        chunks_space_cfg, state, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=extra_info,
+        chunks_space_cfg, pos, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=extra_info,
     )  
 end
 
@@ -101,7 +101,7 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
     # end
 
     if isnothing(chunks)
-        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state, dynamic_cfg) 
+        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg) 
     end
 
     if !isnothing(chunks)
