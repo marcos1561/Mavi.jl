@@ -22,7 +22,9 @@ end
 Configs.particle_radius(dynamic_cfg::DynamicCfg) = dynamic_cfg.min_dist/2
 
 function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
-    dr, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
+    pos = system.state.pos
+    dr, dist = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist

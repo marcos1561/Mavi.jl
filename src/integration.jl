@@ -2,7 +2,7 @@ module Integration
 
 export newton_step!, szabo_step!, rtp_step!
 export calc_forces!, calc_interaction, walls!
-export calc_diff_and_dist, calc_diffs_and_dists!
+export calc_diff, calc_diffs_and_dists!
 export update_verlet!, update_rtp!, update_szabo!
 
 using Base.Threads
@@ -14,30 +14,30 @@ using Mavi.Configs
 using Mavi.ChunksMod
 
 "Position difference (i - j) and distance between particle with id `i` and `j`"
-@inline function calc_diff_and_dist(i, j, pos::Vector, space_cfg)
-    @inbounds dr = pos[i] - pos[j]
-    dist = sqrt(sum(abs2, dr))
-    return dr, dist
+# @inline function calc_diff(i, j, pos::Vector, space_cfg)
+@inline function calc_diff(r1, r2, space_cfg)
+    @inbounds dr = r1 - r2
+    return dr
 end
 
-@inline function calc_diff_and_dist(i, j, pos::Vector, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <: RectangleCfg
+@inline function calc_diff(r1, r2, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <: RectangleCfg
     size_vec = space_cfg.geometry_cfg.size
-    dr = pos[i] - pos[j]
+    dr = r1 - r2
     dr = dr - (abs.(dr) .> (size_vec / 2)) .* copysign.(size_vec, dr)
-    dist = sqrt(sum(abs2, dr))
-    return dr, dist
+    return dr
 end
 
-@inline function calc_diff_and_dist(i, j, pos::Vector, space_cfg::SpaceCfg{W, G}) where {W <: ManyWalls, G <: ManyGeometries}
-    calc_diff_and_dist(i, j, pos, SpaceCfg(space_cfg.wall_type.list[1], space_cfg.geometry_cfg.list[1]))
+@inline function calc_diff(r1, r2, space_cfg::SpaceCfg{W, G}) where {W <: ManyWalls, G <: ManyGeometries}
+    calc_diff(r1, r2, SpaceCfg(space_cfg.wall_type.list[1], space_cfg.geometry_cfg.list[1]))
 end
 
 "Return force on particle with id `i` exerted by particle with id `j`."
 function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
-    state = system.state
+    pos = system.state.pos
     space_cfg = system.space_cfg
 
-    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr = calc_diff(pos[i], pos[j], space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     # Check interaction range
     if dist > dynamic_cfg.ra
@@ -50,10 +50,11 @@ function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
 end
 
 function calc_interaction(i, j, dynamic_cfg::LenJonesCfg, system::System)
-    state = system.state
+    pos = system.state.pos
     space_cfg = system.space_cfg
     
-    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr = calc_diff(pos[i], pos[j], space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -65,10 +66,11 @@ function calc_interaction(i, j, dynamic_cfg::LenJonesCfg, system::System)
 end
 
 function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
-    state = system.state
+    pos = system.state.pos
     space_cfg = system.space_cfg
 
-    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr = calc_diff(pos[i], pos[j], space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     if dist > dynamic_cfg.r_max
         return zero(dr)
@@ -85,10 +87,11 @@ function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
 end
 
 function calc_interaction(i, j, dynamic_cfg::RunTumbleCfg, system::System)
-    state = system.state
+    pos = system.state.pos
     space_cfg = system.space_cfg
 
-    dr, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+    dr = calc_diff(pos[i], pos[j], space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
@@ -319,7 +322,7 @@ function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}})
     end
 end
 
-function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, G}) where G <: GeometryCfg
+function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, G}) where G <: CircleCfg
     pos = system.state.pos
     dynamic_cfg = system.dynamic_cfg
     state = system.state
@@ -329,7 +332,7 @@ function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, G}) where G <
         
         pr = get_particle_radius(dynamic_cfg, state, pid)
         max_r_2 = (circle.radius + pr)^2
-        dr = p - circle.center
+        dr = calc_diff(p, circle.center, system.space_cfg)
         dr_2 = sum(dr.^2)
         if dr_2 > max_r_2
             continue

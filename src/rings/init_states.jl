@@ -26,7 +26,7 @@ end
 
 function rectangular_grid(;
     num_cols, num_rows, num_particles, p_radius, types=nothing, 
-    pad_x=0, pad_y=0, radius_k=1)
+    pad_x=0, pad_y=0, radius_k=1, to_svector=false)
     if types === nothing
         num_particles = [num_particles]
         p_radius = [p_radius]
@@ -61,6 +61,12 @@ function rectangular_grid(;
     space_l = num_cols * (pad_x + max_ring_length)
     space_h = num_rows * (pad_y + max_ring_length)
     geometry_cfg = RectangleCfg(length=space_l, height=space_h)
+
+    if to_svector
+        _, num_max_particles, num_rings = size(ring_pos)
+        ring_pos = copy(reinterpret(SVector{2, eltype(ring_pos)}, vec(ring_pos)))
+        ring_pos = reshape(ring_pos, (num_max_particles, num_rings))
+    end
 
     return ring_pos, geometry_cfg
 end

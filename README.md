@@ -277,20 +277,18 @@ end
 
 # Creating new method used in the forces calculation.
 function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
-    dx, dy, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
+    pos = system.state.pos
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist
 
     if dist > min_dist
-        return 0.0, 0.0
+        return zero(eltype(pos))
     end
 
-    # Force components
-    fx = force * dx / dist
-    fy = force * dy / dist
-
-    return fx, fy
+    return force * dr / dist
 end
 
 # This method is used to draw the particles

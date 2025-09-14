@@ -20,7 +20,7 @@ end
 "Return system's potential energy."
 function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     # Aliases
-    state = system.state
+    pos = system.state.pos
     space_cfg = system.space_cfg
     N = get_num_total_particles(system)
     ko = dynamic_cfg.ko
@@ -31,7 +31,8 @@ function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            _, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
+            dr = calc_diff(pos[i], pos[j], space_cfg)
+            dist = sqrt(sum(dr.^2))
 
             if dist <= ra
                 pot += (dist-ro)^2
@@ -54,7 +55,8 @@ function potential_energy(system::System, dynamic_cfg::LenJonesCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            _, dist = calc_diff_and_dist(i, j, pos, space_cfg)
+            dr = calc_diff(pos[i], pos[j], space_cfg)
+            dist = sqrt(sum(dr.^2))
             pot += ((sigma/dist)^12 - (sigma/dist)^6)
         end
     end

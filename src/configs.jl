@@ -148,7 +148,7 @@ end
 function get_bounding_box(geometry_cfg::CircleCfg)
     r = geometry_cfg.radius
     length = 2 * r
-    bottom_left = SVector(-r, -r)
+    bottom_left = geometry_cfg.center - SVector(r, r)
     size_vec = SVector(length, length) 
     return RectangleCfg(length, length, bottom_left, size_vec)
 end

@@ -2,7 +2,7 @@ module Integration
 
 using StaticArrays
 
-import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces!, walls!
+import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
 
 using Mavi.Rings
@@ -33,9 +33,11 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     ri = get_ring_id(i, num_max_particles(system.state))
     rj = get_ring_id(j, num_max_particles(system.state))
 
+    pos = system.state.pos
     interaction_cfg = get_interaction_cfg(ri, rj, system.state, dynamic_cfg.interaction_finder)
-    dr, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
-    
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
+
     max_dist = 2 * Configs.particle_radius(interaction_cfg)
     neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
 
@@ -75,8 +77,10 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, dr, dist, interaction_
 end
 
 function springs_force(p1_id, p2_id, k, l, state, space_cfg)
-    dr, dist = calc_diff_and_dist(p1_id, p2_id, state.pos, space_cfg)
-    
+    pos = state.pos
+    dr = calc_diff(pos[p1_id], pos[p2_id], space_cfg)
+    dist = sqrt(sum(dr.^2))
+
     # k = rings_cfg.k_spring
     # l = rings_cfg.l_spring
     # if !has_types_func(state)
@@ -115,13 +119,14 @@ function update_continuos_pos!(system, wall_type) end
 
 function update_continuos_pos!(system, wall_type::PeriodicWalls)
     continuos_pos = system.info.continuos_pos
+    pos = system.state.pos
     Threads.@threads for ring_id in get_active_ids(system.state)
         # continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
         continuos_pos[:, ring_id] .= system.state.rings_pos[:, ring_id]
         for i in 2:get_num_particles(system.dynamic_cfg, system.state, ring_id) 
             i_idx = to_scalar_idx(system.state, ring_id, i)
             last_idx = to_scalar_idx(system.state, ring_id, i-1)
-            dr, _ = calc_diff_and_dist(i_idx, last_idx, system.state.pos, system.space_cfg)
+            dr = calc_diff(pos[i_idx], pos[last_idx], system.space_cfg)
             
             continuos_pos[i, ring_id] = continuos_pos[i-1, ring_id] + dr
             # continuos_pos[1, i, ring_id] = continuos_pos[1, i-1, ring_id] + dx
@@ -145,7 +150,8 @@ function area_forces!(system)
     #     area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
     #     system.info.areas[ring_id] = area
     # end
-
+    
+    pos = system.state.pos
     forces = get_forces(system)
 
     for ring_id in get_active_ids(system.state)
@@ -178,7 +184,7 @@ function area_forces!(system)
             
             id1_scalar = to_scalar_idx(system.state, ring_id, id1)
             id2_scalar = to_scalar_idx(system.state, ring_id, id2)
-            dr, _ = calc_diff_and_dist(id2_scalar, id1_scalar, system.state.pos, system.space_cfg)
+            dr = calc_diff(pos[id2_scalar], pos[id1_scalar], system.space_cfg)
 
             a_deriv = SVector(dr.y, -dr.x) / 2
 
