@@ -320,37 +320,25 @@ function update!(system)
         pol = SVector(cos(theta), sin(theta))    
         vel_cm = zero(pol)
 
-        # # pol_x, pol_y = cos(theta), sin(theta) 
-        # vel_cm_x = 0.0
-        # vel_cm_y = 0.0
-
         for i in 1:num_particles
             p_id = to_scalar_idx(state, ring_id, i)
-
-            # vel_x = vo * pol_x + mu * forces[1, p_id]
-            # vel_y = vo * pol_y + mu * forces[2, p_id]
             vel = vo * pol + mu * forces[p_id]
-
-            # vel_cm_x += vel_x
-            # vel_cm_y += vel_y
             vel_cm += vel
-
-            # state.pos[1, p_id] += vel_x * dt
-            # state.pos[2, p_id] += vel_y * dt
             state.pos[p_id] += vel * dt
         end
-        # vel_cm_x /= num_particles
-        # vel_cm_y /= num_particles
         vel_cm /= num_particles
 
-        # speed = (vel_cm_x^2 + vel_cm_y^2)^.5
         speed = sqrt(sum(abs2, vel_cm))
 
-        # cross_prod = (pol_x * vel_cm_y - pol_y * vel_cm_x) / speed 
-        cross_prod = (pol.x * vel_cm.y - pol.y * vel_cm.x) / speed 
-        if abs(cross_prod) > 1
-            cross_prod = sign(cross_prod)
+        if speed == 0
+            cross_prod = 0
+        else
+            cross_prod = (pol.x * vel_cm.y - pol.y * vel_cm.x) / speed 
+            if abs(cross_prod) > 1
+                cross_prod = sign(cross_prod)
+            end
         end
+
         d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
         state.pol[ring_id] += d_theta
     end

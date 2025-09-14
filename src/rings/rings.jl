@@ -317,9 +317,13 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
     Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
     Integration.update_ids!(system)
     Integration.update_cms!(system)
-    Integration.update_chunks!(system.info.r_chunks)
+    Integration.update_chunks_all!(system)
     Integration.update_invasions!(system) 
     Integration.check_invasions!(system)
+
+    Integration.cleaning!(system)
+    Integration.forces!(system)
+    Integration.neigh_sum_buffers(system.info.p_neigh)
 
     return system
 end
