@@ -2,7 +2,7 @@
 module Visualization
 
 export animate, random_colors
-export AnimationCfg, VideoCfg, UiSettings
+export AnimationCfg, VideoCfg, ImageCfg, UiSettings
 export DefaultInfoUICfg
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
 export drawn_borders, colors_from_cmap
@@ -75,6 +75,7 @@ info_cfg:
     ui_settings = UiSettings()
     fig_kwargs::Union{Dict, Nothing} = nothing
     ax_kwargs::Union{Dict, Nothing} = nothing
+    save_fig_path::Union{String, Nothing} = "image.png"
 end
 
 """
@@ -100,6 +101,14 @@ function VideoCfg(;path, duration, anim_cfg=nothing)
     end
 
     VideoCfg(path, duration, anim_cfg)
+end
+
+@kwdef struct ImageCfg{GraphT, T<:Number}
+    path::String
+    tf::T = 0
+    graph_cfg::GraphT = MainGraphCfg()
+    fig_kwargs::Union{Dict, Nothing} = nothing
+    ax_kwargs::Union{Dict, Nothing} = nothing
 end
 
 """
@@ -129,6 +138,7 @@ get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 
 get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:GraphCfg, I} = anim_cfg.graph_cfg
 get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:SystemGraphs.GraphCompCfg, I} = MainGraphCfg(anim_cfg.graph_cfg)
+get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
 function animate(system::System, step!, cfg=nothing)
@@ -207,6 +217,12 @@ function animate(system::System, step!, cfg=nothing)
             end
         end
 
+        function save_fig()
+            path = anim_cfg.save_fig_path
+            save(path, fig)
+            println("Imagem Salva em: ", abspath(path))
+        end
+
         start_stop_button = control_gl[2, 1] = Button(fig, 
             label=button_label,
             width=Relative(0.9),
@@ -242,6 +258,7 @@ function animate(system::System, step!, cfg=nothing)
             num_steps_per_frame = speed
         end
 
+
         on(events(fig).keyboardbutton) do event
             if event.action == Keyboard.press
                 key = event.key
@@ -253,6 +270,9 @@ function animate(system::System, step!, cfg=nothing)
                     reset_limits!(system_ax)
                 elseif key == Keyboard.escape
                     GLMakie.close(display(fig))
+                elseif key == Keyboard.s && 
+                    Keyboard.left_control in events(fig).keyboardstate
+                    save_fig()
                 end
             end
 
@@ -354,6 +374,34 @@ function animate(system::System, step!, cfg=nothing)
             push!(exec_info.times_ui, time() - t1)
         end
     end
+end
+
+function animate(system::System, step!, cfg::ImageCfg)
+    GLMakie.activate!(; title="Mavi")
+
+    ax_kwargs = cfg.ax_kwargs
+    if ax_kwargs === nothing
+        ax_kwargs = Dict()
+    end
+
+    fig_kwargs = cfg.fig_kwargs
+    if fig_kwargs === nothing
+        fig_kwargs = Dict()
+    end
+
+    fig = Figure(; fig_kwargs...)
+    ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
+
+    graph = SystemGraphs.get_graph(ax, system, get_graph_cfg(cfg))
+
+    ti = system.time_info.time
+    while system.time_info.time - ti < cfg.tf
+        step!(system)
+    end
+
+    SystemGraphs.update_graph(graph, system)
+
+    save(cfg.path, fig)
 end
 
 include("rings/view.jl")

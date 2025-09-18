@@ -13,7 +13,7 @@ using Mavi.States
 using Mavi.Configs
 using Mavi.ChunksMod
 
-"Position difference (i - j) and distance between particle with id `i` and `j`"
+"Position difference (r1 - r2)"
 # @inline function calc_diff(i, j, pos::Vector, space_cfg)
 @inline function calc_diff(r1, r2, space_cfg)
     @inbounds dr = r1 - r2
