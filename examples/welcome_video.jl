@@ -148,8 +148,14 @@ function create_system(;num_particles=10)
         height=2*mavi_pad[2] + mavi_bbox.height,
     )
 
+    start_end_walls = Configs.LinesCfg([
+        [rect_cfg.bottom_left, rect_cfg.bottom_left + SVector(0, rect_cfg.height)],
+        [rect_cfg.bottom_left + rect_cfg.size, rect_cfg.bottom_left + SVector(rect_cfg.length, 0)],
+    ])
+
     space_cfg = Configs.SpaceCfg([
         (Configs.PeriodicWalls(), rect_cfg),
+        (Configs.SlipperyWalls(), start_end_walls),
         (Configs.SlipperyWalls(), lines_cfg),
         [(Configs.SlipperyWalls(), c) for c in circles_list]...
     ])
@@ -214,14 +220,14 @@ function main()
             SinkSourceGraphCfg(),
         ])
     )
+    
+    # anim_cfg = VideoCfg(
+    #     path="welcome_video.mp4",
+    #     anim_cfg=anim_cfg,
+    #     duration=20,
+    # )
 
-    video_cfg = VideoCfg(
-        path="welcome_video.mp4",
-        anim_cfg=anim_cfg,
-        duration=20,
-    )
-
-    animate(system, Integration.step!, video_cfg)
+    animate(system, Integration.step!, anim_cfg)
 end
 
 end

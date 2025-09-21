@@ -13,6 +13,7 @@ using DataStructures
 using Mavi.States: State
 using Mavi.Systems
 using Mavi.Configs
+using Mavi.MaviSerder
 using Mavi.Utils.Progress
 
 include("gui/info_ui.jl")
@@ -79,10 +80,11 @@ info_cfg:
 end
 
 """
-Save video configuration.
+Save video configurations.
 
+# Arguments
 - path: 
-    path to save video (relative to where the REPL is)
+    Path to save the video (relative to where the REPL is)
 
 - duration:
     Video duration in seconds.
@@ -94,13 +96,14 @@ struct VideoCfg{D<:Number, A<:AnimationCfg}
     path::String
     duration::D
     anim_cfg::A
+    save_configs::Bool
 end
-function VideoCfg(;path, duration, anim_cfg=nothing)
+function VideoCfg(;path, duration, anim_cfg=nothing, save_configs=false)
     if anim_cfg === nothing
         anim_cfg = AnimationCfg()
     end
 
-    VideoCfg(path, duration, anim_cfg)
+    VideoCfg(path, duration, anim_cfg, save_configs)
 end
 
 @kwdef struct ImageCfg{GraphT, T<:Number}
@@ -334,14 +337,27 @@ function animate(system::System, step!, cfg=nothing)
         
         SystemGraphs.update_graph(graph, system)
     end
+
+    function video_frame!(ax, system::System)
+        time = round(system.time_info.time, digits=2)
+        ax.title = "t = $time"
+    end
     
     if is_video
+        if cfg.save_configs
+            parent_dir = dirname(cfg.path)
+            filename = splitext(basename(cfg.path))[1]
+            save_system_configs(system, parent_dir, "configs_$filename")
+        end
+
         num_frames = trunc(Int, anim_cfg.fps * cfg.duration)
         prog = ProgContinuos(init=1, final=num_frames)
         record(fig, cfg.path; framerate=anim_cfg.fps) do io
+            video_frame!(system_ax, system)
             recordframe!(io)
             for frame in 1:num_frames
                 make_frame(context)
+                video_frame!(system_ax, system)
                 recordframe!(io)
                 show_progress(prog, frame)
             end

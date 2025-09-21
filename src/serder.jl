@@ -38,7 +38,7 @@ function save_component_json(obj, root, name)
     end
 end
 
-function save_system_configs(system::System, root)
+function save_system_configs(system::System, root, name="configs")
     mkpath(root)
     configs_data = Dict(
         "sys_type" => system.type,
@@ -50,7 +50,7 @@ function save_system_configs(system::System, root)
         "time_info" => get_obj_save_data_json(system.time_info),
     )
 
-    open(joinpath(root, "configs.json"), "w") do io
+    open(joinpath(root, "$name.json"), "w") do io
         JSON3.pretty(io, configs_data)
     end
 end
