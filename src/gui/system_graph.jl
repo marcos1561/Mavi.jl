@@ -3,6 +3,7 @@ module SystemGraphs
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
 export drawn_borders, colors_from_cmap
+export RingsGraphs
 
 using GLMakie, ColorSchemes, DataStructures, Random
 using Mavi.Systems
@@ -134,43 +135,6 @@ function get_colors!(colors, types, cmap, particles_ids)
 
     cs = @view colors[1:count-1]
     return cs
-
-    # try
-    #     cmap = colorschemes[cmap]
-    # catch end
-
-    # num_active = length(active_ids)
-
-    # if cmap isa RGBf
-    #     colors[1:num_active] .= cmap
-    # elseif cmap isa Symbol 
-    #     if cmap == :random 
-    #         type_to_color = Dict(t => rand(RGBf) for t in unique(types))
-
-    #         for (i, idx) in enumerate(active_ids)
-    #             colors[i] = type_to_color[types[idx]]
-    #         end
-    #     else
-    #         colors[1:num_active] .= RGBf(GLMakie.to_color(cmap))
-    #     end
-    # elseif cmap isa ColorScheme
-    #     for idx in 1:num_active
-    #         colors[idx] = cmap[rand(Float64)]
-    #     end
-    # else
-    #     for (i, idx) in enumerate(active_ids)
-    #         t = types[idx]
-    #         if t > length(cmap) || t < 1
-    #             colors[i] = RGBf(GLMakie.to_color(:pink))
-    #         elseif cmap[t] == :random
-    #             colors[i] = rand(RGBf)
-    #         else
-    #             colors[i] = cmap[t]
-    #         end
-    #     end
-    # end
-    # cv = @view colors[1:num_active]
-    # return cv
 end
 
 function get_radius!(radius, dynamic_cfg, state, particles_ids)
@@ -267,28 +231,6 @@ function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     comp = ScatterGraph(types, colors, cmap, scatter_plot, (), pos_obs, cfg)
     update_graph(comp, system)
     return comp
-
-    # data = get_graph_data(cfg, system, system.state)
-    # colors = Vector{RGBf}(undef, length(system.state.pos))
-
-    # types_obs = Observable(types)
-    # # colors_obs = lift(types_obs) do types
-    # # colors_obs = lift(pos_obs) do _
-    # #     # get_colors(cfg.colors_map, colors, types)
-    # #     particles_ids = get_particles_ids(system.state, system.dynamic_cfg)
-    # #     get_colors!(colors, types, cmap, particles_ids)
-    # # end
-
-    # pos_points_obs = lift(pos_obs) do pos
-    #     [Point2f(p) for p in pos]
-    # end
-    
-    # particles_ids = get_particles_ids(system.state, system.dynamic_cfg)
-    # colors = get_colors!(colors, types, cmap, particles_ids)
-
-    # scatter_plot = scatter!(ax, pos_points_obs; color=colors, cfg.kwargs...)
-        
-    # ScatterGraph(types, cmap, scatter_plot, (types_obs=types_obs,), pos_obs, cfg)
 end
 
 function update_graph(comp::ScatterGraph, system)
@@ -435,28 +377,6 @@ function get_graph(ax, system, cfg::MainGraphCfg)
         push!(graphs, get_graph(ax, pos_obs, system, g))
     end
 
-    # scatter!(ax, x_obs, y_obs, color=colors_obs)
-    
-    # Circles
-    # poly!(ax,
-    #     lift(pos_obs) do pos
-    #         points_to_circle(pos)
-    #     end,
-    #     # color = :dodgerblue,
-    #     color = colors_obs,
-    #     strokecolor = :black,
-    #     strokewidth = 0.5,
-    # )
-
-    # scatter_graph = nothing
-    # if !(scatter_cfg === nothing)
-    #     colors = Vector{RGBf}(undef, size(data.pos, 2))
-    #     sc_colors_obs = Observable(get_colors(cfg.scatter_cfg.colors_map, colors, data.types))
-    #     scatter!(pos_obs, color=colors_obs)
-        
-    #     scatter_graph = ScatterGraph(sc_colors_obs, cfg.scatter_cfg)
-    # end
-
     graph = MainGraph(ax, data.pos, pos_obs, tuple(graphs...), cfg)
     update_graph(graph, system)
     graph
@@ -466,15 +386,10 @@ function update_graph(graph::MainGraph, system)
     update_graph_data(graph, system)
     for c in graph.components
         update_graph(c, system)
-        # to_update = get_comp_update_data(c)(c, system)
-        # update_all = to_update === nothing
-        # for (name, obs) in pairs(get_comp_obs_list(c))
-        #     if update_all || to_update[name]
-        #         notify(obs)
-        #     end
-        # end
     end
     notify(graph.pos_obs)
 end
+
+include("../rings/view.jl")
 
 end

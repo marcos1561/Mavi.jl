@@ -1,7 +1,11 @@
+module RingsGraphs
+
+using GLMakie
+
 using Mavi.Rings
 using Mavi.Rings.States
 using Mavi.Rings.Configs: get_interaction_cfg, get_num_particles
-import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, get_graph_data, update_graph_data
+import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph
 
 function update_types_to_ring_id!(types, system)
     for ring_id in axes(system.rings_pos, 2)
@@ -51,12 +55,6 @@ end
 
 function get_graph_data(cfg::GraphCompCfg, system, state::RingsState)
     types = Vector{Int}(undef, length(state.pos))
-    # for ring_id in get_active_ids(state)
-    #     num_p = get_num_particles(system.dynamic_cfg, state, ring_id)
-    #     for particle_id in 1:num_p
-    #         types[to_scalar_idx(state, ring_id, particle_id)] = ring_id
-    #     end
-    # end
     num_max_p = num_max_particles(state)
     for ring_id in axes(state.rings_pos, 2)
         for particle_id in 1:num_max_p
@@ -66,27 +64,29 @@ function get_graph_data(cfg::GraphCompCfg, system, state::RingsState)
     return types
 end
 
-# function get_graph_data(system, state::RingsState)
-#     info = system.debug_info
-#     pos, radius, color = info.graph_pos, info.graph_radius, info.graph_color
+@kwdef struct InvasionsGraphCfg{C, F} <: GraphCompCfg
+    color::C = "black"
+    update_data::F = update_graph_data
+end
 
-#     colors = [:red, :blue]
+struct InvasionsGraph{O, C} <: GraphComp
+    obs_list::O
+    cfg::C
+end
 
-#     idx = 1
-#     for ring_id in get_active_ids(state)
-#         ring_type = state.types[ring_id]
-#         for p_id in 1:system.dynamic_cfg.num_particles[ring_type]
-#             pos[1, idx] = state.rings_pos[1, p_id, ring_id] 
-#             pos[2, idx] = state.rings_pos[2, p_id, ring_id] 
-            
-#             radius_i = get_interaction_cfg(ring_type, ring_type, system.dynamic_cfg.interaction_finder).dist_eq / 2.0
-#             radius[idx] = radius_i
-#             color[idx] = colors[ring_type]
-            
-#             idx += 1
-#         end
-#     end
+function get_graph(ax, pos_obs, system, cfg::InvasionsGraphCfg)
+    invasions_pos_obs = Observable(eltype(system.state.pos)[])
 
-#     count = idx-1
-#     return (pos=pos[:, 1:count], radius=radius[1:count], color=color[1:count])    
-# end
+    scatter!(ax, invasions_pos_obs, color=cfg.color, marker=:cross, markersize=12)
+    graph = InvasionsGraph((invasions=invasions_pos_obs,), cfg)
+    update_graph(graph, system)
+    return graph
+end
+
+function update_graph_data(graph::InvasionsGraph, system)
+    graph.obs_list[:invasions][] = [system.state.pos[inv.p_id] for inv in system.info.invasions.list]
+    return
+end
+
+
+end # RingsGraphs

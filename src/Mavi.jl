@@ -26,6 +26,7 @@ using .States
 # Special Systems 
 include("rings/rings.jl")
 
+include("experiments.jl")
 include("visualization.jl")
 
 end

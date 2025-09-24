@@ -4,6 +4,7 @@ export newton_step!, szabo_step!, rtp_step!
 export calc_forces!, calc_interaction, walls!
 export calc_diff, calc_diffs_and_dists!
 export update_verlet!, update_rtp!, update_szabo!
+export get_step_function
 
 using Base.Threads
 using StaticArrays
@@ -469,6 +470,15 @@ function rtp_step!(system::System)
     update_rtp!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
+end
+
+function get_step_function(::StandardSys, system)
+    cfg_to_step = DefaultDict(
+        newton_step!,
+        SzaboCfg => szabo_step!,
+        RunTumbleCfg => rtp_step!,
+    )
+    return cfg_to_step[typeof(system.dynamic_cfg)]
 end
 
 end

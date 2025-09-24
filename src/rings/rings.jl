@@ -1,6 +1,6 @@
 module Rings
 
-export RingsSystem, RingsState, ActiveState, Configs, InitStates, Integration
+export RingsSystem, RingsState, RingsSys, ActiveState, Configs, InitStates, Integration
 export get_num_particles, get_num_total_particles
 export update_active_particles_ids!, update_part_ids!
 export get_continuos_pos, ring_points

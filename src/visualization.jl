@@ -420,6 +420,6 @@ function animate(system::System, step!, cfg::ImageCfg)
     save(cfg.path, fig)
 end
 
-include("rings/view.jl")
+# include("rings/view.jl")
 
 end

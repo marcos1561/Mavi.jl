@@ -2,7 +2,7 @@ module Integration
 
 using StaticArrays
 
-import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!
+import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!, get_step_function
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
 
 using Mavi.Rings
@@ -550,5 +550,7 @@ function step!(system)
     system.time_info.num_steps += 1
     system.time_info.time += system.int_cfg.dt
 end
+
+get_step_function(::RingsSys, system) = step!
 
 end
