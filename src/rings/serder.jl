@@ -65,15 +65,16 @@ end
 # ==
 
 function MaviSerder.get_obj_save_data(state::RingsState)
-    if isnothing(state.active)
-        active_mask = nothing
+    if state.rings_ids isa Rings.States.VarRingsIds
+        active_mask = state.rings_ids.mask
     else
-        active_mask = state.active.mask
+        active_mask = nothing
     end
     return (
         pol=state.pol, 
         rings_pos=state.rings_pos,
         types=state.types,
+        num_particles=state.num_particles,
         active_state=active_mask,
     )
 end
@@ -88,6 +89,7 @@ function MaviSerder.load_component(T::Type{RS}, path::String) where RS <: RingsS
         pol=data.pol,
         types=data.types,
         active_state=active_state,
+        num_particles=data.num_particles,
     )
 end
 
@@ -95,7 +97,7 @@ end
 # Rings System
 # ==
 
-function MaviSerder.load_system(configs, ::RingsSys)
+function MaviSerder.load_system(configs, rng, ::RingsSys)
     configs_loaded = load_dic_configs(configs)
 
     RingsSystem(
@@ -108,6 +110,7 @@ function MaviSerder.load_system(configs, ::RingsSys)
         source_cfg=configs_loaded[:info][:source_cfg],
         user_data=configs_loaded[:info][:user_data],
         time_info=configs_loaded[:time_info],
+        rng=rng,
     )
 
 end

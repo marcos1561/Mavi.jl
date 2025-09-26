@@ -9,7 +9,6 @@ module Example
 using Printf
 
 using Mavi
-using Mavi.Integration
 using Mavi.Configs
 using Mavi.Quantities
 using Mavi.Visualization
@@ -52,7 +51,7 @@ function main()
         info_cfg=DefaultInfoUICfg(custom_items=get_energy),
     )
 
-    animate(system, Integration.newton_step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

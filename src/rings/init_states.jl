@@ -2,7 +2,7 @@ module InitStates
 
 export rectangular_grid, random_pol, create_circle
 
-using StaticArrays
+using StaticArrays, Random
 
 using Mavi.Configs
 using Mavi.Rings.Utils
@@ -71,8 +71,12 @@ function rectangular_grid(;
     return ring_pos, geometry_cfg
 end
 
-function random_pol(num_rings)
-    return rand(Float64, num_rings) .* 2 * π
+function random_pol(num_rings; rng=nothing)
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
+    return rand(rng, Float64, num_rings) .* 2 * π
 end
 
 end

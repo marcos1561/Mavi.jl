@@ -1,9 +1,9 @@
 module Systems
 
 export System, StandardSys
-export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius, get_particles_ids
+export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius
 
-using StaticArrays, Serialization, JSON3, StructTypes
+using StaticArrays, Serialization, JSON3, StructTypes, Random
 
 import Mavi
 using Mavi.States
@@ -45,7 +45,7 @@ d=2: y axis
 struct System{T, ND, NT, 
     StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
     ChunksT<:Union{Nothing, Chunks}, SysT<:SystemType, 
-    InfoT, DebugT}
+    InfoT, DebugT, RNGT<:AbstractRNG}
     state::StateT
     space_cfg::SpaceCfg{WallTypeT, GeometryCfgT}
     dynamic_cfg::DynamicCfgT
@@ -66,10 +66,12 @@ struct System{T, ND, NT,
     info::InfoT
     debug_info::DebugT
     type::SysT
+    rng::RNGT
 end
 function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, 
-    chunks=nothing, info=nothing, debug_info=nothing, time_info=nothing, sys_type=:standard) where {ND, T}
-    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state, info))
+    chunks=nothing, info=nothing, debug_info=nothing, time_info=nothing, 
+    sys_type=:standard, rng=nothing) where {ND, T}
+    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state))
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
     end
@@ -101,14 +103,18 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
     # end
 
     if isnothing(chunks)
-        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg) 
+        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state) 
     end
 
     if !isnothing(chunks)
         update_chunks!(chunks)
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, time_info, info, debug_info, sys_type)
+    if isnothing(rng)
+        rng=Random.GLOBAL_RNG
+    end
+
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, time_info, info, debug_info, sys_type, rng)
 end
 
 # @inline get_forces(system) = @view system.forces[:, :, 1]
@@ -129,15 +135,19 @@ particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.s
 get_particle_radius(dynamic_cfg, state, idx) = particle_radius(dynamic_cfg)
 get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cfg, system.state, idx)
 
-@inline get_num_total_particles(state::State, info=nothing) = length(state.pos)
-@inline get_num_total_particles(system::System, state::State) = get_num_total_particles(state, system.info)
-@inline get_num_total_particles(system::System) = get_num_total_particles(system.state, system.info)
-
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
-@inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
-@inline get_particles_ids(system::System, state) = get_particles_ids(state, system.dynamic_cfg)
-@inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
+# @inline get_num_total_particles(state::State, info=nothing) = length(state.pos)
+# @inline get_num_total_particles(system::System, state::State) = get_num_total_particles(state, system.info)
+# @inline get_num_total_particles(system::System) = get_num_total_particles(system.state, system.info)
+States.get_num_total_particles(system::System) = get_num_total_particles(system.state)
+
+# @inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
+# @inline get_particles_ids(system::System, state) = get_particles_ids(state, system.dynamic_cfg)
+# @inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
+States.get_particles_ids(system::System) = get_particles_ids(system.state)
+
+States.update_ids!(system::System) = update_ids!(system.state)
 
 end

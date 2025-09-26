@@ -7,7 +7,8 @@ export update_area_empty!, process_sink_source!
 using StaticArrays, StructTypes
 
 import Mavi.Configs: GeometryCfg, RectangleCfg, check_intersection, is_inside
-import Mavi.Rings: get_num_particles, get_ids
+import Mavi.Rings: ring_num_particles
+import Mavi.States: get_ids
 
 using Mavi.Rings.States
 using Mavi.Rings.Configs
@@ -16,8 +17,15 @@ using Mavi.ChunksMod
 struct RandomPol{T} end
 StructTypes.StructType(::Type{RandomPol{T}}) where T = StructTypes.Struct()
 
-get_spawn_pol(spawn_pol) = spawn_pol 
-get_spawn_pol(spawn_pol::RandomPol{T}) where T = rand(T) * 2 * π 
+# function RandomPol{T}(rng=nothing) where T
+#     if isnothing(rng)
+#         rng = Random.GLOBAL_RNG
+#     end
+#     RandomPol{T, typeof(rng)}(rng)
+# end
+
+get_spawn_pol(spawn_pol; rng=nothing) = spawn_pol 
+get_spawn_pol(spawn_pol::RandomPol{T}; rng) where T = rand(rng, T) * 2 * π 
 
 struct SourceCfg{T<:AbstractFloat, SP}
     bottom_left::SVector{2, T}
@@ -194,25 +202,6 @@ function update_area_empty!(source::Source{T, C, Cfg}) where {T, C<:PosChecker, 
             end
         end
     end
-
-    # for idx in eachindex(source.bbox)
-    #     source.is_empty[idx] = true
-    #     bbox = source.bbox[idx]
-    #     found = false
-    #     for ring_id in get_active_ids(checker.state)
-    #         for p_id in 1:get_num_particles(dynamic_cfg, state, ring_id)
-    #             p_scalar_idx = to_scalar_idx(state, ring_id, p_id)
-    #             if is_inside(state.pos[p_scalar_idx], bbox, pad=source.cfg.pad)
-    #                 source.is_empty[idx] = false
-    #                 found = true
-    #                 break
-    #             end
-    #         end
-    #         if found
-    #             break
-    #         end
-    #     end
-    # end
 end
 
 function update_area_empty!(source::Source{T, C, Cfg}) where {T, C<:ChunksChecker, Cfg}
@@ -244,9 +233,9 @@ function process_source!(source, state, system=nothing)
         if !source.is_empty[idx]
             continue
         end
-        ring_id = add_ring!(state, source.bbox_spawn_pos[idx], get_spawn_pol(source.cfg.spawn_pol))
+        ring_id = add_ring!(state, source.bbox_spawn_pos[idx], get_spawn_pol(source.cfg.spawn_pol, rng=system.rng))
         if !isnothing(system) && !isnothing(ring_id)
-            num_p = get_num_particles(system, ring_id)
+            num_p = ring_num_particles(system, ring_id)
             system.info.cms[ring_id] = sum(state.rings_pos[1:num_p, ring_id]) / num_p
         end
     end
@@ -263,7 +252,7 @@ end
 
 function process_sink!(sink::Sink, state)
     box = sink.cfg.geometry_cfg
-    for ring_id in get_active_ids(state)
+    for ring_id in get_rings_ids(state)
         if is_inside(sink.pos[ring_id], box)
             remove_ring!(state, ring_id)
         end

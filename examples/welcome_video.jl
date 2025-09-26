@@ -227,7 +227,7 @@ function main()
     #     duration=20,
     # )
 
-    animate(system, Integration.step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

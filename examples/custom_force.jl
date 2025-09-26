@@ -23,7 +23,7 @@ Configs.particle_radius(dynamic_cfg::DynamicCfg) = dynamic_cfg.min_dist/2
 
 function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
     pos = system.state.pos
-    dr, dist = calc_diff(pos[i], pos[j], system.space_cfg)
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
     dist = sqrt(sum(dr.^2))
 
     force = dynamic_cfg.force
@@ -75,7 +75,7 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
-    animate(system, Mavi.Integration.newton_step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

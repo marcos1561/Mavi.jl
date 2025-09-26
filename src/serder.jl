@@ -59,6 +59,7 @@ end
 function save_system(system::System, root)
     save_system_configs(system, root)
     save_component_serial(system.state, root, "state")
+    serialize(joinpath(root, "state/rng.bin"), system.rng)
 end
 
 
@@ -123,7 +124,7 @@ function load_configs(path)
     load_dic_configs(configs)
 end
 
-function load_system(configs, ::StandardSys)
+function load_system(configs, rng, ::StandardSys)
     configs_loaded = load_dic_configs(configs)
     System(
         state=configs_loaded[:state],
@@ -133,6 +134,7 @@ function load_system(configs, ::StandardSys)
         info=configs_loaded[:info],
         time_info=configs_loaded[:time_info],
         debug_info=configs_loaded[:debug_info],
+        rng=rng,
     )
 end
 
@@ -147,7 +149,9 @@ function load_system(configs_path::String, state_path::String, time_info_path=no
         configs[:time_info] = get_load_info_serial(time_info_path)
     end
     
-    load_system(configs, sys_type)
+    rng = deserialize(joinpath(state_path, "rng.bin"))
+
+    load_system(configs, rng, sys_type)
 end
 
 load_system(root) = load_system(joinpath(root, "configs.json"), joinpath(root, "state"))

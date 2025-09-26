@@ -9,7 +9,6 @@ using StaticArrays
 
 using Mavi.Rings
 using Mavi.Rings.Configs
-using Mavi.Rings.Integration
 using Mavi.Rings.InitStates
 using Mavi.Rings.Sources
 
@@ -49,8 +48,8 @@ function create_system(;num_particles=10)
         rot_diff=0.,
         k_area=3.,
         k_spring=30.,
-        l_spring=interaction_cfg.dist_eq*0.8,
         num_particles=num_particles,
+        l_spring=interaction_cfg.dist_eq*0.8,
         interaction_finder=interaction_cfg,
     )
 
@@ -127,7 +126,7 @@ function main()
         ])
     )
 
-    animate(system, Integration.step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

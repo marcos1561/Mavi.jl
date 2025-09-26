@@ -10,11 +10,13 @@ export drawn_borders, colors_from_cmap
 using GLMakie
 using DataStructures
 
+
 using Mavi.States: State
 using Mavi.Systems
 using Mavi.Configs
 using Mavi.MaviSerder
 using Mavi.Utils.Progress
+using Mavi.Integration: get_step_function
 
 include("gui/info_ui.jl")
 include("gui/system_graph.jl")
@@ -141,10 +143,15 @@ get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 
 get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:GraphCfg, I} = anim_cfg.graph_cfg
 get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:SystemGraphs.GraphCompCfg, I} = MainGraphCfg(anim_cfg.graph_cfg)
+get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:GraphCfg, T} = image_cfg.graph_cfg
 get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, step!, cfg=nothing)
+function animate(system::System, cfg=nothing, step! = nothing)
+    if isnothing(step!)
+        step! = get_step_function(system)
+    end
+
     GLMakie.activate!(; title="Mavi")
 
     if cfg === nothing
@@ -392,7 +399,11 @@ function animate(system::System, step!, cfg=nothing)
     end
 end
 
-function animate(system::System, step!, cfg::ImageCfg)
+function animate(system::System, cfg::ImageCfg, step! = nothing)
+    if isnothing(step!)
+        step! = get_step_function(system)
+    end
+
     GLMakie.activate!(; title="Mavi")
 
     ax_kwargs = cfg.ax_kwargs

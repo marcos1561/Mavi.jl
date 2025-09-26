@@ -15,19 +15,19 @@ using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWal
 
 export step!
     
-function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.ParticleIds}
-    chunks.num_particles_in_chunk .= 0
-    for idx in Rings.get_ids(chunks.extra_info)
-        update_particle_chunk!(chunks, idx)
-    end
-end
+# function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.ParticleIds}
+#     chunks.num_particles_in_chunk .= 0
+#     for idx in Rings.get_ids(chunks.extra_info)
+#         update_particle_chunk!(chunks, idx)
+#     end
+# end
 
-function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:RingsState}
-    chunks.num_particles_in_chunk .= 0
-    for idx in get_active_ids(chunks.extra_info)
-        update_particle_chunk!(chunks, idx)
-    end
-end
+# function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:RingsState}
+#     chunks.num_particles_in_chunk .= 0
+#     for idx in get_rings_ids(chunks.extra_info)
+#         update_particle_chunk!(chunks, idx)
+#     end
+# end
 
 function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     ri = get_ring_id(i, num_max_particles(system.state))
@@ -54,7 +54,7 @@ function calc_interaction_force(i, j, ring_id1, ring_id2, dr, dist, interaction_
 
     if ring_id1 == ring_id2
         diff = abs(i - j)
-        num_p = get_num_particles(dynamic_cfg, state, ring_id1) 
+        num_p = ring_num_particles(state, ring_id1) 
         
         if diff == 1 || diff == num_p - 1
             return zero(dr)     
@@ -120,10 +120,10 @@ function update_continuos_pos!(system, wall_type) end
 function update_continuos_pos!(system, wall_type::PeriodicWalls)
     continuos_pos = system.info.continuos_pos
     pos = system.state.pos
-    Threads.@threads for ring_id in get_active_ids(system.state)
+    Threads.@threads for ring_id in get_rings_ids(system.state)
         # continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
         continuos_pos[:, ring_id] .= system.state.rings_pos[:, ring_id]
-        for i in 2:get_num_particles(system.dynamic_cfg, system.state, ring_id) 
+        for i in 2:ring_num_particles(system.state, ring_id) 
             i_idx = to_scalar_idx(system.state, ring_id, i)
             last_idx = to_scalar_idx(system.state, ring_id, i-1)
             dr = calc_diff(pos[i_idx], pos[last_idx], system.space_cfg)
@@ -143,10 +143,10 @@ function area_forces!(system)
         k_area = system.dynamic_cfg.k_area
         p0 = system.dynamic_cfg.p0
         l0 = system.dynamic_cfg.l_spring
-        num_particles = get_num_particles(system.dynamic_cfg)
+        num_particles = system.state.num_particles
     end
     
-    # Threads.@threads for ring_id in get_active_ids(system.state)
+    # Threads.@threads for ring_id in get_rings_ids(system.state)
     #     area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
     #     system.info.areas[ring_id] = area
     # end
@@ -154,8 +154,8 @@ function area_forces!(system)
     pos = system.state.pos
     forces = get_forces(system)
 
-    for ring_id in get_active_ids(system.state)
-        area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
+    for ring_id in get_rings_ids(system.state)
+        area = calc_area(get_continuos_pos(system, ring_id, system.space_cfg.wall_type))
         system.info.areas[ring_id] = area
         # area = system.info.areas[ring_id]
 
@@ -164,7 +164,7 @@ function area_forces!(system)
             k_area = system.dynamic_cfg.k_area[ring_type]
             p0 = system.dynamic_cfg.p0[ring_type]
             l0 = system.dynamic_cfg.l_spring[ring_type]
-            num_particles = system.dynamic_cfg.num_particles[ring_type]
+            num_particles = system.state.num_particles[ring_type]
         end
 
         area0 = (num_particles * l0 / p0)^2
@@ -202,8 +202,8 @@ function forces!(system)
     space_cfg = system.space_cfg
     forces = get_forces(system)
 
-    for ring_id in get_active_ids(state)
-        num_particles = get_num_particles(dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        num_particles = ring_num_particles(state, ring_id)
         k, l = get_spring_pars(dynamic_cfg, state, ring_id)
         for spring_id in 1:num_particles
             first_id = spring_id
@@ -247,7 +247,7 @@ end
 #     state = system.state
 #     lines = space_cfg.geometry_cfg.lines
 #     p_radius = Configs.particle_radius(system.dynamic_cfg)
-#     for ring_id in get_active_ids(system.state)
+#     for ring_id in get_rings_ids(system.state)
 #         for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id) 
 #             pos_i = state.rings_pos[i, ring_id] 
             
@@ -313,8 +313,8 @@ function update!(system)
         mu, dr = dynamic_cfg.mobility, dynamic_cfg.rot_diff 
     end
 
-    for ring_id in get_active_ids(state)
-        num_particles = get_num_particles(dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        num_particles = ring_num_particles(state, ring_id)
         
         if has_types
             ring_type = state.types[ring_id]
@@ -345,19 +345,9 @@ function update!(system)
             end
         end
 
-        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
+        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn(system.rng)
         state.pol[ring_id] += d_theta
     end
-end
-
-function update_active_particles_ids!(part_ids, state, dynamic_cfg) end
-function update_active_particles_ids!(part_ids, state::RingsState{T, ActiveRings}, dynamic_cfg) where T
-    update_part_ids!(part_ids, state, dynamic_cfg)
-end
-
-function update_ids!(system)
-    calc_active_ids!(system.state.active)
-    update_active_particles_ids!(system.info.particles_ids, system.state, system.dynamic_cfg)
 end
 
 function update_sources!(system, sources::Nothing) end
@@ -375,8 +365,8 @@ end
 
 function update_cms!(system)
     wall_type = system.space_cfg.wall_type
-    for ring_id in get_active_ids(system.state)
-        rings_pos = get_continuos_pos(ring_id, system, wall_type)
+    for ring_id in get_rings_ids(system.state)
+        rings_pos = get_continuos_pos(system, ring_id, wall_type)
         system.info.cms[ring_id] = sum(rings_pos) / length(rings_pos)
     end
 end
@@ -506,7 +496,7 @@ function check_invasions!(system, chunks::Chunks)
 end
 
 function check_invasions!(system, chunks::Nothing)
-    rings_ids = get_active_ids(system.state)
+    rings_ids = get_rings_ids(system.state)
     num_rings = length(rings_ids)
 
     for r1_id in 1:num_rings

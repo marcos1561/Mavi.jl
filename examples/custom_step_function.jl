@@ -58,7 +58,7 @@ function main()
         num_steps_per_frame=1,
         fps=60,
     )
-    animate(system, step!, anim_cfg)
+    animate(system, anim_cfg, step!)
 end
 
 end

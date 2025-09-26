@@ -1,7 +1,7 @@
 module Configs
 
 export RingsIntCfg, RingsCfg, has_types_cfg, get_spring_pars
-export get_num_particles, get_area0, get_equilibrium_p0, get_particle_radius
+export get_area0, get_equilibrium_p0, get_particle_radius
 export get_equilibrium_area, get_particles_area_contribution, get_ring_radius
 export HarmTruncCfg
 export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
@@ -12,6 +12,8 @@ using NLsolve, StructTypes, JSON3
 import Mavi.Configs as MaviCfg
 # import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
 
+import Mavi.Rings.States: ring_num_particles
+
 using Reexport
 @reexport using Mavi.Configs
 
@@ -21,11 +23,17 @@ using Reexport
 
 abstract type InteractionCfg end
 
-@kwdef struct HarmTruncCfg <: InteractionCfg
-    k_rep::Float64
-    k_atr::Float64
-    dist_eq::Float64
-    dist_max::Float64
+struct HarmTruncCfg{T<:Number} <: InteractionCfg
+    k_rep::T
+    k_atr::T
+    dist_eq::T
+    dist_max::T
+end
+function HarmTruncCfg(;k_rep, k_atr, dist_eq, dist_max)
+    HarmTruncCfg(promote(k_rep, k_atr, dist_eq, dist_max)...)
+end
+function HarmTruncCfg{T}(; k_rep, k_atr, dist_eq, dist_max) where {T<:Number}
+    HarmTruncCfg{T}(T(k_rep), T(k_atr), T(dist_eq), T(dist_max))
 end
 
 function MaviCfg.particle_radius(interaction_cfg::HarmTruncCfg) 
@@ -77,30 +85,65 @@ struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFind
     k_area::U
     k_spring::U
     l_spring::U
-    num_particles::Union{Vector{Int}, Int}
+    num_particles::Union{Int, Vector{Int}}
     num_types::Int
     interaction_finder::InteracFinderT
 end
 function RingsCfg(;
-    p0, relax_time, vo, mobility, rot_diff, k_area, k_spring, l_spring,
-    num_particles, interaction_finder,
+    p0, relax_time, vo, mobility, rot_diff, k_area, k_spring, l_spring, 
+    interaction_finder, num_particles=-1, NumType=nothing,
     )
-    U = typeof(p0)
-    if U <: Number && !(num_particles isa Int)
-        throw(ArgumentError("If U is Number, num_particles must be Int"))
-    elseif U <: AbstractVector && !(num_particles isa AbstractVector)
-        throw(ArgumentError("If U is AbstractVector, num_particles must be Vector"))
+    args = (p0, relax_time, vo, mobility, rot_diff, k_area, k_spring, l_spring)
+    
+    num_types = maximum([length(arg) for arg in args])
+    if num_types > 1 && !all(x -> x isa AbstractVector, args)
+        new_args = []
+        for arg in args
+            if arg isa Number
+                arg = [arg for _ in 1:num_types]
+            end
+            push!(new_args, arg)
+        end
+        args = new_args
     end
 
-    if U <: Number
-        num_types = 1
+    U = typeof(args[1])
+    
+    if num_particles != -1
+        if U <: Number && !(num_particles isa Int)
+            throw(ArgumentError("If U is Number, num_particles must be Int"))
+        elseif U <: AbstractVector && !(num_particles isa AbstractVector)
+            throw(ArgumentError("If U is AbstractVector, num_particles must be Vector"))
+        elseif num_types != length(num_particles)
+            np = length(num_particles)
+            throw(ArgumentError("`length(num_particles)=$np`, but there exists $num_types types"))
+        end
+    end
+
+    if isnothing(NumType)
+        NumType = promote_type(map(eltype, args)...)
+    end
+    
+    if U <: AbstractVector
+        args = [convert(Vector{NumType}, arg) for arg in args]
     else
-        num_types = length(p0)
+        args = [convert(NumType, arg) for arg in args]
     end
 
+    RingsCfg(args..., num_particles, num_types, interaction_finder)
+end
+function RingsCfg(cfg::RingsCfg, num_particles)
     RingsCfg(
-        p0, relax_time, vo, mobility, rot_diff, 
-        k_area, k_spring, l_spring, num_particles, num_types, interaction_finder,
+        p0=cfg.p0,
+        relax_time=cfg.relax_time,
+        vo=cfg.vo,
+        mobility=cfg.mobility,
+        rot_diff=cfg.rot_diff,
+        k_area=cfg.k_area,
+        k_spring=cfg.k_spring,
+        l_spring=cfg.l_spring,
+        interaction_finder=cfg.interaction_finder,
+        num_particles=num_particles,
     )
 end
 
@@ -137,14 +180,6 @@ function get_spring_pars(dynamic_cfg::RingsCfg{U, T, F}, state, ring_id) where {
 end
 
 
-@inline function get_num_particles(dynamic_cfg::RingsCfg, type=nothing)
-    return get_ring_prop_by_name(dynamic_cfg, :num_particles, type)
-end
-
-@inline function get_num_particles(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I}
-    return get_rings_property(dynamic_cfg, get_num_particles)
-end
-
 @inline function get_particle_radius(dynamic_cfg::RingsCfg, type=nothing)
     inter = get_interaction_cfg(type, type, dynamic_cfg.interaction_finder)
     return particle_radius(inter)
@@ -152,12 +187,14 @@ end
 
 MaviCfg.particle_radius(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, get_particle_radius)
 
+ring_num_particles(dynamic_cfg::RingsCfg, type=nothing) = ring_num_particles(dynamic_cfg.num_particles, type)
+
 """
 Returns the equilibrium area of the area force for
 the given number of particles, taking into account `p0`.
 """
 function get_area0(dynamic_cfg, type=nothing)
-    num_particles = get_num_particles(dynamic_cfg, type)
+    num_particles = ring_num_particles(dynamic_cfg, type)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
     p0 = get_ring_prop_by_name(dynamic_cfg, :p0, type)
     return (num_particles * l_spring / p0)^2
@@ -169,7 +206,7 @@ Returns the p0 at which `area0` is equal to the equilibrium area
 considering only the springs.
 """
 function get_equilibrium_p0(dynamic_cfg::RingsCfg, type=nothing)
-    num_particles = get_num_particles(dynamic_cfg, type)
+    num_particles = ring_num_particles(dynamic_cfg, type)
     theta = 2 * π  / num_particles
     return 2 * (num_particles * (1 - cos(theta))/sin(theta))^.5
 end
@@ -184,7 +221,7 @@ NOTE: The area contribution from the particles is not considered here.
 function get_equilibrium_area(dynamic_cfg::RingsCfg, type=nothing)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
 
-    num_particles = get_num_particles(dynamic_cfg, type) 
+    num_particles = ring_num_particles(dynamic_cfg, type) 
     a0 = get_area0(dynamic_cfg, type)
 
     p0_lim = get_equilibrium_p0(dynamic_cfg, type)
@@ -239,7 +276,7 @@ plus the area of the particles that lies outside this polygon (A_c); this
 function returns A_c.
 """
 function get_particles_area_contribution(dynamic_cfg::RingsCfg, type=nothing)
-    n = get_num_particles(dynamic_cfg, type)
+    n = ring_num_particles(dynamic_cfg, type)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
     diameter = get_particle_radius(dynamic_cfg, type) * 2
 
@@ -258,7 +295,8 @@ It is calculated assuming its equilibrium area.
 function get_ring_radius(dynamic_cfg::RingsCfg, type=nothing)
     area_eq = get_equilibrium_area(dynamic_cfg, type)
     p_radius = get_particle_radius(dynamic_cfg, type)
-    num_particles = get_num_particles(dynamic_cfg, type)
+    num_particles = ring_num_particles(dynamic_cfg, type)
+    
     radius_to_particle = (2 * area_eq / (num_particles * sin(2 * pi / num_particles)))^.5
     return radius_to_particle + p_radius
 end

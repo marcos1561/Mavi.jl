@@ -54,7 +54,6 @@ function main()
 
     animate(
         system, 
-        Mavi.Integration.rtp_step!, 
         AnimationCfg(num_steps_per_frame=100),
     )
 end

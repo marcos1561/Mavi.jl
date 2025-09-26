@@ -4,7 +4,7 @@ export Chunks, update_chunks!, get_chunk_particles, get_chunk_rect
 
 using StaticArrays
 
-using Mavi.States: State
+using Mavi.States: State, get_particles_ids
 using Mavi.Configs
 
 struct Chunks{N, T, P, InfoT}
@@ -148,9 +148,14 @@ end
 "Update particles chunk positions."
 function update_chunks!(chunks::Chunks)
     # num_p = size(chunks.pos)[2]
-    num_p = length(chunks.pos)
+    # num_p = length(chunks.pos)
+    # chunks.num_particles_in_chunk .= 0
+    # for i in 1:num_p
+    #     update_particle_chunk!(chunks, i)
+    # end
+    
     chunks.num_particles_in_chunk .= 0
-    for i in 1:num_p
+    for i in get_particles_ids(chunks.extra_info)
         update_particle_chunk!(chunks, i)
     end
 end

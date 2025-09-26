@@ -28,7 +28,6 @@ function create_system(;num_particles, num_cols, num_rows)
         k_area=1.0,
         k_spring=20.0,
         l_spring=1.0,
-        num_particles=num_particles,
         interaction_finder=interaction_cfg,
     )
 
@@ -83,7 +82,7 @@ function main()
         # graph_cfg=ScatterGraphCfg(),
     )
     
-    animate(system, Integration.step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

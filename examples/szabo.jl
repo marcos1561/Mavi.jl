@@ -61,7 +61,7 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
-    animate(system, Mavi.Integration.szabo_step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

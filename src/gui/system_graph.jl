@@ -7,7 +7,7 @@ export RingsGraphs
 
 using GLMakie, ColorSchemes, DataStructures, Random
 using Mavi.Systems
-using Mavi.States: State
+using Mavi.States
 using Mavi.Configs
 
 "Return circle vertices centered in the origin with given radius."
@@ -88,13 +88,17 @@ function colors_from_cmap(cmap, num)
     return Vector{Any}([cmap[rand(Float64)] for _ in 1:num])
 end
 
-function get_color_map(cmap::AbstractVector, num_types) 
+function get_color_map(cmap::AbstractVector, num_types; rng=nothing) 
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
     cmap_out = Vector{RGBf}(undef, num_types)
     for (idx, c) in enumerate(cmap)
         if c isa RGBf
             c_rgb = c
         elseif c == :random
-            c_rgb = rand(RGBf)
+            c_rgb = rand(rng, RGBf)
         else
             c_rgb = RGBf(GLMakie.to_color(c))
         end
@@ -108,15 +112,18 @@ function get_color_map(cmap::AbstractVector, num_types)
     return cmap_out
 end
 
-function get_color_map(cmap::Symbol, num_types)
+function get_color_map(cmap::Symbol, num_types; rng=nothing)
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
     try
         cmap = colorschemes[cmap]
     catch end
 
     if cmap == :random
-        return [rand(RGBf) for _ in 1:num_types]
+        return [rand(rng, RGBf) for _ in 1:num_types]
     elseif cmap == :ids
-        rng = MersenneTwister(31415)
         return [rand(rng, RGBf) for _ in 1:num_types]
     elseif cmap isa ColorScheme
         return [cmap[rand(Float32)] for _ in 1:num_types]            
@@ -151,21 +158,21 @@ end
 abstract type GraphCfg end
 abstract type Graph end
 
-function get_graph_data(graph_cfg::GraphCfg, system, state::State)
-    num_p = get_num_total_particles(system)
-    return (pos=state.pos, types=Vector(1:num_p), num_p=num_p)
+function get_graph_data(graph_cfg::GraphCfg, state::State, system)
+    num_p = length(system.state.pos)
+    return (pos=state.pos, types=Vector(1:num_p))
 end
-@inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system, system.state)
+@inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system.state, system)
 
-update_graph_data(graph::Graph, system, state::State) = DefaultDict{Symbol, Bool}(false)
-@inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system, system.state)
+update_graph_data(graph::Graph, state::State, system::System) = DefaultDict{Symbol, Bool}(false)
+@inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system.state, system)
 
 
 abstract type GraphCompCfg <: GraphCfg end
 abstract type GraphComp <: Graph end
 abstract type GraphCompDebug <: GraphComp end
 
-get_graph_data(graph_cfg::GraphCompCfg, system, state::State) = collect(1:length(state.pos))
+get_graph_data(graph_cfg::GraphCompCfg, state::State, system) = Vector(1:length(state.pos))
 
 get_comp_update_data(c::GraphComp) = c.cfg.update_data
 get_comp_update_data(c::GraphCompDebug) = (_, _) -> DefaultDict{Symbol, Bool}(false)
@@ -192,8 +199,9 @@ struct ScatterGraphCfg{C, KW, F} <: GraphCompCfg
     colors_map::C
     kwargs::KW
     update_data::F
+    rng::AbstractRNG
 end
-function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothing)
+function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothing, rng=nothing)
     if colors_map isa Vector{Symbol}
         colors_map = RGBf.(GLMakie.to_color.(colors_map))
     end
@@ -206,7 +214,11 @@ function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothin
         kwargs = ()
     end
 
-    ScatterGraphCfg(colors_map, kwargs, update_data)
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
+    ScatterGraphCfg(colors_map, kwargs, update_data, rng)
 end
 
 struct ScatterGraph{O, C, P, PosObs} <: GraphComp
@@ -222,8 +234,8 @@ end
 function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     num_total_particles = length(system.state.pos)
     
-    types = get_graph_data(cfg, system, system.state)
-    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map))
+    types = get_graph_data(cfg, system.state, system)
+    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map), rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     scatter_plot = scatter!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
@@ -237,10 +249,11 @@ function update_graph(comp::ScatterGraph, system)
     update_list = get_comp_update_data(comp)(comp, system)
     notify_comp_observables(comp, update_list)
 
-    particles_ids = get_particles_ids(system, system.state)
+    particles_ids = get_particles_ids(system)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
     pos = comp.pos_obs[]
     points = [Point2f(p) for p in pos]
+
     Makie.update!(comp.plot, points; color=colors)
 end
 
@@ -255,9 +268,10 @@ struct CircleGraphCfg{C, S<:Union{StrokeCfg, Nothing}, F} <: GraphCompCfg
     circle_rel::Int
     colors_map::C
     update_data::F
+    rng::AbstractRNG
 end
 function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, colors_map=:random, 
-    update_data=nothing)
+    update_data=nothing, rng=nothing)
     
     # if colors_map === nothing
     #     colors_map = RGBf(GLMakie.to_color(:black))
@@ -271,7 +285,11 @@ function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=
         update_data = update_graph_data
     end
 
-    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, colors_map, update_data)
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
+    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, colors_map, update_data, rng)
 end
 
 struct CircleGraph{C, P, O, PosObs} <: GraphComp
@@ -302,8 +320,8 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
         end
     end
 
-    types = get_graph_data(cfg, system, system.state)
-    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map))
+    types = get_graph_data(cfg, system.state, system)
+    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map), rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     if isnothing(cfg.stroke_cfg)
@@ -325,10 +343,12 @@ function update_graph(comp::CircleGraph, system)
     update_list = get_comp_update_data(comp)(comp, system)
     notify_comp_observables(comp, update_list)
 
-    particles_ids = get_particles_ids(system, system.state)
+    particles_ids = get_particles_ids(system)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
     radius = get_radius!(comp.radius, system.dynamic_cfg, system.state, particles_ids)
+
     pos = comp.pos_obs[]
+    
     circles = [Circle(Point2f(p), r) for (p, r) in zip(pos, radius)]
     Makie.update!(comp.plot, circles; color=colors)
 end
@@ -365,10 +385,8 @@ end
 
 "Build the Graph respective to `cfg` using the given `grid_layout` from Makie."
 function get_graph(ax, system, cfg::MainGraphCfg)
-    data = get_graph_data(cfg, system, system.state)    
-    # pos_view = @view data.pos[:, 1:data.num_p]
-    pos_view = @view data.pos[1:data.num_p]
-    pos_obs = Observable(pos_view)
+    data = get_graph_data(cfg, system.state, system)
+    pos_obs = Observable(data.pos)
 
     drawn_borders(ax, system.space_cfg.geometry_cfg)
     
@@ -377,9 +395,35 @@ function get_graph(ax, system, cfg::MainGraphCfg)
         push!(graphs, get_graph(ax, pos_obs, system, g))
     end
 
-    graph = MainGraph(ax, data.pos, pos_obs, tuple(graphs...), cfg)
+    graph = MainGraph(ax, similar(data.pos), pos_obs, tuple(graphs...), cfg)
     update_graph(graph, system)
     graph
+end
+
+function update_graph_data(graph::MainGraph, part_ids, state::State) end
+function update_graph_data(graph::MainGraph, part_ids::States.AbstractParticleIds, state::State)
+    # pos = cfg.pos
+    # idx = 1
+    # num_total_particles = 0
+    # for ring_id in get_rings_ids(state)
+    #     num_p = get_num_particles(system.dynamic_cfg, state, ring_id)
+    #     num_total_particles += num_p
+    #     for p_id in 1:num_p
+    #         pos[idx] = state.rings_pos[p_id, ring_id] 
+    #         idx += 1
+    #     end
+    # end
+
+    pos = graph.pos
+    for (idx, p_id) in enumerate(get_particles_ids(state))
+        pos[idx] = state.pos[p_id]
+    end
+
+    graph.pos_obs[] = @view pos[1:get_num_total_particles(state)]
+end
+
+function update_graph_data(graph::MainGraph, state::State, system::System)
+    update_graph_data(graph, state.part_ids, state)
 end
 
 function update_graph(graph::MainGraph, system)

@@ -118,7 +118,7 @@ function main()
         # graph_cfg=ScatterGraphCfg(),
     )
     
-    animate(system, Integration.step!, anim_cfg)
+    animate(system, anim_cfg)
 end
 
 end

@@ -2,7 +2,6 @@ module Rings
 
 export RingsSystem, RingsState, RingsSys, ActiveState, Configs, InitStates, Integration
 export get_num_particles, get_num_total_particles
-export update_active_particles_ids!, update_part_ids!
 export get_continuos_pos, ring_points
 export NeighborsCfg, Invasion
 export save_system, load_system
@@ -27,28 +26,21 @@ struct RingsSys <: SystemType end
 # System utils functions 
 # =
 
-@inline function Configs.get_num_particles(dynamic_cfg::RingsCfg{U, T, I}, state, ring_id) where {U<:AbstractArray, T, I}
-    return get_num_particles(dynamic_cfg, state.types[ring_id])
-end
+States.ring_num_particles(system, ring_id) = ring_num_particles(system.state, ring_id)
 
-@inline function Configs.get_num_particles(dynamic_cfg::RingsCfg{U, T, I}, state, ring_id) where {U<:Number, T, I}
-    return dynamic_cfg.num_particles
-end
-@inline Configs.get_num_particles(system, ring_id) = Configs.get_num_particles(system.dynamic_cfg, system.state, ring_id)
-
-function get_continuos_pos(ring_id, system, wall_type)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
+function get_continuos_pos(system, ring_id, wall_type)
+    num_particles = ring_num_particles(system.state, ring_id) 
     return @view system.state.rings_pos[1:num_particles, ring_id]
 end
 
-function get_continuos_pos(ring_id, system, wall_type::PeriodicWalls)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
+function get_continuos_pos(system, ring_id, wall_type::PeriodicWalls)
+    num_particles = ring_num_particles(system.state, ring_id) 
     return @view system.info.continuos_pos[1:num_particles, ring_id]
 end
 
-get_continuos_pos(ring_id, system, wall_type::ManyWalls) = get_continuos_pos(ring_id, system, wall_type.list[1])
+get_continuos_pos(system, ring_id, wall_type::ManyWalls) = get_continuos_pos(system, ring_id, wall_type.list[1])
 
-ring_points(system, ring_id) = get_continuos_pos(ring_id, system, system.space_cfg.wall_type)
+ring_points(system, ring_id) = get_continuos_pos(system, ring_id, system.space_cfg.wall_type)
 
 @inline function Mavi.Systems.get_particle_radius(dynamic_cfg::RingsCfg{U, T, I}, state::RingsState, idx) where {U<:Number, T, I}
     return Configs.particle_radius(dynamic_cfg.interaction_finder)
@@ -62,9 +54,9 @@ end
 
 function Mavi.Systems.particles_radius(dynamic_cfg::RingsCfg, state)
     p_radius::Vector{Float64} = []
-    for ring_id in get_active_ids(state)
+    for ring_id in get_rings_ids(state)
         inter = get_interaction_cfg(ring_id, ring_id, state, dynamic_cfg.interaction_finder)
-        num_p = get_num_particles(dynamic_cfg, state, ring_id)
+        num_p = ring_num_particles(state, ring_id)
         radius_i = Mavi.Configs.particle_radius(inter)
         for _ in 1:num_p
             push!(p_radius, radius_i)
@@ -74,7 +66,7 @@ function Mavi.Systems.particles_radius(dynamic_cfg::RingsCfg, state)
     return p_radius
 end
 
-function Mavi.Systems.is_valid_pair(state::RingsState, dynamic_cfg::RingsCfg, i, j)
+function Mavi.Systems.is_valid_pair(state::RingsState, i, j)
     num_max = num_max_particles(state)
     for idx in (i, j)
         p_id, ring_id = get_particle_ring_id(idx, num_max)
@@ -82,55 +74,12 @@ function Mavi.Systems.is_valid_pair(state::RingsState, dynamic_cfg::RingsCfg, i,
             return false
         end
 
-        num_ring_particles = get_num_particles(dynamic_cfg, state, ring_id)
+        num_ring_particles = ring_num_particles(state, ring_id)
         if p_id > num_ring_particles
             return false
         end
     end
     return true
-end
-
-Mavi.Systems.get_particles_ids(system::System, state::RingsState) = get_ids(system.info.particles_ids) 
-
-Mavi.Systems.get_num_total_particles(system::System, state::RingsState) = get_num(system.info.part_ids)
-
-# =
-# Particles Indices
-# = 
-
-@kwdef mutable struct ParticleIds
-    ids::Vector{Int}
-    num::Int
-end
-
-get_ids(part_ids) = part_ids
-function get_ids(part_ids::ParticleIds)
-    ids = @view part_ids.ids[1:part_ids.num]
-    return ids
-end
-
-get_num(part_ids) = length(part_ids)
-get_num(part_ids::ParticleIds) = part_ids.num
-
-function update_part_ids!(part_ids, state, dynamic_cfg) end
-function update_part_ids!(part_ids::ParticleIds, state, dynamic_cfg)
-    count = 1
-    for ring_id in get_active_ids(state)
-        first_id = to_scalar_idx(state, ring_id, 1)
-        for i in 1:get_num_particles(dynamic_cfg, state, ring_id)
-            part_ids.ids[count] = first_id +  i - 1
-            count += 1
-        end
-    end
-    part_ids.num = count - 1
-end
-
-function get_particles_ids_obj(state)
-    if isnothing(state.types) && isnothing(state.active)
-        return eachindex(state.pos)
-    end
-
-   ParticleIds(collect(1:length(state.pos)), 0)
 end
 
 # =
@@ -157,11 +106,10 @@ InvasionsInfo(last_check::Int) = InvasionsInfo(Invasion[], last_check)
 include("sources.jl")
 using .Sources
 
-struct RingsInfo{T, PIDS, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, RC<:Union{Chunks, Nothing}, S, U}
+struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, RC<:Union{Chunks, Nothing}, S, U}
     continuos_pos::Matrix{SVector{2, T}}
     areas::Vector{T}
     cms::Vector{SVector{2, T}}
-    particles_ids::PIDS
     p_neigh::PN
     r_neigh::RN
     r_chunks::RC
@@ -169,7 +117,7 @@ struct RingsInfo{T, PIDS, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neigh
     sources::S
     user_data::U
 end
-function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_ids,
+function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg,
     chunks=nothing, r_neighbors_cfg=nothing, p_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing)
     r_neighbors = nothing
     if !isnothing(r_neighbors_cfg) 
@@ -215,7 +163,7 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_i
                 if !isnothing(chunks)
                     s = Source(s_cfg, (state.pos, chunks), nothing)
                 else
-                    s = Source(s_cfg, nothing, (state.pos, parts_ids))
+                    s = Source(s_cfg, nothing, (state.pos, state.rings_ids))
                 end
             elseif s_cfg isa SinkCfg
                 s = Sink(s_cfg, cms)
@@ -250,7 +198,6 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_i
         similar(state.rings_pos),
         Vector{Float64}(undef, size(state.rings_pos, 2)),
         cms,
-        parts_ids,
         p_neighbors,
         r_neighbors,
         rings_chunks,
@@ -260,7 +207,7 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg, parts_i
     )
 end
 
-Mavi.Systems.get_particles_ids(state::RingsState, info::RingsInfo) = get_ids(info.particles_ids)
+# Mavi.Systems.get_particles_ids(state::RingsState, info::RingsInfo) = get_ids(info.particles_ids)
 
 include("integration.jl")
 include("utils.jl")
@@ -273,7 +220,7 @@ include("collectors.jl")
 # = 
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=nothing,
-    r_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing, time_info=nothing)
+    r_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing, time_info=nothing, rng=nothing)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
             error("DynamicCfg has multiple types, but state.types is nothing!")
@@ -282,22 +229,27 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         end
     end
 
-    parts_ids = get_particles_ids_obj(state)
-    update_part_ids!(parts_ids, state, dynamic_cfg)
-    chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, parts_ids)
+    chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state)
 
     info = RingsInfo(
         dynamic_cfg=dynamic_cfg,
         space_cfg=space_cfg,
         state=state,
         int_cfg=int_cfg,
-        parts_ids=parts_ids,
         chunks=chunks,
         r_neighbors_cfg=r_neighbors_cfg,
         p_neighbors_cfg=p_neighbors_cfg,
         source_cfg=source_cfg,
         user_data=user_data,
     )
+    
+    if dynamic_cfg.num_particles == -1
+        dynamic_cfg = RingsCfg(dynamic_cfg, state.num_particles)
+    end
+
+    if dynamic_cfg.num_particles != state.num_particles
+        error("`dynamic_cfg.num_particles` is not equal to `state.num_particles`!")
+    end
 
     system = Mavi.System(
         state=state, 
@@ -308,6 +260,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         info=info, 
         time_info=time_info,
         sys_type=RingsSys(),
+        rng=rng,
     )
 
     if !isnothing(system.int_cfg.extra.invasions_cfg)

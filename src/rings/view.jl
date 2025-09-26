@@ -4,7 +4,7 @@ using GLMakie
 
 using Mavi.Rings
 using Mavi.Rings.States
-using Mavi.Rings.Configs: get_interaction_cfg, get_num_particles
+using Mavi.Rings.Configs
 import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph
 
 function update_types_to_ring_id!(types, system)
@@ -16,15 +16,15 @@ function update_types_to_ring_id!(types, system)
     end
 end
 
-function get_graph_data(cfg::GraphCfg, system, state::RingsState)
+function get_graph_data(cfg::GraphCfg, state::RingsState, system::Rings.System)
     num_p = length(state.pos)
 
     types = Vector{Int}(undef, num_p)
     pos = similar(state.pos)
 
     idx = 1
-    for ring_id in get_active_ids(state)
-        for p_id in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        for p_id in 1:ring_num_particles(state, ring_id)
             pos[idx] = state.rings_pos[p_id, ring_id] 
             types[idx] = ring_id
             idx += 1
@@ -34,15 +34,15 @@ function get_graph_data(cfg::GraphCfg, system, state::RingsState)
     # pos_view = @view system.debug_info.graph_pos[:, 1:num_t]
     # types_view = @view system.debug_info.graph_type[1:num_t]
 
-    return (pos=pos, types=types, num_p=num_t)
+    return (pos=pos, types=types)
 end
 
-function update_graph_data(cfg::MainGraph, system, state::RingsState)
+function update_graph_data(cfg::MainGraph, state::RingsState, system::Rings.System)
     pos = cfg.pos
     idx = 1
     num_total_particles = 0
-    for ring_id in get_active_ids(state)
-        num_p = get_num_particles(system.dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        num_p = ring_num_particles(state, ring_id)
         num_total_particles += num_p
         for p_id in 1:num_p
             pos[idx] = state.rings_pos[p_id, ring_id] 
@@ -53,7 +53,7 @@ function update_graph_data(cfg::MainGraph, system, state::RingsState)
     cfg.pos_obs[] = @view pos[1:num_total_particles]
 end
 
-function get_graph_data(cfg::GraphCompCfg, system, state::RingsState)
+function get_graph_data(cfg::GraphCompCfg, state::RingsState, system::Rings.System)
     types = Vector{Int}(undef, length(state.pos))
     num_max_p = num_max_particles(state)
     for ring_id in axes(state.rings_pos, 2)
@@ -83,7 +83,7 @@ function get_graph(ax, pos_obs, system, cfg::InvasionsGraphCfg)
     return graph
 end
 
-function update_graph_data(graph::InvasionsGraph, system)
+function update_graph_data(graph::InvasionsGraph, system::Rings.System)
     graph.obs_list[:invasions][] = [system.state.pos[inv.p_id] for inv in system.info.invasions.list]
     return
 end

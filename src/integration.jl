@@ -8,6 +8,7 @@ export get_step_function
 
 using Base.Threads
 using StaticArrays
+using DataStructures
 
 using Mavi.Systems
 using Mavi.States
@@ -198,15 +199,28 @@ end
 function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
     forces = get_forces(system)
 
-    N = get_num_total_particles(system)
+    # N = get_num_total_particles(system)
+    # for i in 1:N
+    #     for j in i+1:N
+    #         if !is_valid_pair(system.state, system.dynamic_cfg, i, j)
+    #             continue
+    #         end
+    #         f = calc_interaction(i, j, system.dynamic_cfg, system)
+    #         forces[i] += f
+    #         forces[j] -= f
+    #     end
+    # end
+
+    p_ids = get_particles_ids(system.state)
+    N = length(p_ids)
+
     for i in 1:N
         for j in i+1:N
-            if !is_valid_pair(system.state, system.dynamic_cfg, i, j)
-                continue
-            end
-            f = calc_interaction(i, j, system.dynamic_cfg, system)
-            forces[i] += f
-            forces[j] -= f
+            p_i = p_ids[i]
+            p_j = p_ids[j]
+            f = calc_interaction(p_i, p_j, system.dynamic_cfg, system)
+            forces[p_i] += f
+            forces[p_j] -= f
         end
     end
 end
@@ -472,13 +486,17 @@ function rtp_step!(system::System)
     update_time!(system)
 end
 
+get_step_function(system) = get_step_function(system.type, system)
 function get_step_function(::StandardSys, system)
-    cfg_to_step = DefaultDict(
-        newton_step!,
-        SzaboCfg => szabo_step!,
-        RunTumbleCfg => rtp_step!,
-    )
-    return cfg_to_step[typeof(system.dynamic_cfg)]
+    cfg_type = system.dynamic_cfg
+
+    if cfg_type isa SzaboCfg
+        return szabo_step!
+    elseif cfg_type isa RunTumbleCfg
+        return rtp_step!
+    else
+        return newton_step!
+    end
 end
 
 end
