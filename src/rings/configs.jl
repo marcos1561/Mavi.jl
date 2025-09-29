@@ -157,8 +157,16 @@ end
     return getfield(dynamic_cfg, name)[type]
 end
 
-function get_rings_property(dynamic_cfg::RingsCfg, prop_func)
-    prop_vec = Vector{Float64}(undef, dynamic_cfg.num_types)
+function get_rings_property(dynamic_cfg::RingsCfg{U, T, I}, prop_func; dtype=nothing) where {U, T, I}
+    if isnothing(dtype)
+        if U <: Number
+            dtype = U
+        else 
+            dtype = eltype(U)
+        end
+    end
+
+    prop_vec = Vector{dtype}(undef, dynamic_cfg.num_types)
     for i in 1:dynamic_cfg.num_types
         prop_vec[i] = prop_func(dynamic_cfg, i)
     end
@@ -187,7 +195,8 @@ end
 
 MaviCfg.particle_radius(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, get_particle_radius)
 
-ring_num_particles(dynamic_cfg::RingsCfg, type=nothing) = ring_num_particles(dynamic_cfg.num_particles, type)
+ring_num_particles(dynamic_cfg::RingsCfg, type) = ring_num_particles(dynamic_cfg.num_particles, type)
+ring_num_particles(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, ring_num_particles, dtype=Int)
 
 """
 Returns the equilibrium area of the area force for

@@ -245,6 +245,7 @@ function check_checkpoint(cfg::CheckpointCfg, experiment)
 
     cp.is_valid[cp_name] = false
     save_component_serial(experiment.system.state, path, "sys_state")
+    serialize(joinpath(path, "sys_state/rng.bin"), experiment.system.rng)
     save_component_serial(experiment.system.time_info, path, "time_info")
     save_component_serial(experiment.col.state, path, "col_state")
     

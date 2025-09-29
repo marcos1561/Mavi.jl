@@ -15,12 +15,12 @@ using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWal
 
 export step!
     
-# function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.ParticleIds}
-#     chunks.num_particles_in_chunk .= 0
-#     for idx in Rings.get_ids(chunks.extra_info)
-#         update_particle_chunk!(chunks, idx)
-#     end
-# end
+function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.RingsChunksInfo}
+    chunks.num_particles_in_chunk .= 0
+    for idx in chunks.extra_info.ids_func(chunks.extra_info.state)
+        update_particle_chunk!(chunks, idx)
+    end
+end
 
 # function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:RingsState}
 #     chunks.num_particles_in_chunk .= 0

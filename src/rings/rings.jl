@@ -100,6 +100,15 @@ InvasionsInfo() = InvasionsInfo(Invasion[], 0)
 InvasionsInfo(last_check::Int) = InvasionsInfo(Invasion[], last_check)
 
 # =
+# Chunk Info
+# = 
+
+struct RingsChunksInfo{S, F}
+    state::S
+    ids_func::F
+end
+
+# =
 # Rings Info
 # =
 
@@ -190,7 +199,7 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg,
 
         rings_chunks = Chunks(
             r_chunks_cfg.num_cols, r_chunks_cfg.num_rows,
-            chunks_space_cfg, cms, rings_r, extra_info=state,
+            chunks_space_cfg, cms, rings_r, extra_info=RingsChunksInfo(state, States.get_rings_ids),
         )
     end
 
@@ -229,7 +238,8 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         end
     end
 
-    chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state)
+    chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, RingsChunksInfo(state, States.get_particles_ids))
+    # chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state)
 
     info = RingsInfo(
         dynamic_cfg=dynamic_cfg,
