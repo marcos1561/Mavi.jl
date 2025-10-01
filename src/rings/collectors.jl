@@ -1,0 +1,3 @@
+module RingsCollectors
+
+end # RingsCollectors

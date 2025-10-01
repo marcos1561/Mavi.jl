@@ -11,7 +11,7 @@ using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
 
-function main()
+function main(test=false)
     num_particles = 50
 
     num_p_x = trunc(Int, sqrt(num_particles))
@@ -39,7 +39,7 @@ function main()
     system = System(
         state=SelfPropelledState(
             pos=pos,
-            pol_angle=rand(Float64, size(pos)[2])*2*π,
+            pol_angle=rand(Float64, length(pos))*2*π,
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
@@ -52,14 +52,18 @@ function main()
         ),
     )
 
-    animate(
-        system, 
-        Mavi.Integration.rtp_step!, 
-        AnimationCfg(num_steps_per_frame=100),
-    )
+    if !test
+        animate(
+            system, 
+            AnimationCfg(num_steps_per_frame=100),
+        )
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

@@ -1,143 +1,116 @@
 module Integration
-    
-import Mavi.Integration: calc_diff_and_dist, calc_interaction, calc_forces!, walls!
+
+using StaticArrays
+
+import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!, get_step_function
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
 
-using Mavi.Rings: get_num_particles
+using Mavi.Rings
+using Mavi.Rings.NeighborsMod
 using Mavi.Systems
 using Mavi.Rings.Configs
 using Mavi.Rings.States
-using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls
+using Mavi.Rings.Sources
+using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls, ManyWalls
 
 export step!
-
-@inline function to_scalar_idx(dynamic_cfg, ring_id, particle_id)
-    (ring_id - 1) * num_max_particles(dynamic_cfg) + particle_id
-end
-
-@inline get_ring_id(idx, num_particles) = div(idx-1, num_particles) + 1
-
-@inline get_particle_id(idx, num_particles) = idx - (get_ring_id(idx, num_particles) - 1) * num_particles
-@inline get_particle_id(idx, num_particles, ring_id) = idx - (ring_id - 1) * num_particles
-
-@inline function get_particle_ring_id(idx, num_particles)
-    ring_id = get_ring_id(idx, num_particles)
-    particle_id = get_particle_id(idx, num_particles, ring_id)
-    return particle_id, ring_id
-end
     
-function update_chunks!(chunks::Chunks{T, StateT, InfoT}) where {T, StateT<:RingsState, InfoT}
+function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:Rings.RingsChunksInfo}
     chunks.num_particles_in_chunk .= 0
-    for ring_id in get_active_ids(chunks.state)
-        for p_id in 1:get_num_particles(chunks.extra_info, chunks.state, ring_id)
-            update_particle_chunk!(chunks, to_scalar_idx(chunks.extra_info, ring_id, p_id))
-        end
+    for idx in chunks.extra_info.ids_func(chunks.extra_info.state)
+        update_particle_chunk!(chunks, idx)
     end
 end
+
+# function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:RingsState}
+#     chunks.num_particles_in_chunk .= 0
+#     for idx in get_rings_ids(chunks.extra_info)
+#         update_particle_chunk!(chunks, idx)
+#     end
+# end
 
 function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
-    r1 = get_ring_id(i, num_max_particles(dynamic_cfg))
-    r2 = get_ring_id(j, num_max_particles(dynamic_cfg))
-    interaction_cfg = get_interaction_cfg(r1, r2, system.state, dynamic_cfg.interaction_finder)
-    return calc_interaction_force(i, j, interaction_cfg, system)
+    ri = get_ring_id(i, num_max_particles(system.state))
+    rj = get_ring_id(j, num_max_particles(system.state))
+
+    pos = system.state.pos
+    interaction_cfg = get_interaction_cfg(ri, rj, system.state, dynamic_cfg.interaction_finder)
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
+
+    max_dist = 2 * Configs.particle_radius(interaction_cfg)
+    neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
+
+    return calc_interaction_force(i, j, ri, rj, dr, dist, interaction_cfg, system)
 end
 
-function calc_interaction_force(i, j, interaction_cfg::HarmTruncCfg, system::System)
+function calc_interaction_force(i, j, ring_id1, ring_id2, dr, dist, interaction_cfg::HarmTruncCfg, system::System)
     state = system.state
-    space_cfg = system.space_cfg
     dynamic_cfg = system.dynamic_cfg
 
-    dx, dy, dist = calc_diff_and_dist(i, j, state.pos, space_cfg)
-    
-    if dist < 2*Configs.particle_radius(interaction_cfg) * 1.1
-        r1 = get_ring_id(i, size(state.rings_pos, 2))
-        r2 = get_ring_id(j, size(state.rings_pos, 2))
-        if r1 != r2
-            system.info.neighbors_count[i, Threads.threadid()] += 1
-            system.info.neighbors_count[j, Threads.threadid()] += 1
-        end
-    end
-
     if dist > interaction_cfg.dist_max
-        return 0.0, 0.0
+        return zero(dr)
     end
 
-    num_max_particles = size(state.rings_pos)[2]
-    ring_id1 = get_ring_id(i, num_max_particles)
-    ring_id2 = get_ring_id(j, num_max_particles)
-    
     if ring_id1 == ring_id2
         diff = abs(i - j)
-        num_p = get_num_particles(dynamic_cfg, state, ring_id1) 
+        num_p = ring_num_particles(state, ring_id1) 
         
         if diff == 1 || diff == num_p - 1
-            return 0.0, 0.0     
+            return zero(dr)     
         end
     end
 
     dist_eq = interaction_cfg.dist_eq
 
     if dist < dist_eq
-        # compute rep force
-        fmod = -interaction_cfg.k_rep/dist_eq * (dist - dist_eq) # restoring force
-        fx = fmod * dx / dist 
-        fy = fmod * dy / dist
-        
-        return fx, fy
+        fmod = -interaction_cfg.k_rep * (dist/dist_eq - 1)
+    else
+        if ring_id1 == ring_id2
+            fmod = 0.0
+        else
+            fmod = -interaction_cfg.k_atr * (dist/dist_eq - 1)
+        end
     end
-    
-    if ring_id1 == ring_id2
-        return 0.0, 0.0
-    end
-    
-    # compute atr force
-    adh_size = interaction_cfg.dist_max - dist_eq
-    fmod = -interaction_cfg.k_atr/adh_size*(dist - dist_eq) # restoring force
-    fx = fmod * dx / dist # unit vector x_ij/dist
-    fy = fmod * dy / dist
-    
-    return fx, fy
+
+    return fmod / dist * dr
 end
 
-function springs_force(first_id, second_id, ring_id, state, rings_cfg, space_cfg)
-    p1_id = to_scalar_idx(rings_cfg, ring_id, first_id)
-    p2_id = to_scalar_idx(rings_cfg, ring_id, second_id)
-    dx, dy, dist = calc_diff_and_dist(p1_id, p2_id, state.pos, space_cfg)
-    
+function springs_force(p1_id, p2_id, k, l, state, space_cfg)
+    pos = state.pos
+    dr = calc_diff(pos[p1_id], pos[p2_id], space_cfg)
+    dist = sqrt(sum(dr.^2))
+
     # k = rings_cfg.k_spring
     # l = rings_cfg.l_spring
-    if !has_types_func(state)
-        k = rings_cfg.k_spring
-        l = rings_cfg.l_spring
-    else
-        ring_type = state.types[ring_id]
-        k = rings_cfg.k_spring[ring_type]
-        l = rings_cfg.l_spring[ring_type]
-    end
+    # if !has_types_func(state)
+    #     k = rings_cfg.k_spring
+    #     l = rings_cfg.l_spring
+    # else
+    #     ring_type = state.types[ring_id]
+    #     k = rings_cfg.k_spring[ring_type]
+    #     l = rings_cfg.l_spring[ring_type]
+    # end
 
     fmod = -k * (dist - l)         
-
-    spring_fx = dx/dist * fmod
-    spring_fy = dy/dist * fmod
-
-    return spring_fx, spring_fy
+    return fmod / dist * dr
 end
 
 @inline function cross_prod(v1, v2)
-    return v1[1] * v2[2] - v1[2] * v2[1]
+    @inbounds return v1[1] * v2[2] - v1[2] * v2[1]
 end
 
 function calc_area(ring_pos)
     area = 0.0
-    num_points = size(ring_pos, 2) 
+    num_points = length(ring_pos) 
 
     for i in 1:(num_points - 1)
-        p1 = @view ring_pos[:, i]
-        p2 = @view ring_pos[:, i+1]
+        p1 = ring_pos[i]
+        p2 = ring_pos[i+1]
         area += cross_prod(p1, p2)
     end
-    p1 = @view ring_pos[:, end]
-    p2 = @view ring_pos[:, 1]
+    p1 = ring_pos[end]
+    p2 = ring_pos[1]
     area += cross_prod(p1, p2)
     return area / 2.0
 end
@@ -146,28 +119,23 @@ function update_continuos_pos!(system, wall_type) end
 
 function update_continuos_pos!(system, wall_type::PeriodicWalls)
     continuos_pos = system.info.continuos_pos
-    Threads.@threads for ring_id in get_active_ids(system.state)
-        continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
-        for i in 2:get_num_particles(system.dynamic_cfg, system.state, ring_id) 
-            i_idx = to_scalar_idx(system.dynamic_cfg, ring_id, i)
-            last_idx = to_scalar_idx(system.dynamic_cfg, ring_id, i-1)
-            dx, dy, _ = calc_diff_and_dist(i_idx, last_idx, system.state.pos, system.space_cfg)
+    pos = system.state.pos
+    Threads.@threads for ring_id in get_rings_ids(system.state)
+        # continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
+        continuos_pos[:, ring_id] .= system.state.rings_pos[:, ring_id]
+        for i in 2:ring_num_particles(system.state, ring_id) 
+            i_idx = to_scalar_idx(system.state, ring_id, i)
+            last_idx = to_scalar_idx(system.state, ring_id, i-1)
+            dr = calc_diff(pos[i_idx], pos[last_idx], system.space_cfg)
             
-            continuos_pos[1, i, ring_id] = continuos_pos[1, i-1, ring_id] + dx
-            continuos_pos[2, i, ring_id] = continuos_pos[2, i-1, ring_id] + dy
+            continuos_pos[i, ring_id] = continuos_pos[i-1, ring_id] + dr
+            # continuos_pos[1, i, ring_id] = continuos_pos[1, i-1, ring_id] + dx
+            # continuos_pos[2, i, ring_id] = continuos_pos[2, i-1, ring_id] + dy
         end
     end
 end
 
-function get_continuos_pos(ring_id, system, wall_type)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
-    return @view system.state.rings_pos[:, 1:num_particles, ring_id]
-end
-
-function get_continuos_pos(ring_id, system, wall_type::PeriodicWalls)
-    num_particles = get_num_particles(system.dynamic_cfg, system.state, ring_id) 
-    return @view system.info.continuos_pos[:, 1:num_particles, ring_id]
-end
+update_continuos_pos!(system, wall_type::ManyWalls) = update_continuos_pos!(system, wall_type.list[1]) 
 
 function area_forces!(system)
     has_types = has_types_func(system.state)
@@ -175,18 +143,19 @@ function area_forces!(system)
         k_area = system.dynamic_cfg.k_area
         p0 = system.dynamic_cfg.p0
         l0 = system.dynamic_cfg.l_spring
-        num_particles = get_num_particles(system.dynamic_cfg)
+        num_particles = system.state.num_particles
     end
     
-    # Threads.@threads for ring_id in get_active_ids(system.state)
+    # Threads.@threads for ring_id in get_rings_ids(system.state)
     #     area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
     #     system.info.areas[ring_id] = area
     # end
-
+    
+    pos = system.state.pos
     forces = get_forces(system)
 
-    for ring_id in get_active_ids(system.state)
-        area = calc_area(get_continuos_pos(ring_id, system, system.space_cfg.wall_type))
+    for ring_id in get_rings_ids(system.state)
+        area = calc_area(get_continuos_pos(system, ring_id, system.space_cfg.wall_type))
         system.info.areas[ring_id] = area
         # area = system.info.areas[ring_id]
 
@@ -195,7 +164,7 @@ function area_forces!(system)
             k_area = system.dynamic_cfg.k_area[ring_type]
             p0 = system.dynamic_cfg.p0[ring_type]
             l0 = system.dynamic_cfg.l_spring[ring_type]
-            num_particles = system.dynamic_cfg.num_particles[ring_type]
+            num_particles = system.state.num_particles[ring_type]
         end
 
         area0 = (num_particles * l0 / p0)^2
@@ -213,19 +182,14 @@ function area_forces!(system)
                 id2 = 1
             end
             
-            id1_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, id1)
-            id2_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, id2)
-            @inbounds dx, dy, _ = calc_diff_and_dist(id2_scalar, id1_scalar, system.state.pos, system.space_cfg)
+            id1_scalar = to_scalar_idx(system.state, ring_id, id1)
+            id2_scalar = to_scalar_idx(system.state, ring_id, id2)
+            dr = calc_diff(pos[id2_scalar], pos[id1_scalar], system.space_cfg)
 
-            a_deriv_x = 1/2 * dy
-            a_deriv_y = -1/2 * dx
+            a_deriv = SVector(dr.y, -dr.x) / 2
 
-            fx = -fmod * a_deriv_x
-            fy = -fmod * a_deriv_y
-            
-            idx_scalar = to_scalar_idx(system.dynamic_cfg, ring_id, i)
-            forces[1, idx_scalar] += fx
-            forces[2, idx_scalar] += fy
+            idx_scalar = to_scalar_idx(system.state, ring_id, i)
+            forces[idx_scalar] -= fmod * a_deriv
         end
     end
 end
@@ -238,8 +202,9 @@ function forces!(system)
     space_cfg = system.space_cfg
     forces = get_forces(system)
 
-    for ring_id in get_active_ids(state)
-        num_particles = get_num_particles(dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        num_particles = ring_num_particles(state, ring_id)
+        k, l = get_spring_pars(dynamic_cfg, state, ring_id)
         for spring_id in 1:num_particles
             first_id = spring_id
             second_id = spring_id + 1
@@ -247,15 +212,13 @@ function forces!(system)
                 second_id = 1
             end
 
-            fx, fy = springs_force(first_id, second_id, ring_id, state, dynamic_cfg, space_cfg) 
+            p1_id = to_scalar_idx(system.state, ring_id, first_id)
+            p2_id = to_scalar_idx(system.state, ring_id, second_id)
             
-            p1_id = to_scalar_idx(system.dynamic_cfg, ring_id, first_id)
-            p2_id = to_scalar_idx(system.dynamic_cfg, ring_id, second_id)
+            f = springs_force(p1_id, p2_id, k, l, state, space_cfg) 
 
-            forces[1, p1_id] += fx
-            forces[2, p1_id] += fy        
-            forces[1, p2_id] -= fx
-            forces[2, p2_id] -= fy        
+            forces[p1_id] += f
+            forces[p2_id] -= f
         end
     end
 
@@ -263,84 +226,76 @@ function forces!(system)
 end
 
 "Periodic walls"
-function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}, dynamic_cfg::RingsCfg) where T 
-    state = system.state
-    geometry_cfg = space_cfg.geometry_cfg
-    center = (geometry_cfg.bottom_left[1] + geometry_cfg.length/2, geometry_cfg.bottom_left[2] + geometry_cfg.height/2)
+# function walls!(system::System, space_cfg::SpaceCfg{PeriodicWalls, RectangleCfg{T}}, ::RingsSys) where T 
+#     state = system.state
+#     geometry_cfg = space_cfg.geometry_cfg
+#     center = geometry_cfg.bottom_left + geometry_cfg.size / 2
+#     half_size = geometry_cfg.size / 2
 
-    for ring_id in get_active_ids(system.state)
-        for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id)
-            pos_i = @view state.rings_pos[:, i, ring_id] 
-            diff = pos_i[1] - center[1]  
-            if abs(diff) > geometry_cfg.length/2
-                pos_i[1] -= sign(diff) * geometry_cfg.length
-            end
+#     for idx in get_particles_ids(system, state)
+#         pos = state.pos[idx]
+#         diff = pos - center
+        
+#         out_bounds = abs.(diff) .> half_size
+#         if any(out_bounds)
+#             state.pos[i] = pos .- sign.(diff) .* (half_size * 2) .* out_bounds
+#         end
+#     end
+# end
 
-            diff = pos_i[2] - center[2]  
-            if abs(diff) > geometry_cfg.height/2
-                pos_i[2] -= sign(diff) * geometry_cfg.height
-            end
-        end
-    end
-end
-
-function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}, dynamic_cfg::RingsCfg) where T
-    state = system.state
-    lines = space_cfg.geometry_cfg.lines
-    p_radius = Configs.particle_radius(system.dynamic_cfg)
-    for ring_id in get_active_ids(system.state)
-        for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id) 
-            pos_i = @view state.rings_pos[:, i, ring_id] 
+# function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}, ::RingsSys) where T
+#     state = system.state
+#     lines = space_cfg.geometry_cfg.lines
+#     p_radius = Configs.particle_radius(system.dynamic_cfg)
+#     for ring_id in get_rings_ids(system.state)
+#         for i in 1:get_num_particles(system.dynamic_cfg, state, ring_id) 
+#             pos_i = state.rings_pos[i, ring_id] 
             
-            for line in lines
-                point_x = line.p1.x #+ line.normal.x * p_radius
-                point_y = line.p1.y #+ line.normal.y * p_radius
+#             for line in lines
+#                 point = line.p1
                 
-                x, y = pos_i[1] - point_x, pos_i[2] - point_y
-                delta_s = x * line.normal.x + y * line.normal.y   
+#                 dr = pos_i - point
+#                 delta_s = sum(dr .* line.normal)
                 
-                if abs(delta_s) > p_radius
-                    continue
-                end
+#                 if abs(delta_s) > p_radius
+#                     continue
+#                 end
                 
-                delta_t = x * line.tangent.x + y * line.tangent.y   
+#                 delta_t = sum(dr .* line.tangent)
                 
-                is_corner = false
-                if delta_t > 0
-                    if delta_t > line.length
-                        if delta_t > (line.length + p_radius)
-                            continue
-                        end
-                        is_corner = true
-                        corner_p = line.p2
-                    end
-                elseif delta_t > -p_radius    
-                    is_corner = true
-                    corner_p = line.p1
-                else
-                    continue
-                end
+#                 is_corner = false
+#                 if delta_t > 0
+#                     if delta_t > line.length
+#                         if delta_t > (line.length + p_radius)
+#                             continue
+#                         end
+#                         is_corner = true
+#                         corner_p = line.p2
+#                     end
+#                 elseif delta_t > -p_radius    
+#                     is_corner = true
+#                     corner_p = line.p1
+#                 else
+#                     continue
+#                 end
                 
-                if is_corner 
-                    dx = pos_i[1] - corner_p.x
-                    dy = pos_i[2] - corner_p.y
-                    norm = sqrt(dx^2 + dy^2)
-                    if norm > p_radius
-                        continue
-                    end
-                    alpha = p_radius / sqrt(dx^2 + dy^2) - 1
-                    pos_i[1] += alpha * dx
-                    pos_i[2] += alpha * dy
-                else
-                    sgn = sign(delta_s)
-                    alpha = sgn * (p_radius - sgn * delta_s) 
-                    pos_i[1] += alpha * line.normal.x
-                    pos_i[2] += alpha * line.normal.y
-                end
-            end
-        end
-    end
-end
+#                 if is_corner 
+#                     dr = pos_i - corner_p
+#                     norm = sqrt(sum(abs2, dr))
+#                     if norm > p_radius
+#                         continue
+#                     end
+#                     alpha = p_radius / norm - 1
+#                     state.rings_pos[i, ring_id] += alpha * dr
+#                 else
+#                     sgn = sign(delta_s)
+#                     alpha = sgn * (p_radius - sgn * delta_s) 
+#                     state.rings_pos[i, ring_id] += alpha * line.normal
+#                 end
+#             end
+#         end
+#     end
+# end
 
 function update!(system)
     state = system.state
@@ -358,8 +313,8 @@ function update!(system)
         mu, dr = dynamic_cfg.mobility, dynamic_cfg.rot_diff 
     end
 
-    for ring_id in get_active_ids(state)
-        num_particles = get_num_particles(dynamic_cfg, state, ring_id)
+    for ring_id in get_rings_ids(state)
+        num_particles = ring_num_particles(state, ring_id)
         
         if has_types
             ring_type = state.types[ring_id]
@@ -368,47 +323,224 @@ function update!(system)
         end
 
         theta = state.pol[ring_id]
-        pol_x, pol_y = cos(theta), sin(theta) 
-        vel_cm_x = 0.0
-        vel_cm_y = 0.0
+        pol = SVector(cos(theta), sin(theta))    
+        vel_cm = zero(pol)
 
         for i in 1:num_particles
-            p_id = to_scalar_idx(dynamic_cfg, ring_id, i)
-
-            vel_x = vo * pol_x + mu * forces[1, p_id]
-            vel_y = vo * pol_y + mu * forces[2, p_id]
-            
-            vel_cm_x += vel_x
-            vel_cm_y += vel_y
-
-            state.pos[1, p_id] += vel_x * dt
-            state.pos[2, p_id] += vel_y * dt
+            p_id = to_scalar_idx(state, ring_id, i)
+            vel = vo * pol + mu * forces[p_id]
+            vel_cm += vel
+            state.pos[p_id] += vel * dt
         end
-        vel_cm_x /= num_particles
-        vel_cm_y /= num_particles
+        vel_cm /= num_particles
 
-        speed = (vel_cm_x^2 + vel_cm_y^2)^.5
+        speed = sqrt(sum(abs2, vel_cm))
 
-        cross_prod = (pol_x * vel_cm_y - pol_y * vel_cm_x) / speed 
-        if abs(cross_prod) > 1
-            cross_prod = sign(cross_prod)
+        if speed == 0
+            cross_prod = 0
+        else
+            cross_prod = (pol.x * vel_cm.y - pol.y * vel_cm.x) / speed 
+            if abs(cross_prod) > 1
+                cross_prod = sign(cross_prod)
+            end
         end
-        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
+
+        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn(system.rng)
         state.pol[ring_id] += d_theta
     end
 end
 
-function step!(system)
+function update_sources!(system, sources::Nothing) end
+function update_sources!(system, sources)
+    for sink_source in sources
+        process_sink_source!(sink_source, system.state, system)
+    end
+end
+
+function cleaning!(system)
+    clean_forces!(system)
+    neigh_clean!(system.info.p_neigh)
+    # neigh_clean!(system.info.r_neigh)
+end
+
+function update_cms!(system)
+    wall_type = system.space_cfg.wall_type
+    for ring_id in get_rings_ids(system.state)
+        rings_pos = get_continuos_pos(system, ring_id, wall_type)
+        system.info.cms[ring_id] = sum(rings_pos) / length(rings_pos)
+    end
+end
+
+function update_chunks_all!(system)
     update_chunks!(system.chunks)
-    update_continuos_pos!(system, system.space_cfg.wall_type)
+    update_chunks!(system.info.r_chunks)
+end
+
+function point_line_intersect(p, line)
+    dx = line[2].x - line[1].x
+    dy = line[2].y - line[1].y
+    if dx == 0
+        x_inter = line[1].x
+        
+        check1 = x_inter > p.x
+        
+        y_id1, y_id2 = 1, 2
+        if dy < 0
+            y_id1, y_id2 = 2, 1
+        end
+        check2 = line[y_id1].y < p.y < line[y_id2].y  
+
+        return check1 & check2
+    else
+        if dy == 0
+            return false
+        end
+        
+        c = dy * line[1].x - dx * line[1].y
+        x_inter = (c + dx * p.y) / dy 
+    end
+
+    check1 = x_inter > p.x
     
-    system.info.neighbors_count .= 0
-    clean_forces(system)
+    y_id1, y_id2 = 1, 2
+    if dy < 0
+        y_id1, y_id2 = 2, 1
+    end
+    
+    x_id1, x_id2 = 1, 2
+    if dx < 0
+        x_id1, x_id2 = 2, 1
+    end
+
+    check2 = (line[x_id1].x < x_inter < line[x_id2].x) & (line[y_id1].y < p.y < line[y_id2].y)
+
+    return check1 & check2
+end
+
+function polygons_intersect(poly1, poly2)
+    num_poly2 = length(poly2)
+    intersections = Int[]
+    for (id, p1) in enumerate(poly1)
+        count = 0
+        for idx1 in eachindex(poly2)
+            idx2 = idx1 + 1
+            if idx1 == num_poly2
+                idx2 = 1
+            end
+
+            if point_line_intersect(p1, (poly2[idx1], poly2[idx2]))
+                count += 1
+            end
+        end
+        if count % 2 != 0
+            push!(intersections, id)
+        end
+    end
+
+    return intersections
+end
+
+function find_invasions!(system, r1_id, r2_id)
+    invasions = system.info.invasions.list
+    state = system.state
+    r1 = ring_points(system, r1_id)
+    r2 = ring_points(system, r2_id)
+
+    particles_inv1 = polygons_intersect(r1, r2)
+    particles_inv2 = polygons_intersect(r2, r1)
+
+    pairs = (
+        (particles_inv1, r1_id, r2_id),
+        (particles_inv2, r2_id, r1_id),
+    )
+
+    for (p_ids, invasor_id, invaded_id) in pairs
+        for pi_id in p_ids
+            push!(invasions,
+                Invasion(
+                    invasor=invasor_id,
+                    invaded=invaded_id,
+                    p_id=to_scalar_idx(state, invasor_id, pi_id),
+                )
+            )
+        end
+    end
+end
+
+function check_invasions!(system, chunks::Chunks)
+    empty!(system.info.invasions.list)
+
+    for col in 1:chunks.num_cols, row in 1:chunks.num_rows
+        np = chunks.num_particles_in_chunk[row, col]
+        chunk = @view chunks.chunk_particles[:, row, col]
+        neighbors = chunks.neighbors[row, col]
+
+        for i in 1:np
+            r1_id = chunk[i]
+            for j in (i+1):np
+                r2_id = chunk[j]
+                find_invasions!(system, r1_id, r2_id)
+            end
+
+            for neighbor_id in neighbors
+                nei_np = chunks.num_particles_in_chunk[neighbor_id]
+                nei_chunk = @view chunks.chunk_particles[:, neighbor_id]
+                
+                for j in 1:nei_np
+                    r2_id = nei_chunk[j]
+                    find_invasions!(system, r1_id, r2_id)
+                end
+            end
+        end
+    end 
+end
+
+function check_invasions!(system, chunks::Nothing)
+    rings_ids = get_rings_ids(system.state)
+    num_rings = length(rings_ids)
+
+    for r1_id in 1:num_rings
+        for r2_id in (r1_id+1):num_rings
+            find_invasions!(system, r1_id, r2_id)
+        end
+    end
+end
+
+check_invasions!(system) = check_invasions!(system, system.info.r_chunks)
+
+function update_invasions!(system, inv_cfg::Nothing) end
+function update_invasions!(system, inv_cfg::InvasionsCfg)
+    num_steps = system.time_info.num_steps
+    if num_steps - system.info.invasions.last_check < inv_cfg.steps_to_update
+        return
+    end
+    system.info.invasions.last_check = num_steps
+    check_invasions!(system)
+end
+update_invasions!(system) = update_invasions!(system, system.int_cfg.extra.invasions_cfg)
+
+function step!(system)
+    update_cms!(system)
+    update_sources!(system, system.info.sources)
+    
+    update_ids!(system)
+    
+    update_chunks_all!(system)
+    update_continuos_pos!(system, system.space_cfg.wall_type)
+    update_invasions!(system)
+
+    cleaning!(system)
     forces!(system)
-    system.info.neighbors_count[:, 1] .= sum(system.info.neighbors_count, dims=2)
+    neigh_sum_buffers(system.info.p_neigh)
+    # neigh_sum_buffers(system.info.r_neigh)
     
     update!(system)
     walls!(system)
+
+    system.time_info.num_steps += 1
+    system.time_info.time += system.int_cfg.dt
 end
+
+get_step_function(::RingsSys, system) = step!
 
 end

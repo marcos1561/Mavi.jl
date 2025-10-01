@@ -1,5 +1,10 @@
-/Manifest.toml
 .vscode
+/Manifest.toml
+.sync_journal*
+.owncloudsync*
+
 main
 temp
 experiments
+count_lines.py
+

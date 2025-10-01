@@ -2,6 +2,9 @@ module InitStates
 
 export rectangular_grid, random_vel
 
+using StaticArrays
+using Random
+
 using Mavi.Configs: RectangleCfg
 
 """
@@ -28,9 +31,9 @@ particles being `offset * radius`.
 - geometry_cfg::RectangleCfg  
     GeometryCfg that contains all particles.
 """
-function rectangular_grid(num_p_x, num_p_y, offset, radius)
-    x = Vector{Float64}()
-    y = Vector{Float64}()
+function rectangular_grid(num_p_x, num_p_y, offset, radius; NUM_T=Float64)
+    x = Vector{NUM_T}()
+    y = Vector{NUM_T}()
     current_y = radius * (offset + 1)
     for i in 1:num_p_y
         current_x = -radius
@@ -47,18 +50,23 @@ function rectangular_grid(num_p_x, num_p_y, offset, radius)
         height=num_p_y*2*radius + radius*offset*(num_p_y + 1),
     )
 
-    pos = Matrix{Float64}(undef, 2, num_p_x*num_p_y)
+    pos = Matrix{NUM_T}(undef, 2, num_p_x*num_p_y)
     pos[1, :] = x
     pos[2, :] = y
-    return pos, geometry_cfg
+    return copy(reinterpret(SVector{size(pos, 1), NUM_T}, vec(pos))), geometry_cfg
 end
 
 """
 Create random velocitys for `num_p` particles with the maximum component 
 value being `max_value`.
 """
-function random_vel(num_p, max_value=1)
-    return (rand(2, num_p).*2.0 .- 1.0) .* max_value
+function random_vel(num_p, max_value=1; rng=Random.default_rng(), NUM_T=Float64)
+    vels = Vector{SVector{2, NUM_T}}(undef, num_p)
+    for i in eachindex(vels)
+        vels[i] = (rand(rng, SVector{2, NUM_T}) * 2 .- 1) * max_value
+    end
+
+    return vels
 end
 
 end

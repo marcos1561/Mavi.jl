@@ -1,22 +1,28 @@
 "Calculation of thermodynamic quantities."
 module Quantities
 
-using Mavi.States: State
-using Mavi.Systems: System
+using Mavi.States
+using Mavi.Systems
+using Mavi.Integration
 using Mavi.Configs
 
 export kinetic_energy, potential_energy
 
 "Return system's kinetic energy."
 function kinetic_energy(state::State)
-    return sum(state.vel .^2)/2
+    ke = 0
+    for vel in state.vel
+        ke += sum(abs2, vel)
+    end
+    return ke / 2
 end
 
 "Return system's potential energy."
 function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     # Aliases
-    N = system.num_p
-    r = system.dists
+    pos = system.state.pos
+    space_cfg = system.space_cfg
+    N = get_num_total_particles(system)
     ko = dynamic_cfg.ko
     ro = dynamic_cfg.ro
     ra = dynamic_cfg.ra
@@ -25,8 +31,11 @@ function potential_energy(system::System, dynamic_cfg::HarmTruncCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            if r[i,j] <= ra
-                pot += (r[i,j]-ro)^2
+            dr = calc_diff(pos[i], pos[j], space_cfg)
+            dist = sqrt(sum(dr.^2))
+
+            if dist <= ra
+                pot += (dist-ro)^2
             end
         end
     end
@@ -36,8 +45,9 @@ end
 
 function potential_energy(system::System, dynamic_cfg::LenJonesCfg)
     # Aliases
-    N = system.num_p
-    r = system.dists
+    pos = system.state.pos
+    space_cfg = system.space_cfg
+    N = get_num_total_particles(system)
     sigma = dynamic_cfg.sigma
     epsilon = dynamic_cfg.epsilon
 
@@ -45,7 +55,9 @@ function potential_energy(system::System, dynamic_cfg::LenJonesCfg)
     pot = 0.0
     for i in 1:N
         for j in i+1:N
-            pot += ((sigma/r[i,j])^12 - (sigma/r[i,j])^6)
+            dr = calc_diff(pos[i], pos[j], space_cfg)
+            dist = sqrt(sum(dr.^2))
+            pot += ((sigma/dist)^12 - (sigma/dist)^6)
         end
     end
     pot *= 4*epsilon

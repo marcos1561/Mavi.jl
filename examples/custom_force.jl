@@ -22,23 +22,21 @@ end
 Configs.particle_radius(dynamic_cfg::DynamicCfg) = dynamic_cfg.min_dist/2
 
 function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
-    dx, dy, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
+    pos = system.state.pos
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist
-
+    
     if dist > min_dist
-        return 0.0, 0.0
+        return zero(dr)
     end
 
-    # Force components
-    fx = force * dx / dist
-    fy = force * dy / dist
-
-    return fx, fy
+    return force * dr / dist
 end
 
-function main()
+function main(test=false)
     # Init state configs
     num_p_x = 10
     num_p_y = 10
@@ -49,7 +47,7 @@ function main()
     radius = particle_radius(dynamic_cfg)
 
     pos, geometry_cfg = Mavi.InitStates.rectangular_grid(num_p_x, num_p_y, offset, radius)
-    state = Mavi.SecondLawState{Float64}(
+    state = Mavi.SecondLawState(
         pos=pos,
         vel=Mavi.InitStates.random_vel(num_p, 1/5),
     )
@@ -77,10 +75,15 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
-    animate(system, Mavi.Integration.newton_step!, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

@@ -1,16 +1,40 @@
 module Systems
 
-export System, particles_radius, get_forces, clean_forces, get_num_total_particles
+export System, StandardSys
+export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius
 
-using Mavi.States: State
+using StaticArrays, Serialization, JSON3, StructTypes, Random
+
+import Mavi
+using Mavi.States
 using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
+
+function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, pos, dynamic_cfg, extra_info=nothing)
+    if isnothing(chunks_cfg)
+        return nothing
+    end
+
+    bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
+    chunks_space_cfg = SpaceCfg(
+        wall_type=space_cfg.wall_type,
+        geometry_cfg=bounding_box,
+    )
+
+    Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
+        chunks_space_cfg, pos, minimum(Configs.particle_radius(dynamic_cfg)), extra_info=extra_info,
+    )  
+end
 
 mutable struct TimeInfo
     num_steps::Int
     time::Float64
 end
+
+abstract type SystemType end
+# StructTypes.StructType(::Type{S}) where S <: SystemType = StructTypes.Struct()
+struct StandardSys <: SystemType end
 
 """
 Base struct that represent a system of particles.
@@ -18,23 +42,15 @@ Base struct that represent a system of particles.
 d=1: x axis
 d=2: y axis
 """
-struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
-    InfoT, DebugT}
+struct System{T, ND, NT, 
+    StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
+    ChunksT<:Union{Nothing, Chunks}, SysT<:SystemType, 
+    InfoT, DebugT, RNGT<:AbstractRNG}
     state::StateT
     space_cfg::SpaceCfg{WallTypeT, GeometryCfgT}
     dynamic_cfg::DynamicCfgT
     int_cfg::IntCfgT
-    chunks::Union{Chunks, Nothing}
-    
-    """
-    Position difference between all particles
-    
-    diffs[d, i, j] = Position of particle i minus particle j in dimension d.
-
-    d=1: x axis
-    d=2: y axis
-    """
-    diffs::Array{T, 3}
+    chunks::ChunksT
     
     """
     Total force of all particles. One should use get_forces(system) to
@@ -42,28 +58,30 @@ struct System{T, StateT<:State{T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCf
 
     forces[d, i, thread id] = Total force on particle i in dimension d.
     """
-    forces::Array{T, 3}
+    forces::SVector{NT, Vector{SVector{ND, T}}}
     # forces_local::Union{Array{T, 3}, Nothing}
     
-    """
-    Distance between all particles
-
-    dists[i, j] = Distance between particle i and j.
-    """
-    dists::Array{T, 2}
-
-    "Number of particles"
-    num_p::Int
-
     time_info::TimeInfo
 
     info::InfoT
     debug_info::DebugT
+    type::SysT
+    rng::RNGT
 end
-function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing, debug_info=nothing) where {T}
-    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg)
+function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg, 
+    chunks=nothing, info=nothing, debug_info=nothing, time_info=nothing, 
+    sys_type=:standard, rng=nothing) where {ND, T}
+    all_inside, out_ids = check_inside(state, space_cfg.geometry_cfg, get_particles_ids(state))
     if all_inside == false
         throw("Particles with ids=$(out_ids) outside space.")
+    end
+
+    if sys_type == :standard
+        sys_type = StandardSys()
+    end
+
+    if isnothing(time_info)
+        time_info = TimeInfo(0, 0.0)
     end
 
     num_forces_slices = 1
@@ -71,44 +89,65 @@ function System(;state::State{T}, space_cfg, dynamic_cfg, int_cfg, info=nothing,
         num_forces_slices = Threads.nthreads()
     end
 
-    num_p = size(state.pos)[2]
-    diffs = Array{T, 3}(undef, 2, num_p, num_p)
-    forces = Array{T, 3}(undef, 2, num_p, num_forces_slices)
-    dists = zeros(T, num_p, num_p)
+    # num_p = size(state.pos)[2]
+    # forces = Array{T, 3}(undef, 2, num_p, num_forces_slices)
+    
+    num_p = length(state.pos)
+    forces = SVector{num_forces_slices, Vector{SVector{ND, T}}}([
+        Vector{SVector{ND, T}}(undef, num_p) for _ in 1:num_forces_slices
+    ])
 
     # forces_local = nothing
     # if int_cfg.device isa Threaded
     #     forces_local =  Array{T, 3}(undef, 2, num_p, num_forces_slices)
     # end
 
-    chunks = nothing
-    # if typeof(int_cfg) == ChunksIntCfg
-    if has_chunks(int_cfg)
-        chunks_cfg = int_cfg.chunks_cfg
-        bounding_box = Configs.get_bounding_box(space_cfg.geometry_cfg) 
-        chunks_space_cfg = SpaceCfg(
-            wall_type=space_cfg.wall_type,
-            geometry_cfg=bounding_box,
-        )
-
-        chunks = Chunks(chunks_cfg.num_cols, chunks_cfg.num_rows,
-            chunks_space_cfg, state, minimum(particle_radius(dynamic_cfg)), extra_info=dynamic_cfg)
+    if isnothing(chunks)
+        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state) 
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, diffs, forces, dists, num_p, TimeInfo(0, 0.01), info, debug_info)
+    if !isnothing(chunks)
+        update_chunks!(chunks)
+    end
+
+    if isnothing(rng)
+        rng=Random.GLOBAL_RNG
+    end
+
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, time_info, info, debug_info, sys_type, rng)
 end
 
-@inline get_forces(system) = @view system.forces[:, :, 1]
+# @inline get_forces(system) = @view system.forces[:, :, 1]
+@inline get_forces(system) = system.forces[1]
 
-@inline clean_forces(system) = system.forces .= 0
+@inline function clean_forces!(system)
+    for f in system.forces
+        f .= Scalar(zero(eltype(f)))
+    end
+end
 
-function particles_radius(system, dynamic_cfg)
+function particles_radius(dynamic_cfg, state)
     p_radius = particle_radius(dynamic_cfg)
-    fill(p_radius, system.num_p)
+    fill(p_radius, get_num_total_particles(state))
 end
+particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.state)
 
-@inline get_num_total_particles(system, state) = size(state.pos, 2)
+get_particle_radius(dynamic_cfg, state, idx) = particle_radius(dynamic_cfg)
+get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cfg, system.state, idx)
 
-@inline get_num_total_particles(system) = get_num_total_particles(system, system.state)
-    
+@inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
+@inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
+
+# @inline get_num_total_particles(state::State, info=nothing) = length(state.pos)
+# @inline get_num_total_particles(system::System, state::State) = get_num_total_particles(state, system.info)
+# @inline get_num_total_particles(system::System) = get_num_total_particles(system.state, system.info)
+States.get_num_total_particles(system::System) = get_num_total_particles(system.state)
+
+# @inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
+# @inline get_particles_ids(system::System, state) = get_particles_ids(state, system.dynamic_cfg)
+# @inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
+States.get_particles_ids(system::System) = get_particles_ids(system.state)
+
+States.update_ids!(system::System) = update_ids!(system.state)
+
 end

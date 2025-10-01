@@ -1,11 +1,15 @@
 module InitStates
 
+export rectangular_grid, random_pol, create_circle
+
+using StaticArrays, Random
+
 using Mavi.Configs
 using Mavi.Rings.Utils
 
-function create_circle(center, radius, num_p)
+function create_circle(center, radius, num_p; dtype=Float64, to_svector=false)
     radius = radius
-    pos = Matrix(undef, 2, num_p)
+    pos = Matrix{dtype}(undef, 2, num_p)
 
     theta = 2 * π / num_p
     for i in 1:num_p
@@ -13,12 +17,16 @@ function create_circle(center, radius, num_p)
         pos[2, i] = radius * sin((i - 1)* theta) + center[2]
     end
 
+    if to_svector
+        pos = copy(reinterpret(SVector{2, eltype(pos)}, vec(pos)))
+    end
+
     return pos
 end
 
 function rectangular_grid(;
     num_cols, num_rows, num_particles, p_radius, types=nothing, 
-    pad_x=0, pad_y=0, radius_k=1)
+    pad_x=0, pad_y=0, radius_k=1, to_svector=false)
     if types === nothing
         num_particles = [num_particles]
         p_radius = [p_radius]
@@ -54,11 +62,21 @@ function rectangular_grid(;
     space_h = num_rows * (pad_y + max_ring_length)
     geometry_cfg = RectangleCfg(length=space_l, height=space_h)
 
+    if to_svector
+        _, num_max_particles, num_rings = size(ring_pos)
+        ring_pos = copy(reinterpret(SVector{2, eltype(ring_pos)}, vec(ring_pos)))
+        ring_pos = reshape(ring_pos, (num_max_particles, num_rings))
+    end
+
     return ring_pos, geometry_cfg
 end
 
-function random_pol(num_rings)
-    return rand(Float64, num_rings) .* 2 * π
+function random_pol(num_rings; rng=nothing)
+    if isnothing(rng)
+        rng = Random.GLOBAL_RNG
+    end
+
+    return rand(rng, Float64, num_rings) .* 2 * π
 end
 
 end

@@ -9,13 +9,12 @@ module Example
 using Printf
 
 using Mavi
-using Mavi.Integration
 using Mavi.Configs
 using Mavi.Quantities
 using Mavi.Visualization
 
-function main()
-    state = Mavi.SecondLawState{Float64}(
+function main(test=false)
+    state = Mavi.SecondLawState(
         pos = [1 -2.5 3.3 -4 5; -1.7 2.1 -3.8 4.4 -5.4],
         vel = [0.3 2 5.7 9.8 3.; 1 0 7.8 .12 2.2],
     )
@@ -24,16 +23,18 @@ function main()
         state=state, 
         space_cfg=SpaceCfg(
             wall_type=RigidWalls(),
-            geometry_cfg=CircleCfg(radius=10),
+            geometry_cfg=CircleCfg(
+                radius=10,
+                center=[0, 0],
+            ),
         ), 
-        dynamic_cfg=LenJonesCfg(sigma=2,epsilon=4),
+        dynamic_cfg=LenJonesCfg(sigma=2, epsilon=4),
         int_cfg=IntCfg(dt=0.01),
     )
 
     "Calculates and returns energies formatted for printing"
     function get_energy(system, exec_info)
         energys = []
-        Integration.calc_diffs_and_dists!(system, system.space_cfg)
 
         pe = potential_energy(system, system.dynamic_cfg)
         ke = kinetic_energy(state)
@@ -46,13 +47,19 @@ function main()
     end
 
     anim_cfg = AnimationCfg(
+        # num_steps_per_frame=60,
         info_cfg=DefaultInfoUICfg(custom_items=get_energy),
     )
 
-    animate(system, Integration.newton_step!, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

@@ -11,19 +11,19 @@ using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
 
-function main()
+function main(test=false)
     num_particles = 200
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))
 
     dynamic_cfg = SzaboCfg(
-        vo=1,
-        mobility=1,
-        relax_time=1,
-        k_rep=10,
+        vo=1.,
+        mobility=1.,
+        relax_time=1.,
+        k_rep=10.,
         k_adh=0.75,
-        r_eq=1,
+        r_eq=1.,
         r_max=1+0.1,
         rot_diff=0.01,
     )
@@ -43,7 +43,7 @@ function main()
     system = System(
         state=SelfPropelledState(
             pos=pos,
-            pol_angle=rand(Float64, size(pos)[2])*2*π,
+            pol_angle=rand(Float64, length(pos))*2*π,
         ),
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
@@ -61,10 +61,15 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
-    animate(system, Mavi.Integration.szabo_step!, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

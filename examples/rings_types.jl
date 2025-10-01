@@ -34,11 +34,12 @@ function create_system(;num_cols, num_rows)
         dist_max = 0.8 * 1.1,
     )
 
+    pair_dist_eq = interaction_cfg_1.dist_eq/2 + interaction_cfg_2.dist_eq/2
     interaction_cfg_pair = HarmTruncCfg(
         k_rep = 13,
-        k_atr = 3,
-        dist_eq = 1,
-        dist_max = 1 + 0.1,
+        k_atr = 10,
+        dist_eq = pair_dist_eq,
+        dist_max = pair_dist_eq * 1.2,
     )
     
     interaction_finder = InteractionMatrix([
@@ -58,33 +59,35 @@ function create_system(;num_cols, num_rows)
         k_area=[1., 1.],
         k_spring=[20., 20.],
         l_spring=[inter.dist_eq*0.8 for inter in self_interactions],
-        num_particles=[10, 5],
         interaction_finder=interaction_finder,
     )
 
     interactions = list_interactions(dynamic_cfg.interaction_finder)
 
+    num_particles = [10, 5]
+
     num_rings = num_cols * num_rows
     types = rand(1:2, num_rings)
     p_radius = Configs.particle_radius.([interaction_cfg_1, interaction_cfg_2])
     rings_pos, geometry_cfg = InitStates.rectangular_grid(
-        num_cols = num_cols,
-        num_rows = num_rows,
-        num_particles = dynamic_cfg.num_particles,
-        p_radius = p_radius,
+        num_cols=num_cols,
+        num_rows=num_rows,
+        num_particles=num_particles,
+        p_radius=p_radius,
         types=types,
         pad_x=0.1, pad_y=0.1,
     )
 
     space_cfg = Configs.SpaceCfg(
-        geometry_cfg = geometry_cfg,
-        wall_type = Configs.PeriodicWalls(),
+        geometry_cfg=geometry_cfg,
+        wall_type=Configs.PeriodicWalls(),
     )
     
     state = RingsState(
-        rings_pos = rings_pos,
-        pol = InitStates.random_pol(num_rings),
-        types = types,
+        rings_pos=rings_pos,
+        pol=InitStates.random_pol(num_rings),
+        types=types,
+        num_particles=num_particles,
     )
 
     bbox = get_bounding_box(space_cfg.geometry_cfg)
@@ -93,21 +96,22 @@ function create_system(;num_cols, num_rows)
     num_y_chunks = floor(Int, bbox.height / max_size)
 
     system = RingsSystem(
-        state = state,
-        space_cfg = space_cfg,
-        dynamic_cfg = dynamic_cfg,
-        int_cfg = Configs.IntCfg(
-            dt = 0.01,
-            chunks_cfg = Configs.ChunksCfg(
-                num_x_chunks, num_y_chunks,
-            ),
+        state=state,
+        space_cfg=space_cfg,
+        dynamic_cfg=dynamic_cfg,
+        int_cfg=Configs.RingsIntCfg(
+            dt=0.01,
+            device=Configs.Sequencial(),
+            # p_chunks_cfg=Configs.ChunksCfg(
+            #     num_x_chunks, num_y_chunks,
+            # ),
         ),
     )
 
     return system
 end
 
-function main()
+function main(test=false)
     system = create_system(
         num_cols = 6,
         num_rows = 6,
@@ -123,7 +127,7 @@ function main()
     colors_map = ColorSchemes.bam
     # colors_map = ColorSchemes.vik
     colors::Vector{RGBf} = []
-    for ring_id in 1:size(system.state.rings_pos, 3)
+    for ring_id in 1:size(system.state.rings_pos, 2)
         t = system.state.types[ring_id]
         if t == 1
             c = rand(Float64)/4 + 3/4
@@ -137,10 +141,25 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=colors),
     )
 
-    animate(system, Integration.step!, anim_cfg)
+    # num_particles = system.state.num_particles
+    # sum = 0
+    # for ring_id in Rings.States.get_rings_ids(system.state)
+    #     sum += num_particles[system.state.types[ring_id]]
+    # end
+
+
+    # println("num_particles: $(Rings.States.get_num_total_particles(system))")
+    # println("num_particles_check: $sum")
+
+    if !test
+        animate(system, anim_cfg)
+    else
+        Rings.Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

@@ -11,12 +11,14 @@ module Example
 using Mavi.Rings
 using Mavi.Visualization
 
+using Mavi.Visualization.RingsGraphs
+
 function create_system(;num_particles, num_cols, num_rows)
     interaction_cfg = Configs.HarmTruncCfg(
         k_rep=20,
-        k_atr=1,
+        k_atr=4,
         dist_eq=1,
-        dist_max=1 + 0.1,
+        dist_max=1 + 0.2,
     )
 
     dynamic_cfg = Configs.RingsCfg(
@@ -28,7 +30,6 @@ function create_system(;num_particles, num_cols, num_rows)
         k_area=1.0,
         k_spring=20.0,
         l_spring=1.0,
-        num_particles=num_particles,
         interaction_finder=interaction_cfg,
     )
 
@@ -59,9 +60,9 @@ function create_system(;num_particles, num_cols, num_rows)
         state=state,
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
-        int_cfg=Configs.IntCfg(
+        int_cfg=Configs.RingsIntCfg(
             dt=0.01,
-            chunks_cfg=Configs.ChunksCfg(num_x_chunks, num_y_chunks),
+            p_chunks_cfg=Configs.ChunksCfg(num_x_chunks, num_y_chunks),
             device=Configs.Threaded(),
         ),
     )
@@ -69,7 +70,7 @@ function create_system(;num_particles, num_cols, num_rows)
     return system
 end
 
-function main()
+function main(test=false)
     system = create_system(
         num_particles=10,
         num_cols=13,
@@ -78,13 +79,26 @@ function main()
 
     anim_cfg = AnimationCfg(
         num_steps_per_frame=15,
-        graph_cfg=CircleGraphCfg(),
+        # graph_cfg=CircleGraphCfg(),
+        
+        graph_cfg=MainGraphCfg((
+            CircleGraphCfg(),
+            RingsNumsGraphCfg(),
+        )),
+        
+        # begin_paused=true,
+        # graph_cfg=ScatterGraphCfg(),
     )
     
-    animate(system, Integration.step!, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Rings.Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

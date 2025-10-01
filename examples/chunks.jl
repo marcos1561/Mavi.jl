@@ -11,7 +11,9 @@ using Mavi.Configs
 using Mavi.InitStates
 using Mavi.Visualization
 
-function main()
+using StaticArrays, StatsBase
+
+function main(test=false)
     # Set to false to see the performance without chunks.
     use_chunks = true
 
@@ -25,7 +27,7 @@ function main()
     radius = particle_radius(dynamic_cfg)
 
     pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
-    state = Mavi.SecondLawState{Float64}(
+    state = Mavi.SecondLawState(
         pos=pos,
         vel=random_vel(num_p, 1/5),
     )
@@ -54,16 +56,20 @@ function main()
     )
 
     anim_cfg = Visualization.AnimationCfg(
-        fps=60,    
-        num_steps_per_frame=300,
+        num_steps_per_frame=200,
         exec_times_size=100,
         graph_cfg=CircleGraphCfg(colors_map=:magma),
     )
 
-    animate(system, Mavi.Integration.newton_step!, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

@@ -1,6 +1,9 @@
 # Mavi.jl
 Mavi is a _Particle Dynamics Engine_.
 
+![Descrição do GIF](docs/videos/welcome_video.gif)
+*See the code that generated this video here: [examples/welcome_video.jl](/examples/welcome_video.jl)*
+
 Its goal is to provide a common structure for implementing particle dynamics simulations, allowing users to use default behaviors or create their own as needed.
 
 Here are some `Mavi.jl` features:
@@ -13,15 +16,42 @@ Here are some `Mavi.jl` features:
 
 - Quantity calculators, such as kinetic and potential energy.
 
+- Experiment system to collect data from simulations.
+
 - Visualization:
 
     - Real-time rendering of simulations using [Makie](https://docs.makie.org/v0.21/).
 
     - Video generation of simulations.
 
+    - Image generation of simulations.
+
 In addition to the core `Mavi` module, there is a module named `Mavi.Rings`, which implements active rings — a model used in this paper: ["Segregation in Binary Mixture with Differential Contraction among Active Rings"](https://link.aps.org/doi/10.1103/PhysRevLett.134.138401) by Teixeira, E., et al (Physical Review Letters, 2025).
 
-Check out `Mavi.jl` examples in [this folder](/examples/). Animations of these examples can be seen [here](https://www.youtube.com/watch?v=VgV9Pwx5TTA).
+- Check out `Mavi.jl` examples in [this folder](/examples/). Animations of these examples can be seen [here](https://www.youtube.com/watch?v=VgV9Pwx5TTA).
+- Mavi Blogs:
+    - [Mavi's Space System](docs/_posts/2025-09-14-space_system.md)
+
+# Index
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Mavi Philosophy](#mavi-philosophy)
+- [System Members](#about-system-members)
+    - [State](#state)
+    - [SpaceCfg](#spacecfg)
+    - [DynamicCfg](#dynamiccfg)
+    - [IntCfg](#intcfg)
+- [Step Function](#about-the-step-function)
+    - [Custom Forces](#how-to-use-custom-forces)
+    - [Custom Equations of Motion](#how-to-use-different-equations-of-motion)
+    - [Wall Collisions](#how-do-wall-collisions-work)
+- [Physical Quantities](#physical-quantities)
+- [Running Experiments](#running-experiments)
+    - [Using Checkpoint](#using-checkpoints)
+- [Visual Interface](#visual-interface)
+    - [Animating the System](#animating-the-system)
+    - [Extending the Information Panel](#extending-the-information-panel)
 
 # Installation
 The easiest way to install Mavi is:
@@ -33,10 +63,10 @@ The easiest way to install Mavi is:
     ```
 This will install Mavi in the currently active environment, placing its files in `~/.julia/dev/Mavi`.
 
-Note: If you just want to use Mavi (not modify it), use `add` instead of `dev`.
+> Note: If you just want to use Mavi (not modify it), use `add` instead of `dev`.
 
 # Quick Start
-Let's create a gas of particles. The first thing we need to to is create the system's state: The particles' positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potencial between particles (in this example we will use a Lennard-Jones potencial). The particle radius can be accessed via the `particle_radius()` function:  
+Let's create a gas of particles. The first thing we need to do is create the system's state. Particles' positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potential between them (in this example we will use a Lennard-Jones potential). The particle radius can be accessed via the `particle_radius()` function:  
 
 ```julia
 using Mavi.Configs
@@ -50,7 +80,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction Potencial Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
@@ -79,7 +109,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction Potencial Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
@@ -103,10 +133,10 @@ Now we can put it all together in a `System` and animate!
 
 ```julia
 using Mavi
-using Mavi.Integration
 using Mavi.Configs
 using Mavi.States
 using Mavi.InitStates
+
 using Mavi.Visualization
 
 function main()
@@ -116,7 +146,7 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potencial between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
@@ -142,7 +172,7 @@ function main()
         int_cfg=IntCfg(dt=0.01), # Configurations related to how the system is integrated, such as the time step (dt)
     )
 
-    animate(system, newton_step!)
+    animate(system)
 end
 ```
 
@@ -179,10 +209,11 @@ In this section we will talk about the main system's members: what they represen
 
 ## State
 The state of a system is defined by the equations that govern its dynamics. For example, an ordinary, linear, second-order differential equation in $x(t)$ requires that two variables be stored in memory (the variable $x$ itself and its derivative $\dot x$).
-States must be subtypes of `State{T}` (see [`states.jl`](src/states.jl) for examples), where T is the type of the numbers representing the state (Int32, Float64, etc). Currently, two states are implemented in the core `Mavi.States` module:
+States must be subtypes of `State{T}` (see [`states.jl`](src/states.jl) for examples), where T is the number type (Int32, Float64, etc). Currently, two states are implemented in the core `Mavi.States` module:
 
-`SecondLawState`: has pos and vel as members, both of which must be $2 \times N$ matrices. This state is useful when the equation to be solved is Newton's second law.
-`SelfPropelledState`: a state related to a system of particles with overdamped dynamics and a self-alignment mechanism.
+- `SecondLawState`: has `pos` and `vel` as members, both of which must be $2 \times N$ matrices or `Vector{SVector}`. This state is useful when the equation to be solved is Newton's second law.
+
+- `SelfPropelledState`: a state related to a system of particles with overdamped dynamics and a self-alignment mechanism.
 
 The following example creates a state with 3 particles using `SecondLawState`.
 
@@ -200,11 +231,11 @@ The space of a system is described by its geometric shape and how its boundaries
 
 - Space geometry: These are structures that inherit from `GeometryCfg` and contain all the necessary information to describe the geometry of the space. Examples: `RectangleCfg` and `CircleCfg`.
 
-Boundary behavior: These are structures that inherit from `WallType` and do not necessarily need to have any fields; they simply indicate the type of boundary. Examples: `RigidWalls` and `PeriodicWalls`.
+Boundary behavior: These are structures that inherit from `WallType` and do not necessarily need to have any fields; they simply indicate the boundary type. Examples: `RigidWalls` and `PeriodicWalls`.
 
 `SpaceCfg` encapsulates these two structures. See [`configs.jl`](src/configs.jl) for more details.
 
-Example: Configuring a rectangle with its bottom-left corner at the origin and with periodic boundaries
+Example: Configuring a rectangle with its bottom-left corner at the origin and with periodic boundaries:
 
 ```julia
 using Mavi.Configs
@@ -228,13 +259,13 @@ As examples, `Mavi.Configs` module has these potential structures:
 
 Details about parameters can be found in [configs.jl](src/configs.jl).
 
-`DynamicCfg` is used to calculate forces, users should only implement a method for `calc_interaction(i, j, state, dynamic_cfg, space_cfg)` (inside module `Mavi.Integration`), where i and j are particles indices (more info in its documentation [`integration.jl`](src/integration.jl)).
+`DynamicCfg` is used to calculate forces, users should only implement a method for `calc_interaction(i, j, dynamic_cfg, space_cfg)` (inside module `Mavi.Integration`), where i and j are particles indices (more info in its documentation [`integration.jl`](src/integration.jl)).
 
 Also, particles radius should be inferred from these configurations, so there exists a function `particle_radius(dynamic_cfg)`. 
 
 ## IntCfg
 Configurations for how the equations of motion should be integrated. Every instance is a subtype of `AbstractIntCfg`.
-The default integration configuration inside `Mavi.Configs` is `IntCfg`, which has two members:
+The default integration configuration inside `Mavi.Configs` is `IntCfg`, which has two main members:
 - dt: Time step used in the integration.
 - chunks_cfg: Configurations of the technique used to speed distance calculations: the system is divided into boxes, or chunks, and the interaction between particles is calculated only for neighboring boxes, greatly reducing the simulation time for short range interactions. If its value is `nothing`, then this technique is not used.
 
@@ -277,20 +308,18 @@ end
 
 # Creating new method used in the forces calculation.
 function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
-    dx, dy, dist = calc_diff_and_dist(i, j, system.state.pos, system.space_cfg)
+    pos = system.state.pos
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    dist = sqrt(sum(dr.^2))
 
     force = dynamic_cfg.force
     min_dist = dynamic_cfg.min_dist
 
     if dist > min_dist
-        return 0.0, 0.0
+        return zero(eltype(pos))
     end
 
-    # Force components
-    fx = force * dx / dist
-    fy = force * dy / dist
-
-    return fx, fy
+    return force * dr / dist
 end
 
 # This method is used to draw the particles
@@ -301,7 +330,6 @@ After that, a `System` can be created as usual, with `dynamic_cfg` set to `Radia
 
 >Note: The function that computes all the pairwise forces is `calc_forces!()`, it is inside the module `Mavi.Integration` and in the file [`integration.jl`](src/integration.jl).
 
-
 ## How to use different equations of motion?
 Just create your own step function with the appropriate equations' of motion. Remember, you can reuse the general method to compute pairwise forces (`calc_forces!()`) and wall collision detections, thus just focusing on the equations of motion.
 
@@ -311,7 +339,7 @@ Mavi already has functions to integrate some equations of motion, such as:
 - `update_szabo!`: Szabo particles, which follow the equations of motion introduced in the paper ["Phase transition in the collective migration of tissue cells: experiment and model"](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.74.061908) by Szabó, B., et al. (Physical Review E, 2006).
 
 ## How do wall collisions work?
-The method `walls!(system, space_cfg)` (inside module `Mavi.Integration`) is responsible to resolve wall collisions. It dispatches on `space_cfg`, therefore, for example, to implement rigid walls in a retangular geometry (this method is already implemented on `Mavi.jl`), one should create the method
+The method `walls!(system, space_cfg)` (inside module `Mavi.Integration`) is responsible to resolve wall collisions. It dispatches on `space_cfg`, therefore, for instance, to implement rigid walls in a retangular geometry (this method is already implemented on `Mavi.jl`), one should create the method
 
 ```julia
 function walls!(system, space_cfg::SpaceCfg{RigidWalls, RectangleCfg})
@@ -321,6 +349,7 @@ end
 
 `walls!` should directly change the state in `system`, resolving the collisions.
 
+>Note: See more about how `Mavi` deals with walls collisions in the blog post [Mavi's Space System](docs/_posts/2025-09-14-space_system.md).
 # Physical Quantities
 The `Quantities` module contains functions that return physical quantities of interest. Currently, two of them are defined:
 
@@ -333,18 +362,98 @@ The `Quantities` module contains functions that return physical quantities of in
 
 The example [print_energy.jl](examples/print_energy.jl) uses these functions.
 
+# Running Experiments
+To collect data with simulations, we need to run an experiment. To create an experiment, one needs a system and a `Collector` (object that collect data while the simulation is running). Let's demonstrate how to run an experiment in `Mavi`:
+
+Given we have a function `create_system` (which creates a system), the first thing to do is to create the experiment configurations
+
+```julia
+using Mavi.Experiments
+
+system = create_system()
+
+experiment_cfg = ExperimentCfg(
+    tf=10, # Final simulation time
+    root="experiment_data", # Where the experiment data will be saved
+)
+```
+
+next, we need to create the collector configurations, it's possible to use existing ones or create a custom collector, let's use the `DelayedCol`, which always have the system state some time in the past (this collector is useful to have the state system just before something bad happens, allowing the coder to investigate what is happening)
+
+```julia
+using Mavi.Experiments
+
+system = create_system()
+
+experiment_cfg = ExperimentCfg(
+    tf=10, # Final simulation time
+    root="experiment_data", # Where the experiment date will be sabes
+)
+
+collector_cfg = DelayedCfg(
+    delay_time=4, # How much in the past the state is
+)
+```
+
+now we can create an experiment and run it
+
+```julia
+using Mavi.Experiments
+
+system = create_system()
+
+experiment_cfg = ExperimentCfg(
+    tf=10, # Final simulation time
+    root="experiment_data", # Where the experiment date will be sabes
+)
+
+collector_cfg = DelayedCfg(
+    delay_time=4, # How much in the past the state is
+)
+
+experiment = Experiment(experiment_cfg, collector_cfg, system)
+
+run_experiment(experiment)
+```
+
+all data collect by the `Collector` and other things will be inside the `root` path specified when creating `ExperimentCfg`. Here's a list (not complete) of what is saved in an experiment:
+
+- data: data collected by the `Collector`.
+- final_state: system state just after the experimente finished.
+- configs.json: system configurations used.
+- experiment_configs.json: experiment configurations used.
+
+## Using checkpoints
+If your experiment takes a lot of time, it's a good ideia to run the experiment with checkpoints, in that way, an experimente can be resumed from a checkpoint if something bad happens. To do that, simply pass a `CheckpointCfg` to `ExperimentCfg`
+
+```julia
+experiment_cfg = ExperimentCfg(
+    tf=10,
+    root="experiment_data",
+    checkpoint_cfg=CheckpointCfg(delta_time=2), # Creates a checkpoint every two seconds (in simulation time)
+)
+```
+
+and here is how to resume an experiment from a checkpoint
+
+```julia
+using Mavi.Experiment
+
+experiment = load_experiment("path-to-experiment")
+run_experiment(experiment)
+```
+
 # Visual Interface
 Mavi has a visual interface (built entirely with [Makie](https://docs.makie.org/v0.21/)) whose purpose is to serve as a visual debugging tool for the system being explored. The UI structure essentially has two main elements:
 
 1. A plot where the system's particles are rendered in real time.
-2. An information panel showing the state of the system and the execution of the program.
+2. A panel showing some information and buttons to control the animation.
 
 <!-- ![alt text](docs/images/ui_components.png "Title") -->
 <img src="docs/images/ui_components.png" alt="Componentes da UI" width="500"/>
 
 ## Animating the system
-Given that a `step!(system)` function has already been implemented for a given system, we can animate the integration process as follows:
-
+To animate a system, simply call the function `animate` inside the module `Mavi.Visualization`
 
 ```julia
 using Mavi.Visualization
@@ -352,7 +461,18 @@ using Mavi.Visualization
 # Creating the system
 system = ...
 
-animate(system, step!)
+animate(system)
+```
+
+and if you have a custom step function called `my_step!`
+
+```julia
+using Mavi.Visualization
+
+# Creating the system
+system = ...
+
+animate(system, step_func=my_step!)
 ```
 
 It is possible to configure aspects of the animation by passing an instance of `AnimationCfg` to animate. The following example animates the system with the FPS set to 30, executing 15 time steps per animation frame:
@@ -364,11 +484,11 @@ using Mavi.Visualization
 system = ...
 
 anim_cfg = AnimationCfg(
-    fps = 30,
-    num_steps_per_frame = 15,
+    fps=30,
+    num_steps_per_frame=15,
 )
 
-animate(system, step!, anim_cfg)
+animate(system, anim_cfg)
 ```
 
 ## Extending the Information Panel
@@ -377,32 +497,37 @@ It is possible to inject custom information into the information panel. This is 
 The following example uses a system already defined in `Mavi.jl` and adds the position of the first particle to the information panel.
 
 ```julia
-using Mavi
-using Mavi.Configs
-using Mavi.Visualization
-using Printf
-
+# Creating a System
 system = System(
-    state = State{Float64}(
+    state = SecondLawState(
         pos=[[1 2 3]; [1 2 3]],
         vel=[[1 1 0]; [-1 0 2]],
     ),
-    space_cfg=RectangleCfg(length=4, height=4),
+    space_cfg=SpaceCfg(
+        wall_type=RigidWalls(),
+        geometry_cfg=RectangleCfg(length=4, height=4),
+    ),
     dynamic_cfg=LenJonesCfg(sigma=1, epsilon=0.1),
     int_cfg=IntCfg(dt=0.01),
 )
 
+# Function used to show particle position
+# in the information panel
 function get_pos(system, _)
-    pos = system.state.pos[:, 1]
+    pos = system.state.pos[1]
     pos_formatted = @sprintf("(%.3f, %.3f)", pos[1], pos[2])
-    return [("pos_1", pos_formatted)]
+    return [("pos[1]", pos_formatted)]
 end
 
 anim_cfg = AnimationCfg(
     info_cfg=DefaultInfoUICfg(
         custom_items=get_pos
-    )
+    ),
+    graph_cfg=MainGraphCfg((
+        CircleGraphCfg(), # Render particles as circles
+        NumsGraphCfg(), # Show particles indices
+    ))
 )
 
-animate(system, Mavi.Integration.step!, anim_cfg)
+animate(system, anim_cfg)
 ```
