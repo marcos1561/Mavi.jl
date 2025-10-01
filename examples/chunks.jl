@@ -13,7 +13,7 @@ using Mavi.Visualization
 
 using StaticArrays, StatsBase
 
-function main()
+function main(test=false)
     # Set to false to see the performance without chunks.
     use_chunks = true
 
@@ -61,10 +61,15 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:magma),
     )
 
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

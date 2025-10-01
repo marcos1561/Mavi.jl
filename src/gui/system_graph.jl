@@ -1,7 +1,7 @@
 module SystemGraphs
 
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
-export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
+export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
 export drawn_borders, colors_from_cmap
 export RingsGraphs
 
@@ -10,20 +10,8 @@ using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
 
-"Return circle vertices centered in the origin with given radius."
-function get_circle(radius, resolution=20)
-    theta = LinRange(0, 2π, resolution+1)
 
-    circle = Vector{Point2f}()
-    for id in 1:length(theta)-1
-        t1, t2 = theta[id], theta[id+1]
-        push!(circle, Point2f(radius * cos(t1), radius * sin(t1))) 
-        push!(circle, Point2f(radius * cos(t2), radius * sin(t2))) 
-    end
-
-    return circle
-end
-
+"Drawn the borders of `geometry_cfg`."
 function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
     l, h = geometry_cfg.length, geometry_cfg.height
     x, y = geometry_cfg.bottom_left
@@ -62,25 +50,16 @@ function drawn_borders(ax, geometry_cfg::ManyGeometries)
     end
 end
 
-function update_circles!(circle_points, circle_base, pos)
-    num_edges = length(circle_base)
-    num_p = size(pos)[2]
-    for i in 1:num_p
-        begin_id = num_edges * (i-1) + 1
-        end_id = begin_id + num_edges - 1 
-        center = [pos[1, i], pos[2, i]]
-        circle_points[begin_id:end_id] .= circle_base .+ [center]
-    end
-end
+# "Numbers of types given a list of "
+# function get_num_types(types, cmap)
+#     if typeof(cmap) <: AbstractArray
+#         return max(length(types), length(cmap))
+#     else
+#         return length(types)
+#     end
+# end
 
-function get_num_types(types, cmap)
-    if typeof(cmap) <: AbstractArray
-        return max(length(types), length(cmap))
-    else
-        return length(types)
-    end
-end
-
+"Returns `num` random colors from the colormap `cmap`."
 function colors_from_cmap(cmap, num)
     if cmap isa Symbol
         cmap = colorschemes[cmap]
@@ -88,6 +67,7 @@ function colors_from_cmap(cmap, num)
     return Vector{Any}([cmap[rand(Float64)] for _ in 1:num])
 end
 
+"Convert `cmap` to a list of colors with `num_types` elements."
 function get_color_map(cmap::AbstractVector, num_types; rng=nothing) 
     if isnothing(rng)
         rng = Random.GLOBAL_RNG
@@ -126,13 +106,29 @@ function get_color_map(cmap::Symbol, num_types; rng=nothing)
     elseif cmap == :ids
         return [rand(rng, RGBf) for _ in 1:num_types]
     elseif cmap isa ColorScheme
-        return [cmap[rand(Float32)] for _ in 1:num_types]            
+        return [cmap[rand(rng, Float32)] for _ in 1:num_types]            
     else
         color = RGBf(GLMakie.to_color(cmap))
         return fill(color, num_types)
     end
 end
 
+"""
+Returns a list of colors for the given particles, to be used in plotting.
+
+# Arguments
+- `colors`: 
+    Preallocated vector to store colors for each particle.
+
+- `types`: 
+    Vector of indices for each particle.
+
+- `cmap`: 
+    Vector mapping types to colors.
+
+- `particles_ids`: 
+    Vector of particle indices.
+"""
 function get_colors!(colors, types, cmap, particles_ids)
     count = 1
     for idx in particles_ids
@@ -144,6 +140,22 @@ function get_colors!(colors, types, cmap, particles_ids)
     return cs
 end
 
+"""
+Returns a list of radius for the given particles, to be used in plotting.
+
+# Arguments
+- `radius`: 
+    Preallocated vector to store radius for each particle.
+
+- `dynamic_cfg`: 
+    System dynamic configuration.
+
+- `state`: 
+    System state.
+
+- `particles_ids`: 
+    Vector of particle indices.
+"""
 function get_radius!(radius, dynamic_cfg, state, particles_ids)
     count = 1
     for idx in particles_ids
@@ -154,29 +166,74 @@ function get_radius!(radius, dynamic_cfg, state, particles_ids)
     return rs
 end
 
+# =
+# Graphs
+# = 
 
 abstract type GraphCfg end
 abstract type Graph end
 
+"Construct a Graph for `ax` given its configurations `cfg`."
+function get_graph(ax, system, cfg::GraphCfg) end
+
+"Updates the graph to the next frame."
+function update_graph(graph::Graph, system) end
+
+"""
+Data used by Graph.
+
+# Returns
+    Named Tuple with two fields:
+
+    - pos: Particles positions
+    - types: Particles indices in the `pos` Vector.
+
+    OBS: pos is a reference to system.state.pos
+"""
 function get_graph_data(graph_cfg::GraphCfg, state::State, system)
     num_p = length(system.state.pos)
     return (pos=state.pos, types=Vector(1:num_p))
 end
 @inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system.state, system)
 
+"""
+Updates the graph data but do not notify observables, only return a
+dictionary of observable to be updated.
+
+# Returns
+There are two return options:
+
+- DefaultDict{Symbol, Bool}  
+    Dictionary mapping observable names (as symbols) to bools. True if
+    the observable needs to be notified false otherwise.
+
+- Nothing  
+    Informs that every observable should be notified.
+"""
 update_graph_data(graph::Graph, state::State, system::System) = DefaultDict{Symbol, Bool}(false)
 @inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system.state, system)
 
+# =
+# Graph Components
+# = 
 
 abstract type GraphCompCfg <: GraphCfg end
 abstract type GraphComp <: Graph end
 abstract type GraphCompDebug <: GraphComp end
 
+"""
+Data used by a component Graph.
+
+# Returns
+    Vector with particles indices in the pos Vector.
+"""
 get_graph_data(graph_cfg::GraphCompCfg, state::State, system) = Vector(1:length(state.pos))
 
+"Returns the function to update the graph component data (particles types)."
 get_comp_update_data(c::GraphComp) = c.cfg.update_data
 get_comp_update_data(c::GraphCompDebug) = (_, _) -> DefaultDict{Symbol, Bool}(false)
 
+"Returns the Named Tuple of observables in the graph component `c`"
 get_comp_obs_list(c::GraphComp) = c.obs_list
 get_comp_obs_list(c::GraphCompDebug) = ()
 
@@ -201,6 +258,28 @@ struct ScatterGraphCfg{C, KW, F} <: GraphCompCfg
     update_data::F
     rng::AbstractRNG
 end
+
+"""
+Drawn particles using scatter.
+
+# Arguments
+- `colors_map`:  
+    Mapping for types to colors. It can be:
+    - :random  
+        Random colors for each type
+    - A colormap name as symbol  
+        Random colors from the given colormap.
+    - Vector of colors for each type.
+
+- `kwargs`:  
+    kwargs passed to scatter
+
+- `update_data`:  
+    Function to update the particles types. Defaults to no update.
+
+- `rng`:  
+    RNG object. Default to the global RNG.
+"""
 function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothing, rng=nothing)
     if colors_map isa Vector{Symbol}
         colors_map = RGBf.(GLMakie.to_color.(colors_map))
@@ -235,7 +314,7 @@ function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     num_total_particles = length(system.state.pos)
     
     types = get_graph_data(cfg, system.state, system)
-    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map), rng=cfg.rng)
+    cmap = get_color_map(cfg.colors_map, length(types), rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     scatter_plot = scatter!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
@@ -270,6 +349,32 @@ struct CircleGraphCfg{C, S<:Union{StrokeCfg, Nothing}, F} <: GraphCompCfg
     update_data::F
     rng::AbstractRNG
 end
+
+"""
+Drawn particles as circles.
+
+# Arguments
+- `circle_radius`:  
+    Radius used to draw the circles. If -1 (the default), infer particles radius 
+    using system dynamic configurations. 
+
+- `stroke_cfg`:  
+    Stroke circle configurations.
+
+- `colors_map`:  
+    Mapping for types to colors. It can be:
+    - :random  
+        Random colors for each type
+    - A colormap name as symbol  
+        Random colors from the given colormap.
+    - Vector of colors for each type.
+
+- `update_data`:  
+    Function to update the particles types. Defaults to no update.
+
+- `rng`:  
+    RNG object. Default to the global RNG.
+"""
 function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, colors_map=:random, 
     update_data=nothing, rng=nothing)
     
@@ -308,10 +413,10 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
 
     # TODO: Make cfg.circle_radius work with dispatch system
     if cfg.circle_radius == -1
-        radius = Vector{eltype(system.state.pos[1])}(undef, num_total_particles)
+        radius = Vector{Float64}(undef, num_total_particles)
     else
         if cfg.circle_radius <: Number
-            radius = fill(cfg.circle_radius, num_total_particles) 
+            radius = fill(Float64(cfg.circle_radius), num_total_particles) 
         elseif length(cfg.circle_radius) != num_total_particles
             throw(ArgumentError(
                 "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
@@ -321,7 +426,7 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     end
 
     types = get_graph_data(cfg, system.state, system)
-    cmap = get_color_map(cfg.colors_map, get_num_types(types, cfg.colors_map), rng=cfg.rng)
+    cmap = get_color_map(cfg.colors_map, length(types), rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     if isnothing(cfg.stroke_cfg)
@@ -333,7 +438,7 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
             strokewidth=cfg.stroke_cfg.width,
         )
     end
-    
+
     comp = CircleGraph(types, colors, radius, cmap, circles_plot, (), pos_obs, cfg)
     update_graph(comp, system)
     return comp
@@ -353,14 +458,43 @@ function update_graph(comp::CircleGraph, system)
     Makie.update!(comp.plot, circles; color=colors)
 end
 
-"""
-Drawn every particle with a circumference and a central point.
+@kwdef struct NumsGraphCfg <: GraphCompCfg 
+    kwargs = Dict()
+end
 
-- circle_radius:  
-    Radius used to draw circles centered on particles positions.  
-    If not given, `particle_radius(dynamic_cfg)` will be used.
-- circle_rel:  
-    How many vertices used to draw circles.
+struct NumsGrah{O, P} <: GraphComp 
+    pos_obs::O
+    plot::P
+    cfg::NumsGraphCfg
+end
+
+function get_graph(ax, pos_obs, system, cfg::NumsGraphCfg)
+    kwargs = cfg.kwargs
+
+    if !(:align in keys(kwargs))
+        kwargs[:align] = (:center, :center)
+    end
+
+    plot = text!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
+    graph = NumsGrah(pos_obs, plot, cfg)
+    update_graph(graph, system)
+
+    return graph
+end
+
+function update_graph(comp::NumsGrah, system)
+    pos = comp.pos_obs[]
+    particles_ids = get_particles_ids(system)
+    
+    points = [Point2f(p) for p in pos]
+    text = [string(i) for i in particles_ids]
+
+    Makie.update!(comp.plot, points; text=text)
+end
+    
+"""
+List of components to be drawn. Defaults to
+drawn particles as circles.
 """
 struct MainGraphCfg{T<:Tuple} <: GraphCfg
     comps_cfgs::T

@@ -1,7 +1,7 @@
 """
-Example: Szabo
+Example: Running an Experiment
 
-Simple exemple using Szabo model
+This example shows how to run an experiment to collect data from simulations.
 """
 module Example
 
@@ -10,9 +10,10 @@ using Mavi.States
 using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
+using Mavi.Experiments
 
-function main(test=false)
-    num_particles = 200
+function create_system()
+    num_particles = 100
 
     num_p_x = trunc(Int, sqrt(num_particles))
     num_p_y = trunc(Int, sqrt(num_particles))
@@ -40,7 +41,7 @@ function main(test=false)
         geometry_cfg=geometry_cfg,
     )
 
-    system = System(
+    System(
         state=SelfPropelledState(
             pos=pos,
             pol_angle=rand(Float64, length(pos))*2*π,
@@ -55,20 +56,30 @@ function main(test=false)
             ),
         ),
     )
+end
 
-    anim_cfg = AnimationCfg(
-        num_steps_per_frame=15,
-        graph_cfg=CircleGraphCfg(colors_map=:viridis),
+function main(test=false)
+    system = create_system()
+
+    experiment_cfg = ExperimentCfg(
+        tf=10,
+        root="experiment_data",
+        checkpoint_cfg=CheckpointCfg(delta_time=2),
     )
 
-    if !test
-        animate(system, anim_cfg)
-    else
-        Mavi.run(system, tf=1)
-    end
+    collector_cfg = DelayedCfg(
+        delay_time=4,
+    )
+
+    experiment = Experiment(experiment_cfg, collector_cfg, system)
+
+    run_experiment(experiment)
+
+    # Discommend to animate the system
+    # animate(system)
 end
 
-end
+end #Tmp
 
 if !((@isdefined TEST_EX) && TEST_EX)
     Example.main()

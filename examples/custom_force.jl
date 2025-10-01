@@ -36,7 +36,7 @@ function Integration.calc_interaction(i, j, dynamic_cfg::RadialForce, system)
     return force * dr / dist
 end
 
-function main()
+function main(test=false)
     # Init state configs
     num_p_x = 10
     num_p_y = 10
@@ -75,10 +75,15 @@ function main()
         graph_cfg=CircleGraphCfg(colors_map=:viridis),
     )
 
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

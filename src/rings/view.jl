@@ -1,5 +1,7 @@
 module RingsGraphs
 
+export InvasionsGraphCfg, RingsNumsGraphCfg
+
 using GLMakie
 
 using Mavi.Rings
@@ -86,6 +88,42 @@ end
 function update_graph_data(graph::InvasionsGraph, system::Rings.System)
     graph.obs_list[:invasions][] = [system.state.pos[inv.p_id] for inv in system.info.invasions.list]
     return
+end
+
+@kwdef struct RingsNumsGraphCfg <: GraphCompCfg 
+    kwargs = Dict()
+end
+
+struct RingsNumsGraph{P} <: GraphComp 
+    plot::P
+    cfg::RingsNumsGraphCfg
+end
+
+function get_graph(ax, pos_obs, system, cfg::RingsNumsGraphCfg)
+    kwargs = cfg.kwargs
+
+    if !(:align in keys(kwargs))
+        kwargs[:align] = (:center, :center)
+    end
+
+    plot = text!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
+    graph = RingsNumsGraph(plot, cfg)
+    update_graph(graph, system)
+    
+    return graph
+end
+
+function update_graph(comp::RingsNumsGraph, system)
+    rings_ids = get_rings_ids(system)
+    
+    points = Vector{Point2f}(undef, length(rings_ids))
+    text = Vector{String}(undef, length(rings_ids))
+    for (idx, rid) in enumerate(rings_ids)
+        points[idx] = system.info.cms[rid]
+        text[idx] = string(rid)
+    end
+
+    Makie.update!(comp.plot, points; text=text)
 end
 
 

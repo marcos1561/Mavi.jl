@@ -4,7 +4,7 @@ module Visualization
 export animate, random_colors
 export AnimationCfg, VideoCfg, ImageCfg, UiSettings
 export DefaultInfoUICfg
-export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg
+export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
 export drawn_borders, colors_from_cmap
 
 using GLMakie
@@ -147,9 +147,9 @@ get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:GraphCfg, T} = image_cfg.grap
 get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, cfg=nothing, step! = nothing)
-    if isnothing(step!)
-        step! = get_step_function(system)
+function animate(system::System, cfg=nothing; step_func=nothing)
+    if isnothing(step_func)
+        step_func = get_step_function(system)
     end
 
     GLMakie.activate!(; title="Mavi")
@@ -338,7 +338,7 @@ function animate(system::System, cfg=nothing, step! = nothing)
         graph = context.graph
 
         for _ in 1:num_steps_per_frame
-            step_info = @timed step!(system)
+            step_info = @timed step_func(system)
             push!(exec_info.times, step_info.time)
         end
         

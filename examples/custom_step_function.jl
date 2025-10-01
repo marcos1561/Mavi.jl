@@ -8,12 +8,12 @@ module Example
 
 using StaticArrays
 
-using Mavi.Systems
+using Mavi
 using Mavi.States
 using Mavi.Visualization
 using Mavi.Configs
 
-function main()
+function main(test=false)
     state = SecondLawState(
         pos=[1 2; 1 2],
         vel=[0.3 2; 1 0]
@@ -34,7 +34,7 @@ function main()
         ),
     )
 
-    function step!(system::System)
+    function my_step!(system::System)
         state = system.state
         dt = system.int_cfg.dt
 
@@ -58,10 +58,15 @@ function main()
         num_steps_per_frame=1,
         fps=60,
     )
-    animate(system, anim_cfg, step!)
+    if !test
+        animate(system, anim_cfg, step_func=my_step!)
+    else
+        Mavi.run(system, num_steps=100, step_func=my_step!)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

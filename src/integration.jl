@@ -33,9 +33,9 @@ end
     calc_diff(r1, r2, SpaceCfg(space_cfg.wall_type.list[1], space_cfg.geometry_cfg.list[1]))
 end
 
-function update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:States.State}
+function ChunksMod.update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P, InfoT<:States.State}
     chunks.num_particles_in_chunk .= 0
-    for idx in States.get_ids(chunks.extra_info)
+    for idx in States.get_particles_ids(chunks.extra_info)
         ChunksMod.update_particle_chunk!(chunks, idx)
     end
 end

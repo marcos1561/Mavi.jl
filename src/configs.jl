@@ -264,9 +264,13 @@ Lennard-Jones potential.
 - epsilon:   
     Depth of the potential well.
 """
-@kwdef struct LenJonesCfg{T<:Number} <: DynamicCfg
+struct LenJonesCfg{T<:Number} <: DynamicCfg
     sigma::T
     epsilon::T
+end
+function LenJonesCfg(;sigma, epsilon)
+    sigma, epsilon = promote(sigma, epsilon)
+    LenJonesCfg(sigma, epsilon)
 end
 
 @kwdef struct SzaboCfg{T<:Number} <: DynamicCfg

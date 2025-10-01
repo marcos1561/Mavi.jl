@@ -111,7 +111,7 @@ function create_system(;num_cols, num_rows)
     return system
 end
 
-function main()
+function main(test=false)
     system = create_system(
         num_cols = 6,
         num_rows = 6,
@@ -151,10 +151,15 @@ function main()
     # println("num_particles: $(Rings.States.get_num_total_particles(system))")
     # println("num_particles_check: $sum")
 
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Rings.Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

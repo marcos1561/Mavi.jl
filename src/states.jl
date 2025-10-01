@@ -84,6 +84,10 @@ function SecondLawState(pos::Matrix, vel::Matrix, active_state=nothing)
     
     T = promote_type(eltype(pos), eltype(vel))
 
+    if T <: Int
+        T = Float64
+    end
+
     pos = convert(Matrix{T}, pos)
     vel = convert(Matrix{T}, vel)
 
@@ -92,6 +96,7 @@ function SecondLawState(pos::Matrix, vel::Matrix, active_state=nothing)
 
     SecondLawState(pos, vel, active_state)
 end
+SecondLawState(; pos, vel, active_state=nothing) = SecondLawState(pos, vel, active_state)
 
 "Overdamped and self propelled state (positions and polarizations)"
 struct SelfPropelledState{N, T, PID <: Union{ParticleIds, AbstractVector}} <: State{N, T}

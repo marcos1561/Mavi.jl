@@ -104,7 +104,7 @@ function create_system(;num_particles, num_cols, num_rows)
     return system
 end
 
-function main()
+function main(test=false)
     system = create_system(
         num_particles=10,
         num_cols=13,
@@ -118,10 +118,15 @@ function main()
         # graph_cfg=ScatterGraphCfg(),
     )
     
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Rings.Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

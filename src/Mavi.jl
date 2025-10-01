@@ -14,12 +14,16 @@ include("systems.jl")
 include("integration.jl")
 include("quantities.jl")
 include("serder.jl")
+include("run_system.jl")
 
 using .Systems
 export System 
 
 using .MaviSerder
 export save_system, load_system
+
+using .RunSystem
+export run
 
 using .States
 

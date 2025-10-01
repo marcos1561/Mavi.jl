@@ -11,7 +11,7 @@ using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
 
-function main()
+function main(test=false)
     num_particles = 50
 
     num_p_x = trunc(Int, sqrt(num_particles))
@@ -52,13 +52,18 @@ function main()
         ),
     )
 
-    animate(
-        system, 
-        AnimationCfg(num_steps_per_frame=100),
-    )
+    if !test
+        animate(
+            system, 
+            AnimationCfg(num_steps_per_frame=100),
+        )
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

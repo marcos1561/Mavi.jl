@@ -13,7 +13,7 @@ using Mavi.Configs
 using Mavi.Quantities
 using Mavi.Visualization
 
-function main()
+function main(test=false)
     state = Mavi.SecondLawState(
         pos = [1 -2.5 3.3 -4 5; -1.7 2.1 -3.8 4.4 -5.4],
         vel = [0.3 2 5.7 9.8 3.; 1 0 7.8 .12 2.2],
@@ -51,10 +51,15 @@ function main()
         info_cfg=DefaultInfoUICfg(custom_items=get_energy),
     )
 
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

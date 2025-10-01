@@ -24,10 +24,13 @@ function state_square_distance(s1, s2)
     return dist
 end
 
-function create_system_normal(rng=nothing, device=Configs.Sequencial(), use_chunks=true)
-    num_particles = 10
-    num_cols = 13 
-    num_rows = 13
+function create_system_normal(rng=nothing, device=Configs.Sequencial(); use_chunks=true,
+    p_neighbors_cfg=nothing,
+    r_neighbors_cfg=nothing,
+    num_particles=10,
+    num_cols=13,
+    num_rows=13,
+    )
 
     interaction_cfg = HarmTruncCfg(
         k_rep=20,
@@ -87,13 +90,15 @@ function create_system_normal(rng=nothing, device=Configs.Sequencial(), use_chun
             p_chunks_cfg=p_chunks_cfg,
             device=device,
         ),
-        rng=rng
+        p_neighbors_cfg=p_neighbors_cfg,
+        r_neighbors_cfg=r_neighbors_cfg,
+        rng=rng,
     )
 
     return system
 end
 
-function create_system_source(rng=nothing, device=Configs.Sequencial(), use_chunks=true)
+function create_system_source(rng=nothing, device=Configs.Sequencial(); use_chunks=true, p_neighbors_cfg=nothing,)
     num_particles=10
 
     interaction_cfg = Configs.HarmTruncCfg(
@@ -164,6 +169,7 @@ function create_system_source(rng=nothing, device=Configs.Sequencial(), use_chun
             p_chunks_cfg=p_chunks_cfg,
             device=device,
         ),
+        p_neighbors_cfg=p_neighbors_cfg,
         source_cfg=[
             SourceCfg(
                 bottom_left=geometry_cfg.bottom_left + SVector(2*ring_d, geometry_cfg.height/2 - ring_d),
@@ -184,7 +190,7 @@ function create_system_source(rng=nothing, device=Configs.Sequencial(), use_chun
     return system
 end
 
-function create_system_types(rng=nothing, device=Configs.Sequencial(), use_chunks=true)
+function create_system_types(rng=nothing, device=Configs.Sequencial(); use_chunks=true, p_neighbors_cfg=nothing,)
     if isnothing(rng)
         rng = Random.GLOBAL_RNG
     end
@@ -278,6 +284,7 @@ function create_system_types(rng=nothing, device=Configs.Sequencial(), use_chunk
         state=state,
         space_cfg=space_cfg,
         dynamic_cfg=dynamic_cfg,
+        p_neighbors_cfg=p_neighbors_cfg,
         int_cfg=RingsIntCfg(
             dt=0.01,
             p_chunks_cfg=p_chunks_cfg,

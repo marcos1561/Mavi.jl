@@ -115,7 +115,7 @@ function create_system(;num_particles=10)
     return system
 end
 
-function main()
+function main(test=false)
     system = create_system()
     
     anim_cfg = AnimationCfg(
@@ -126,10 +126,15 @@ function main()
         ])
     )
 
-    animate(system, anim_cfg)
+    if !test
+        animate(system, anim_cfg)
+    else
+        Rings.Mavi.run(system, tf=1)
+    end
 end
 
 end
 
-import .Example
-Example.main()
+if !((@isdefined TEST_EX) && TEST_EX)
+    Example.main()
+end

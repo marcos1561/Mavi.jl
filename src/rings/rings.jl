@@ -133,7 +133,7 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg,
         num_max_neighbors = r_neighbors_cfg.only_count == false ? 15 : nothing 
 
         r_neighbors = Neighbors(
-            num_entities=size(state.ring_pos, 3),
+            num_entities=size(state.rings_pos, 2),
             num_max_neighbors=num_max_neighbors,
             device=int_cfg.device,
             cfg=r_neighbors_cfg,
