@@ -2,7 +2,7 @@ module Integration
 
 using StaticArrays
 
-import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!, get_step_function
+import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!, get_step_function, calc_walls_forces!
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
 
 using Mavi.Rings
@@ -531,6 +531,7 @@ function step!(system)
 
     cleaning!(system)
     forces!(system)
+    calc_walls_forces!(system)
     neigh_sum_buffers(system.info.p_neigh)
     # neigh_sum_buffers(system.info.r_neigh)
     

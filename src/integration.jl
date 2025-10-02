@@ -16,7 +16,6 @@ using Mavi.Configs
 using Mavi.ChunksMod
 
 "Position difference (r1 - r2)"
-# @inline function calc_diff(i, j, pos::Vector, space_cfg)
 @inline function calc_diff(r1, r2, space_cfg)
     @inbounds dr = r1 - r2
     return dr
@@ -233,6 +232,42 @@ function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
 end
 
 @inline calc_forces!(system::System) = calc_forces!(system, system.chunks, system.int_cfg.device)
+
+function calc_walls_forces!(system, space_cfg::SpaceCfg, device) end
+
+function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:GeometryCfg} 
+    forces = get_forces(system)
+    for i in get_particles_ids(system.state)
+        pos = system.state.pos[i]
+        dr, dist = signed_pos(pos, space_cfg.geometry_cfg)
+        f = potential_force(dr, dist, space_cfg.wall_type.potencial)
+        forces[i] += f
+    end
+end
+
+function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:LinesCfg} 
+    forces = get_forces(system)
+    for i in get_particles_ids(system.state)
+        for line in space_cfg.geometry_cfg.lines
+            pos = system.state.pos[i]
+            dr, dist = signed_pos(pos, line)
+            f = potential_force(dr, dist, space_cfg.wall_type.potencial)
+            forces[i] += f
+        end
+    end
+end
+
+function calc_walls_forces!(system::System, space_cfg::SpaceCfg{W, G}, device) where {W <: ManyWalls, G <: ManyGeometries}
+    for (wall_cfg, geom_cfg) in zip(space_cfg.wall_type.list, space_cfg.geometry_cfg.list)
+        if wall_cfg isa ForceWalls
+            calc_walls_forces!(system, SpaceCfg(wall_cfg, geom_cfg), device)
+        end
+    end
+end
+
+@inline calc_walls_forces!(system::System) = calc_walls_forces!(system, system.space_cfg, system.int_cfg.device)
+
+function walls!(system::System, space_cfg::SpaceCfg) end
 
 "Rigid walls collisions. Reflect velocity on collision."
 function walls!(system::System, space_cfg::SpaceCfg{RigidWalls, G}) where G <: RectangleCfg
@@ -470,6 +505,7 @@ function newton_step!(system::System)
     clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
+    calc_walls_forces!(system)
     update_verlet!(system, calc_forces!)
     walls!(system, system.space_cfg)
     update_time!(system)
@@ -479,6 +515,7 @@ function szabo_step!(system::System)
     clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
+    calc_walls_forces!(system)
     update_szabo!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
@@ -488,6 +525,7 @@ function rtp_step!(system::System)
     clean_forces!(system)
     update_chunks!(system.chunks)
     calc_forces!(system)
+    calc_walls_forces!(system)
     update_rtp!(system)
     walls!(system, system.space_cfg)
     update_time!(system)

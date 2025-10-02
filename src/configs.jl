@@ -3,20 +3,26 @@ module Configs
 
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg, ManyGeometries 
-export get_bounding_box, check_intersection, is_inside
+export get_bounding_box, check_intersection, signed_pos, is_inside
 export RigidWalls, PeriodicWalls, SlipperyWalls, ManyWalls
+export ForceWalls, PotentialWalls
 export get_main_wall, get_main_geometry
+export get_space_data, SpaceData
 
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksCfg, has_chunks
 export DeviceMode, Sequencial, Threaded
-export particle_radius
+export particle_radius, potential_force
 
 using StaticArrays, StructTypes
 
-#
-# Space Configurations 
-#
+abstract type SpaceData end
+
+get_space_data(space_cfg) = nothing  
+    
+# =
+# Geometries 
+# =
 abstract type GeometryCfg end
 
 struct ManyGeometries{G <: Tuple} <: GeometryCfg
@@ -84,13 +90,6 @@ function is_inside(point, r::RectangleCfg; pad=0)
     return is_x && is_y
 end
 
-# struct Point2D{T}
-#     x::T
-#     y::T
-# end
-# Point2D(x, y) = Point2D(promote(x, y)...)
-# Point2D(p) = Point2D(p...)
-
 struct Line2D{T}
     p1::SVector{2, T}
     p2::SVector{2, T}
@@ -115,6 +114,24 @@ function Line2D(p1, p2)
     return Line2D(p1, p2, n, t, norm)
 end
 
+function signed_pos(point, line::Line2D)
+    p1 = line.p1
+            
+    dr = point - p1
+    delta_t = sum(dr .* line.tangent)
+    
+    if delta_t > 0
+        if delta_t < line.length
+            base_pos = p1 + line.tangent * delta_t
+            dr = point - base_pos
+        else
+            dr = point - line.p2
+        end
+    end
+
+    return dr, sqrt(sum(dr.^2))
+end
+
 @kwdef struct LinesCfg{T} <: GeometryCfg
     lines::Vector{Line2D{T}}
     bbox::Union{RectangleCfg{2, T}, Nothing}
@@ -130,6 +147,17 @@ end
 function CircleCfg(;radius, center)
     radius, center... = promote(radius, center...)
     CircleCfg(radius, SVector(center...))
+end
+
+function signed_pos(point, geometry_cfg::CircleCfg)
+    dr = point - geometry_cfg.center
+    dist = sum(dr.^2)^.5
+    dr_hat = dr / dist
+
+    dr = dr - dr_hat * geometry_cfg.radius
+    sign_dist = dist - geometry_cfg.radius 
+
+    return dr, sign_dist
 end
 
 check_intersection(r1::RectangleCfg, r2::CircleCfg) = check_intersection(r2, r1)
@@ -187,9 +215,10 @@ function get_bounding_box(geometry_cfg::ManyGeometries)
     return bbox
 end
 
-#
+# =
 # Wall Type
-#
+# =
+
 abstract type WallType end
 StructTypes.StructType(::Type{W}) where W <: WallType = StructTypes.Struct()
 
@@ -200,6 +229,20 @@ struct SlipperyWalls <: WallType end
 struct ManyWalls{W <: Tuple} <: WallType 
     list::W
 end  
+
+# =
+# Force Walls
+# =
+
+abstract type ForceWalls <: WallType end
+
+struct PotentialWalls{P} <: ForceWalls 
+    potencial::P
+end
+    
+# =
+# Space Configuration
+# = 
 
 @kwdef struct SpaceCfg{W<:WallType, G<:GeometryCfg} 
     wall_type::W
@@ -230,10 +273,15 @@ get_main_geometry(geometry_cfg::GeometryCfg) = geometry_cfg
 get_main_geometry(geometry_cfg::ManyGeometries) = geometry_cfg.list[1]
 get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cfg)
 
-#
+# ==
 # Dynamic Configurations 
-#
+# =
+
 abstract type DynamicCfg end
+
+function potential_force(dr, potencial)
+    potential_force(dr, sqrt(sum(dr.^2)), potencial)
+end
 
 """
 Truncated harmonic potencial configuration.
@@ -252,6 +300,18 @@ Truncated harmonic potencial configuration.
     ko::T
     ro::T
     ra::T
+end
+
+function potential_force(dr, dist, potencial::HarmTruncCfg)
+    if dist > potencial.ra
+        return zero(dr)
+    end
+
+    fmod = -potencial.ko*(abs(dist) - potencial.ro)
+
+    # println(dist, ", ", fmod)
+
+    return fmod/dist * dr
 end
 
 """
@@ -296,9 +356,9 @@ particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
 particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 
-#
+# =
 # Integration Configuration
-#
+# =
 abstract type AbstractIntCfg end
 
 abstract type DeviceMode end
@@ -322,4 +382,4 @@ end
 has_chunks(int_cfg::IntCfg{T, Nothing, D, E}) where {T, D, E} = false
 has_chunks(int_cfg::IntCfg{T, ChunksCfg, D, E}) where {T, D, E} = true
 
-end
+end # Configs

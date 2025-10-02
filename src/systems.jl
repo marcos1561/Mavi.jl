@@ -45,7 +45,7 @@ d=2: y axis
 struct System{T, ND, NT, 
     StateT<:State{ND, T}, WallTypeT<:WallType, GeometryCfgT<:GeometryCfg, DynamicCfgT<:DynamicCfg, IntCfgT<:AbstractIntCfg,
     ChunksT<:Union{Nothing, Chunks}, SysT<:SystemType, 
-    InfoT, DebugT, RNGT<:AbstractRNG}
+    SpaceDataT<:Union{Nothing, SpaceData}, InfoT, DebugT, RNGT<:AbstractRNG}
     state::StateT
     space_cfg::SpaceCfg{WallTypeT, GeometryCfgT}
     dynamic_cfg::DynamicCfgT
@@ -54,13 +54,15 @@ struct System{T, ND, NT,
     
     """
     Total force of all particles. One should use get_forces(system) to
-    get a Num "Dimensions X Num Particles" matrix.
+    get the forces.
 
-    forces[d, i, thread id] = Total force on particle i in dimension d.
+    forces[i, thread id] = Total force on particle i.
     """
     forces::SVector{NT, Vector{SVector{ND, T}}}
     # forces_local::Union{Array{T, 3}, Nothing}
     
+    space_data::SpaceDataT
+
     time_info::TimeInfo
 
     info::InfoT
@@ -114,7 +116,9 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
         rng=Random.GLOBAL_RNG
     end
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, time_info, info, debug_info, sys_type, rng)
+    space_data = get_space_data(space_cfg)
+
+    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, space_data, time_info, info, debug_info, sys_type, rng)
 end
 
 # @inline get_forces(system) = @view system.forces[:, :, 1]

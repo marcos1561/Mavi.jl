@@ -36,6 +36,22 @@ function HarmTruncCfg{T}(; k_rep, k_atr, dist_eq, dist_max) where {T<:Number}
     HarmTruncCfg{T}(T(k_rep), T(k_atr), T(dist_eq), T(dist_max))
 end
 
+function MaviCfg.potential_force(dr, dist, potencial::HarmTruncCfg)
+    if dist > potencial.dist_max
+        return zero(dr)
+    end
+
+    dist_eq = potencial.dist_eq
+
+    if dist < dist_eq
+        fmod = -potencial.k_rep * (dist/dist_eq - 1)
+    else
+        fmod = -potencial.k_atr * (dist/dist_eq - 1)
+    end
+
+    return fmod / dist * dr
+end
+
 function MaviCfg.particle_radius(interaction_cfg::HarmTruncCfg) 
     return interaction_cfg.dist_eq / 2.0
 end

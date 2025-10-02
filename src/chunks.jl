@@ -86,7 +86,7 @@ function get_neighbors(num_rows, num_cols, wall_type::PeriodicWalls)
     return neighbors
 end
 
-function get_neighbors(num_rows, num_cols, wall_type::Union{RigidWalls, SlipperyWalls})
+function get_neighbors(num_rows, num_cols, wall_type)
     neighbors = Matrix{Vector{CartesianIndex{2}}}(undef, num_rows, num_cols)
     for i in 1:(num_rows-1)
         neighbors[i, 1] = [
