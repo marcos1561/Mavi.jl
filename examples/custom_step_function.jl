@@ -6,12 +6,13 @@ a step function with constant velocity and rigid walls.
 """
 module Example
 
-using StaticArrays
+using Mavi.StaticArrays
 
 using Mavi
 using Mavi.States
 using Mavi.Visualization
 using Mavi.Configs
+
 
 function main(test=false)
     state = SecondLawState(

@@ -3,7 +3,7 @@ Example: Welcome Video
 """
 module Example
 
-using StaticArrays
+using Mavi.StaticArrays
 
 using Mavi.Rings
 using Mavi.Rings.Configs

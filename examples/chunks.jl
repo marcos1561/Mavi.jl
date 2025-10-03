@@ -11,8 +11,6 @@ using Mavi.Configs
 using Mavi.InitStates
 using Mavi.Visualization
 
-using StaticArrays, StatsBase
-
 function main(test=false)
     # Set to false to see the performance without chunks.
     use_chunks = true

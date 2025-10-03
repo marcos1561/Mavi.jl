@@ -8,11 +8,12 @@ Simulation with Rings using different ring types. Description:
 """
 module Example
 
+using ColorSchemes
+
 using Mavi.Rings
 using Mavi.Rings.Configs 
 using Mavi.Visualization
 using Mavi.Configs: get_bounding_box
-using ColorSchemes
 
 using Random
 Random.seed!(1234)
