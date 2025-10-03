@@ -1,7 +1,7 @@
 name = "Mavi"
 uuid = "744abf98-bd76-4ff1-9030-f2bc55e921ed"
 authors = ["Marcos Pasa", "Vinícius"]
-version = "1.0.0"
+version = "1.0.1"
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
