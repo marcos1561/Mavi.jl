@@ -26,6 +26,7 @@ using .RunSystem
 export run
 
 using .States
+export StaticArrays
 
 # Special Systems 
 include("rings/rings.jl")

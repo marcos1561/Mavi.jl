@@ -5,7 +5,7 @@ Creates an empty system with a source and a sink at apposite sides.
 """
 module Example
 
-using StaticArrays
+using Mavi.StaticArrays
 
 using Mavi.Rings
 using Mavi.Rings.Configs

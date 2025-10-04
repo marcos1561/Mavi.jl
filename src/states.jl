@@ -1,5 +1,7 @@
 module States
 
+export StaticArrays
+
 using StaticArrays
 
 export SecondLawState, SelfPropelledState, State

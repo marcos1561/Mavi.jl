@@ -79,15 +79,7 @@ function main(test=false)
 
     anim_cfg = AnimationCfg(
         num_steps_per_frame=15,
-        # graph_cfg=CircleGraphCfg(),
-        
-        graph_cfg=MainGraphCfg((
-            CircleGraphCfg(),
-            RingsNumsGraphCfg(),
-        )),
-        
-        # begin_paused=true,
-        # graph_cfg=ScatterGraphCfg(),
+        graph_cfg=CircleGraphCfg(),
     )
     
     if !test
