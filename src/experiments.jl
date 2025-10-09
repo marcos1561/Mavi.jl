@@ -1,10 +1,12 @@
 module Experiments
 
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
+export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values
 export DelayedCfg, ManyColsCfg
 export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
+using Base.Threads
 
 using Mavi.Systems
 using Mavi.MaviSerder
@@ -74,7 +76,11 @@ function Experiment(
     Experiment(cfg, get_collector(col_cfg, cfg, system), system, custom_step, checkpoint)
 end
 
-function run_experiment(experiment::Experiment, stop_func=nothing)
+function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=nothing)
+    if isnothing(prog_kwargs)
+        prog_kwargs = ()
+    end
+
     system = experiment.system
     col = experiment.col
     cfg = experiment.cfg
@@ -103,7 +109,7 @@ function run_experiment(experiment::Experiment, stop_func=nothing)
 
     experiment_step! = experiment.custom_step
 
-    prog = ProgContinuos(init=system.time_info.time, final=cfg.tf)
+    prog = ProgContinuos(init=system.time_info.time, final=cfg.tf; prog_kwargs...)
     while system.time_info.time < cfg.tf
         experiment_step!(system)
         collect(col, system)
@@ -128,6 +134,122 @@ function run_experiment(experiment::Experiment, stop_func=nothing)
     end
     
     return
+end
+
+struct ExperimentBatch{C<:ColCfg, S<:System, V, F}
+    exp_cfg::ExperimentCfg
+    col_cfg::C
+    init_system::S
+    values::V
+    custom_step::F
+end
+function ExperimentBatch(; exp_cfg, col_cfg, init_system, values, custom_step=nothing)
+    if isnothing(custom_step)
+        custom_step = get_step_function(init_system.type, init_system)
+    end
+    ExperimentBatch(exp_cfg, col_cfg, init_system, values, custom_step)
+end
+
+function add_experiments(experiment_batch::ExperimentBatch, extra_values)
+    new_values = vcat(experiment_batch.values, extra_values)
+
+    ExperimentBatch(
+        experiment_batch.exp_cfg,
+        experiment_batch.col_cfg,
+        experiment_batch.init_system,
+        new_values,
+        experiment_batch.custom_step,
+    ) 
+end
+
+function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing)
+    exp_cfg = experiment_batch.exp_cfg
+    col_cfg = experiment_batch.col_cfg
+    init_system = experiment_batch.init_system
+    values = experiment_batch.values
+    step_func = experiment_batch.custom_step
+
+    mkpath(exp_cfg.root)
+
+    open(joinpath(exp_cfg.root, EXP_COL_CONFIGS_NAME), "w") do io
+        JSON3.pretty(io, 
+            Dict(
+                "experiment" => get_obj_save_data_json(exp_cfg), 
+                "collector" => get_obj_save_data_json(col_cfg), 
+            ),
+        )
+    end
+    serialize(joinpath(exp_cfg.root, "values.bin"), values)
+    save_system(init_system, joinpath(exp_cfg.root, "init_system"))
+
+    results = Vector{Union{Nothing, Exception}}(undef, length(values))
+
+    t1 = time()
+
+    # for i in eachindex(values)
+    @threads for i in eachindex(values)
+        idx = i
+        try
+            exp_value = values[i]
+
+            println("\nExperiment $idx on thread $(threadid())")
+
+            exp_root = joinpath(exp_cfg.root, "data", string(idx))
+            
+            done_path = joinpath(exp_root, ".done")
+            if isfile(done_path)
+                println("$idx: Experiment already completed")
+                results[i] = nothing
+                continue
+            end
+            
+            experiment = nothing
+            try
+                experiment = load_experiment(exp_root, step_func)
+                println("$idx: Experiment Loaded!")
+            catch e
+                exp_cfg_i = ExperimentCfg(
+                    tf=exp_cfg.tf,
+                    root=exp_root,
+                    save_final_state=exp_cfg.save_final_state,
+                    checkpoint_cfg=exp_cfg.checkpoint_cfg,
+                )
+
+                system = get_system(init_system, exp_value, idx)
+                experiment = Experiment(
+                    exp_cfg_i, col_cfg, system, 
+                    step_func,
+                )
+            end
+            
+            try
+                formatter = ProgFormatter(string(idx))
+                run_experiment(experiment, stop_func, prog_kwargs=(formatter=formatter,))
+            catch e
+                println("$idx: Error during experiment: ", e)
+                println("Stacktrace:")
+                showerror(stdout, e, catch_backtrace())
+                save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
+                Collectors.save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
+            end
+
+            results[i] = nothing
+        catch e
+            results[i] = e
+            println("$idx: Error setting up experiment: ", e)
+            println("Stacktrace:")
+            showerror(stdout, e, catch_backtrace())
+        end
+    end
+
+    # Report results
+    failed_experiments = findall(x -> x isa Exception, results)
+    if !isempty(failed_experiments)
+        println("Failed experiments: ", failed_experiments)
+    end
+
+    t2 = time()
+    println("\nTotal time: ", Progress.seconds_to_hhmmss(t2 - t1))
 end
 
 # = 
@@ -288,6 +410,25 @@ function load_experiment(root, custom_step=nothing)
     col = get_collector(col_cfg, exp_cfg, system, col_state)
 
     return Experiment(exp_cfg, col, system, custom_step, cp_info)
+end
+
+function load_experiment_batch(root, custom_step=nothing)
+    configs = convert(Dict{Symbol, Any}, JSON3.read(joinpath(root, EXP_COL_CONFIGS_NAME)))
+    configs = load_dic_configs(configs)
+    exp_cfg = configs[:experiment] 
+    col_cfg = configs[:collector] 
+    values = deserialize(joinpath(root, "values.bin"))
+    init_system = load_system(joinpath(root, "init_system"))
+
+    ExperimentBatch(
+        exp_cfg=exp_cfg, col_cfg=col_cfg,
+        init_system=init_system, values=values,
+        custom_step=custom_step,
+    )
+end
+    
+function load_experiment_batch_values(root)
+    return deserialize(joinpath(root, "values.bin"))
 end
 
 include("rings/collectors.jl")

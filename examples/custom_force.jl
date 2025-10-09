@@ -78,7 +78,7 @@ function main(test=false)
     if !test
         animate(system, anim_cfg)
     else
-        Mavi.run(system, tf=1)
+        Mavi.run_system(system, tf=1)
     end
 end
 

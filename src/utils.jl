@@ -2,6 +2,7 @@ module Progress
     using Printf
 
     export ProgContinuos, show_progress, show_finish
+    export ProgFormatter
 
     function seconds_to_hhmmss(seconds)
         h = trunc(Int, seconds ÷ 3600)
@@ -10,22 +11,50 @@ module Progress
         return lpad(h, 2, '0') * ":" * lpad(m, 2, '0') * ":" * lpad(s, 2, '0')
     end    
 
+    struct ProgFormatter{L}
+        label::L
+    end
+
+    function progress_text(formatter::ProgFormatter{Nothing}, progress, remaining)
+        println("Progress: $(progress) % | $(remaining)")
+    end
+    function progress_text(formatter::ProgFormatter{String}, progress, remaining)
+        l = formatter.label
+        println("$l: Progress: $(progress) % | $(remaining)")
+    end
+
+    function final_text(prog, formatter::ProgFormatter{Nothing})
+        elapsed_time = time() - prog.init_time
+        println("Elapsed Time: $(seconds_to_hhmmss(elapsed_time))")
+    end
+    function final_text(prog, formatter::ProgFormatter{String})
+        elapsed_time = time() - prog.init_time
+        l = formatter.label
+        println("$l: Elapsed Time: $(seconds_to_hhmmss(elapsed_time))")
+    end
+
     mutable struct ProgInfo
         last_shown::Float64
         has_shown::Bool
     end
 
-    struct ProgContinuos{T<:Number}
+    struct ProgContinuos{T<:Number, F}
         init::T
         final::T
         show_step::Float64
         init_time::Float64
         check_show_time::Float64
         info::ProgInfo
+        formatter::F
     end
-    function ProgContinuos(;init, final, show_step=0.1)
+    function ProgContinuos(;init, final, show_step=0.1, formatter=nothing)
         init, final = promote(init, final)
-        ProgContinuos(init, final, show_step, time(), 10.0, ProgInfo(0.0, false))
+
+        if isnothing(formatter)
+            formatter = ProgFormatter(nothing)
+        end
+
+        ProgContinuos(init, final, show_step, time(), 10.0, ProgInfo(0.0, false), formatter)
     end 
 
     function show_progress(prog, i)
@@ -50,12 +79,9 @@ module Progress
             
             progress_str = @sprintf("%05.2f", progress*100)
 
-            println("Progress: $(progress_str) % | $(remaining_txt)")
+            progress_text(prog.formatter, progress_str, remaining_txt)
         end
     end
 
-    function show_finish(prog)
-        elapsed_time = time() - prog.init_time
-        println("Elapsed Time: $(seconds_to_hhmmss(elapsed_time))")
-    end
+    show_finish(prog) = final_text(prog, prog.formatter)
 end

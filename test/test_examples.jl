@@ -14,7 +14,11 @@ TEST_EX = false
 function test()
     for ex_item in examples_main
         try
-            ex_item.main(true)
+            if ex_item.name == "experiment.jl"
+                ex_item.main(true, delete_data=true)
+            else
+                ex_item.main(true)
+            end
         catch e
             println("Error in $(ex_item.name): ", e)
             println("Stacktrace:")

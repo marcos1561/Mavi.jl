@@ -58,12 +58,12 @@ function create_system()
     )
 end
 
-function main(test=false)
+function main(test=false; delete_data=false)
     system = create_system()
 
     experiment_cfg = ExperimentCfg(
         tf=10,
-        root="experiment_data",
+        root="example_experiment_data",
         checkpoint_cfg=CheckpointCfg(delta_time=2),
     )
 
@@ -74,6 +74,10 @@ function main(test=false)
     experiment = Experiment(experiment_cfg, collector_cfg, system)
 
     run_experiment(experiment)
+
+    if delete_data
+        isdir(experiment_cfg.root) && rm(experiment_cfg.root, recursive=true)
+    end
 
     # Discommend to animate the system
     # animate(system)

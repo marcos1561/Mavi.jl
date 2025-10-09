@@ -1,10 +1,10 @@
 module RunSystem
 
-export run
+export run_system
 
 using Mavi.Integration: get_step_function
 
-function run(system; tf=nothing, num_steps=nothing, step_func=nothing)
+function run_system(system; tf=nothing, num_steps=nothing, step_func=nothing)
     if isnothing(step_func)
         step_func = get_step_function(system)
     end

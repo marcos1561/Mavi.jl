@@ -23,7 +23,7 @@ using .MaviSerder
 export save_system, load_system
 
 using .RunSystem
-export run
+export run_system
 
 using .States
 export StaticArrays

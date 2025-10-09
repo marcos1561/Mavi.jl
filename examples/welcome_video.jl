@@ -230,7 +230,7 @@ function main(test=false)
     if !test
         animate(system, anim_cfg)
     else
-        Rings.Mavi.run(system, tf=1)
+        Rings.Mavi.run_system(system, tf=1)
     end
 end
 

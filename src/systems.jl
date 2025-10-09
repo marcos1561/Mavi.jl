@@ -91,18 +91,10 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
         num_forces_slices = Threads.nthreads()
     end
 
-    # num_p = size(state.pos)[2]
-    # forces = Array{T, 3}(undef, 2, num_p, num_forces_slices)
-    
     num_p = length(state.pos)
     forces = SVector{num_forces_slices, Vector{SVector{ND, T}}}([
         Vector{SVector{ND, T}}(undef, num_p) for _ in 1:num_forces_slices
     ])
-
-    # forces_local = nothing
-    # if int_cfg.device isa Threaded
-    #     forces_local =  Array{T, 3}(undef, 2, num_p, num_forces_slices)
-    # end
 
     if isnothing(chunks)
         chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state) 
@@ -142,16 +134,26 @@ get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cf
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
-# @inline get_num_total_particles(state::State, info=nothing) = length(state.pos)
-# @inline get_num_total_particles(system::System, state::State) = get_num_total_particles(state, system.info)
-# @inline get_num_total_particles(system::System) = get_num_total_particles(system.state, system.info)
 States.get_num_total_particles(system::System) = get_num_total_particles(system.state)
 
-# @inline get_particles_ids(state::State, dynamic_cfg=nothing) = eachindex(state.pos)
-# @inline get_particles_ids(system::System, state) = get_particles_ids(state, system.dynamic_cfg)
-# @inline get_particles_ids(system::System) = get_particles_ids(system.state, system.dynamic_cfg)
 States.get_particles_ids(system::System) = get_particles_ids(system.state)
 
 States.update_ids!(system::System) = update_ids!(system.state)
+
+function system_deepcopy(system, sys_type::StandardSys)
+    System(
+        state=deepcopy(system.state),
+        space_cfg=deepcopy(system.space_cfg),
+        dynamic_cfg=deepcopy(system.dynamic_cfg),
+        int_cfg=deepcopy(system.int_cfg),
+        info=deepcopy(system.info),
+        debug_info=deepcopy(system.debug_info),
+        time_info=deepcopy(system.time_info),
+        sys_type=sys_type,
+        rng=deepcopy(system.rng),
+    )
+end
+
+Base.deepcopy(system::System) = system_deepcopy(system, system.type)
 
 end

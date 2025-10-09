@@ -9,7 +9,7 @@ export save_system, load_system
 using StaticArrays
 
 using Mavi
-import Mavi.Systems: System, SystemType, get_num_total_particles, get_chunks
+import Mavi.Systems: System, SystemType, get_num_total_particles, get_chunks, system_deepcopy
 import Mavi.Configs: SpaceCfg, PeriodicWalls, ManyWalls
 import Mavi.ChunksMod: Chunks, update_chunks!
 
@@ -282,13 +282,31 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
     Integration.update_cms!(system)
     Integration.update_chunks_all!(system)
     Integration.update_invasions!(system) 
-    Integration.check_invasions!(system)
 
     Integration.cleaning!(system)
     Integration.forces!(system)
     Integration.neigh_sum_buffers(system.info.p_neigh)
 
     return system
+end
+
+function system_deepcopy(system::System, sys_type::RingsSys)
+    sources = system.info.sources
+
+    source_cfg = isnothing(sources) ? nothing : [deepcopy(s.cfg) for s in system.info.sources]
+    
+    RingsSystem(
+        state=deepcopy(system.state),
+        space_cfg=deepcopy(system.space_cfg),
+        dynamic_cfg=deepcopy(system.dynamic_cfg),
+        int_cfg=deepcopy(system.int_cfg),
+        p_neighbors_cfg=isnothing(system.info.p_neigh) ? nothing : deepcopy(get_neigh(system.info.p_neigh).cfg),
+        r_neighbors_cfg=isnothing(system.info.r_neigh) ? nothing : deepcopy(get_neigh(system.info.r_neigh).cfg),
+        source_cfg=source_cfg,
+        user_data=deepcopy(system.info.user_data),
+        time_info=deepcopy(system.time_info),
+        rng=deepcopy(system.rng),
+    )
 end
 
 end

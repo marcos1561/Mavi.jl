@@ -58,7 +58,7 @@ function main(test=false)
             AnimationCfg(num_steps_per_frame=100),
         )
     else
-        Mavi.run(system, tf=1)
+        Mavi.run_system(system, tf=1)
     end
 end
 

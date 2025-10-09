@@ -62,7 +62,7 @@ function main(test=false)
     if !test
         animate(system, anim_cfg, step_func=my_step!)
     else
-        Mavi.run(system, num_steps=100, step_func=my_step!)
+        Mavi.run_system(system, num_steps=100, step_func=my_step!)
     end
 end
 
