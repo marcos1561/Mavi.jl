@@ -162,7 +162,7 @@ function add_experiments(experiment_batch::ExperimentBatch, extra_values)
     ) 
 end
 
-function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing)
+function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing; verbose=true)
     exp_cfg = experiment_batch.exp_cfg
     col_cfg = experiment_batch.col_cfg
     init_system = experiment_batch.init_system
@@ -191,14 +191,14 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
         idx = i
         try
             exp_value = values[i]
-
-            println("\nExperiment $idx on thread $(threadid())")
+            
+            verbose && println("\nExperiment $idx on thread $(threadid())")
 
             exp_root = joinpath(exp_cfg.root, "data", string(idx))
             
             done_path = joinpath(exp_root, ".done")
             if isfile(done_path)
-                println("$idx: Experiment already completed")
+                verbose && println("$idx: Experiment already completed")
                 results[i] = nothing
                 continue
             end
@@ -206,7 +206,7 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
             experiment = nothing
             try
                 experiment = load_experiment(exp_root, step_func)
-                println("$idx: Experiment Loaded!")
+                verbose && println("$idx: Experiment Loaded!")
             catch e
                 exp_cfg_i = ExperimentCfg(
                     tf=exp_cfg.tf,
@@ -223,12 +223,14 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
             end
             
             try
-                formatter = ProgFormatter(string(idx))
+                formatter = verbose ? NormalFormatter(string(idx)) : SilenceFormatter()
                 run_experiment(experiment, stop_func, prog_kwargs=(formatter=formatter,))
             catch e
-                println("$idx: Error during experiment: ", e)
-                println("Stacktrace:")
-                showerror(stdout, e, catch_backtrace())
+                if verbose
+                    println("$idx: Error during experiment: ", e)
+                    println("Stacktrace:")
+                    showerror(stdout, e, catch_backtrace())
+                end
                 save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
                 Collectors.save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
             end
@@ -236,20 +238,24 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
             results[i] = nothing
         catch e
             results[i] = e
-            println("$idx: Error setting up experiment: ", e)
-            println("Stacktrace:")
-            showerror(stdout, e, catch_backtrace())
+            if verbose
+                println("$idx: Error setting up experiment: ", e)
+                println("Stacktrace:")
+                showerror(stdout, e, catch_backtrace())
+            end
         end
     end
 
     # Report results
-    failed_experiments = findall(x -> x isa Exception, results)
-    if !isempty(failed_experiments)
-        println("Failed experiments: ", failed_experiments)
-    end
+    if verbose
+        failed_experiments = findall(x -> x isa Exception, results)
+        if !isempty(failed_experiments)
+            println("Failed experiments: ", failed_experiments)
+        end
 
-    t2 = time()
-    println("\nTotal time: ", Progress.seconds_to_hhmmss(t2 - t1))
+        t2 = time()
+        println("\nTotal time: ", Progress.seconds_to_hhmmss(t2 - t1))
+    end
 end
 
 # = 

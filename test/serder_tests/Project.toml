@@ -1,4 +1,0 @@
-[deps]
-Mavi = "744abf98-bd76-4ff1-9030-f2bc55e921ed"
-Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"

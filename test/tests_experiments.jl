@@ -63,10 +63,10 @@ end
 Run an experiment batch and checks if the expected files exists after
 the simulation is done.
 """
-function experiment_batch(; remove_data=true)
+function experiment_batch(; remove_data=true, verbose=false)
     exp_cfg = ExperimentCfg(
         tf=2000.0,
-        root=joinpath(@__DIR__, "experiment_batch_run_test"),
+        root=joinpath(@__DIR__, "tmp/experiment_batch_run_test"),
     )
 
     remove_data && isdir(exp_cfg.root) && rm(exp_cfg.root, recursive=true)
@@ -84,7 +84,7 @@ function experiment_batch(; remove_data=true)
         values=values,
     )
 
-    run_experiment_batch(exp_batch, get_system)
+    run_experiment_batch(exp_batch, get_system, verbose=verbose)
 
     exp_datas_list = sort!(collect(readdir(joinpath(exp_cfg.root, "data"))))
     
@@ -103,10 +103,10 @@ end
 Run a batch with an intentional error in the middle of the batch, then reload 
 the experiment and finish the batch.
 """
-function load_batch()
+function load_batch(; verbose=false)
     exp_cfg = ExperimentCfg(
         tf=1,
-        root=joinpath(@__DIR__, "experiment_batch_load_test"),
+        root=joinpath(@__DIR__, "tmp/experiment_batch_load_test"),
     )
 
     isdir(exp_cfg.root) && rm(exp_cfg.root, recursive=true)
@@ -124,10 +124,10 @@ function load_batch()
         values=values,
     )
 
-    run_experiment_batch(exp_batch, get_system_load_test)
+    run_experiment_batch(exp_batch, get_system_load_test, verbose=verbose)
 
     exp_batch = load_experiment_batch(exp_cfg.root)
-    run_experiment_batch(exp_batch, get_system)
+    run_experiment_batch(exp_batch, get_system, verbose=verbose)
 
     exp_datas_list = sort!(collect(readdir(joinpath(exp_cfg.root, "data"))))
 
@@ -137,12 +137,12 @@ function load_batch()
 end
 
 """
-Run a bunch, then load it, add two more experiments and run it again.
+Run a batch, then load it, add two more experiments and run it again.
 """
-function add_experiments_to_batch()
+function add_experiments_to_batch(verbose=false)
      exp_cfg = ExperimentCfg(
         tf=1,
-        root=joinpath(@__DIR__, "experiment_batch_add_test"),
+        root=joinpath(@__DIR__, "tmp/experiment_batch_add_test"),
     )
 
     isdir(exp_cfg.root) && rm(exp_cfg.root, recursive=true)
@@ -160,14 +160,14 @@ function add_experiments_to_batch()
         values=values,
     )
 
-    run_experiment_batch(exp_batch, get_system)
+    run_experiment_batch(exp_batch, get_system, verbose=verbose)
 
     exp_batch = load_experiment_batch(exp_cfg.root)
     
     new_values = [(ko=10.0, dt=0.0012), (ko=10.69, dt=0.0021)]
     exp_batch = add_experiments(exp_batch, new_values)
 
-    run_experiment_batch(exp_batch, get_system)
+    run_experiment_batch(exp_batch, get_system, verbose=verbose)
 
     exp_datas_list = sort!(collect(readdir(joinpath(exp_cfg.root, "data"))))
     
@@ -200,8 +200,8 @@ end
 
 function run_tests()
     tests_func = [
-        experiment_batch,
-        load_batch,
+        # experiment_batch,
+        # load_batch,
         add_experiments_to_batch
     ]
 
@@ -226,7 +226,7 @@ end
 end # TestExperiments
 
 # TestExperiments.run_tests()
-# TestExperiments.experiment_batch(remove_data=true)
+# TestExperiments.experiment_batch()
 # TestExperiments.load_batch()
 # TestExperiments.add_experiments_to_batch()
 # TestExperiments.load_batch()

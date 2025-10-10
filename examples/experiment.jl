@@ -11,6 +11,7 @@ using Mavi.InitStates
 using Mavi.Configs
 using Mavi.Visualization
 using Mavi.Experiments
+using Mavi.Utils.Progress
 
 function create_system()
     num_particles = 100
@@ -58,7 +59,7 @@ function create_system()
     )
 end
 
-function main(test=false; delete_data=false)
+function main(test=false; delete_data=false, verbose=true)
     system = create_system()
 
     experiment_cfg = ExperimentCfg(
@@ -73,7 +74,8 @@ function main(test=false; delete_data=false)
 
     experiment = Experiment(experiment_cfg, collector_cfg, system)
 
-    run_experiment(experiment)
+    formatter = verbose ? NormalFormatter() : SilenceFormatter()
+    run_experiment(experiment, prog_kwargs=(formatter=formatter,))
 
     if delete_data
         isdir(experiment_cfg.root) && rm(experiment_cfg.root, recursive=true)

@@ -12,7 +12,7 @@ Here are some `Mavi.jl` features:
 
 - Spaces with different geometries, such as rectangular or circular.
 
-- Spaces with different wall types, such as rigid or periodic walls.
+- Spaces with different wall types, such as rigid, periodic or dynamic (walls that exert forces on the particles).
 
 - Quantity calculators, such as kinetic and potential energy.
 
@@ -59,11 +59,8 @@ The easiest way to install Mavi is:
 * Open the Julia REPL and enter package manager mode (by pressing `]` at the empty REPL prompt)
 * Execute the command:
     ```julia
-    pkg> dev https://github.com/marcos1561/Mavi.jl.git 
+    pkg> add https://github.com/marcos1561/Mavi.jl.git 
     ```
-This will install Mavi in the currently active environment, placing its files in `~/.julia/dev/Mavi`.
-
-> Note: If you just want to use Mavi (not modify it), use `add` instead of `dev`.
 
 # Quick Start
 Let's create a gas of particles. The first thing we need to do is create the system's state. Particles' positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potential between them (in this example we will use a Lennard-Jones potential). The particle radius can be accessed via the `particle_radius()` function:  

@@ -2,9 +2,11 @@
 /Manifest.toml
 .sync_journal*
 .owncloudsync*
+.sync-exclude*
 
 main
 temp
+test/tmp
 experiments
 count_lines.py
 

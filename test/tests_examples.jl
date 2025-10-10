@@ -15,7 +15,7 @@ function test()
     for ex_item in examples_main
         try
             if ex_item.name == "experiment.jl"
-                ex_item.main(true, delete_data=true)
+                ex_item.main(true, delete_data=true, verbose=false)
             else
                 ex_item.main(true)
             end

@@ -2,7 +2,7 @@ module Progress
     using Printf
 
     export ProgContinuos, show_progress, show_finish
-    export ProgFormatter
+    export NormalFormatter, SilenceFormatter
 
     function seconds_to_hhmmss(seconds)
         h = trunc(Int, seconds ÷ 3600)
@@ -11,23 +11,31 @@ module Progress
         return lpad(h, 2, '0') * ":" * lpad(m, 2, '0') * ":" * lpad(s, 2, '0')
     end    
 
-    struct ProgFormatter{L}
+    abstract type ProgFormatter end
+
+    struct SilenceFormatter <: ProgFormatter end
+
+    function progress_text(formatter::SilenceFormatter, progress, remaining) end
+    function final_text(prog, formatter::SilenceFormatter) end
+
+
+    struct NormalFormatter{L} <: ProgFormatter
         label::L
     end
 
-    function progress_text(formatter::ProgFormatter{Nothing}, progress, remaining)
+    function progress_text(formatter::NormalFormatter{Nothing}, progress, remaining)
         println("Progress: $(progress) % | $(remaining)")
     end
-    function progress_text(formatter::ProgFormatter{String}, progress, remaining)
+    function progress_text(formatter::NormalFormatter{String}, progress, remaining)
         l = formatter.label
         println("$l: Progress: $(progress) % | $(remaining)")
     end
 
-    function final_text(prog, formatter::ProgFormatter{Nothing})
+    function final_text(prog, formatter::NormalFormatter{Nothing})
         elapsed_time = time() - prog.init_time
         println("Elapsed Time: $(seconds_to_hhmmss(elapsed_time))")
     end
-    function final_text(prog, formatter::ProgFormatter{String})
+    function final_text(prog, formatter::NormalFormatter{String})
         elapsed_time = time() - prog.init_time
         l = formatter.label
         println("$l: Elapsed Time: $(seconds_to_hhmmss(elapsed_time))")
@@ -51,7 +59,7 @@ module Progress
         init, final = promote(init, final)
 
         if isnothing(formatter)
-            formatter = ProgFormatter(nothing)
+            formatter = NormalFormatter(nothing)
         end
 
         ProgContinuos(init, final, show_step, time(), 10.0, ProgInfo(0.0, false), formatter)
