@@ -19,10 +19,15 @@ const THREAD_ID_MAP::Dict{Int, Int} = Dict{Int, Int}()
 
 function initialize_thread_map!()
     empty!(THREAD_ID_MAP)
+
+    map_lock = Threads.ReentrantLock()
+
     Threads.@threads for i in 1:Threads.nthreads()
         tid = Threads.threadid()
-        if !haskey(THREAD_ID_MAP, tid)
-            THREAD_ID_MAP[tid] = i
+        lock(map_lock) do
+            if !haskey(THREAD_ID_MAP, tid)
+                THREAD_ID_MAP[tid] = i
+            end
         end
     end
 end

@@ -267,7 +267,7 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
                     thread_logger_error("Error during experiment", e, idx, thread_id, log_dir, catch_backtrace())
                 end
                 save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
-                Collectors.save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
+                save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
             end
 
             results[i] = nothing
