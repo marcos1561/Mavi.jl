@@ -16,10 +16,11 @@ end
 
 abstract type AbstractNeighbors end
 
-struct Neighbors{L<:Union{AbstractArray, Nothing}} <: AbstractNeighbors
+struct Neighbors{L<:Union{AbstractArray, Nothing}, D} <: AbstractNeighbors
     list::L
     count::Array{Int, 2}
     cfg::NeighborsCfg
+    device::D
 end
 function Neighbors(;num_entities, num_max_neighbors, device, cfg)
     num_slices = 1
@@ -33,9 +34,11 @@ function Neighbors(;num_entities, num_max_neighbors, device, cfg)
         neigh_array = fill(-1, (num_max_neighbors, num_entities, num_slices))
     end
 
-    Neighbors(neigh_array, neigh_count, cfg)
+    Neighbors(neigh_array, neigh_count, cfg, device)
 end
 
+get_slide_idx(::Mavi.Configs.Sequencial) = 1
+get_slide_idx(::Mavi.Configs.Threaded) = Threads.threadid()
 
 """
 - type:  
@@ -68,11 +71,11 @@ end
 
 function neigh_sum_buffers(neighbors) end
 
-function neigh_sum_buffers(neighbors::Neighbors{Nothing})
+function neigh_sum_buffers(neighbors::Neighbors{Nothing, D}) where D
     neighbors.count[:, 1] .= sum(neighbors.count, dims=2)
 end
 
-function neigh_sum_buffers(neighbors::Neighbors{L}) where L<:AbstractArray
+function neigh_sum_buffers(neighbors::Neighbors{L, D}) where {L<:AbstractArray, D}
     neigh_main = @view neighbors.list[:, :, 1]
     count_main = @view neighbors.count[:, 1]
 
@@ -93,23 +96,23 @@ end
 
 neigh_sum_buffers(neighbors::ParticleNeighbors) = neigh_sum_buffers(get_neigh(neighbors))
 
-function neigh_update_data!(neighbors::Neighbors{Nothing}, i, j)
+function neigh_update_data!(neighbors::Neighbors{Nothing, D}, i, j) where D
     count = neighbors.count
-    tid = Threads.threadid()
-    count[i, tid] += 1
-    count[j, tid] += 1
+    idx = get_slide_idx(neighbors.device)
+    count[i, idx] += 1
+    count[j, idx] += 1
 end
 
 function neigh_update_data!(neighbors::Neighbors, i, j)
     count = neighbors.count
     neigh_list = neighbors.list
-    tid = Threads.threadid()
+    idx = get_slide_idx(neighbors.device)
 
-    count_i = count[i, tid] += 1
-    count_j = count[j, tid] += 1
+    count_i = count[i, idx] += 1
+    count_j = count[j, idx] += 1
     
-    neigh_list[count_i, i, tid] = j
-    neigh_list[count_j, j, tid] = i
+    neigh_list[count_i, i, idx] = j
+    neigh_list[count_j, j, idx] = i
 end
 
 function neigh_update!(neighbors::Nothing, i, j, dist, max_dist) end

@@ -162,6 +162,33 @@ function add_experiments(experiment_batch::ExperimentBatch, extra_values)
     ) 
 end
 
+function thread_logger(msg, idx, thread_id, log_dir)
+    log_file = joinpath(log_dir, "thread_$(thread_id)_exp_$(idx).log")
+    mkpath(dirname(log_file))
+    open(log_file, "a") do io  # "a" para append
+        # timestamp = now()
+        # println(io, "[$timestamp] Thread $thread_id, Exp $idx: $msg")
+        println(io, "Thread $thread_id, Exp $idx: $msg")
+        flush(io)
+    end
+end
+
+# Nova função para logging de erros com stacktrace
+function thread_logger_error(msg, error, idx, thread_id, log_dir, backtrace=nothing)
+    log_file = joinpath(log_dir, "thread_$(thread_id)_exp_$(idx).log")
+    mkpath(dirname(log_file))
+    open(log_file, "a") do io
+        println(io, "Thread $thread_id, Exp $idx: $msg")
+        println(io, "Error: $error")
+        if !isnothing(backtrace)
+            println(io, "Stacktrace:")
+            showerror(io, error, backtrace)
+        end
+        println(io, "")  # Linha em branco para separar
+        flush(io)
+    end
+end
+
 function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing; verbose=true)
     exp_cfg = experiment_batch.exp_cfg
     col_cfg = experiment_batch.col_cfg
@@ -184,21 +211,27 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
 
     results = Vector{Union{Nothing, Exception}}(undef, length(values))
 
+    log_dir = joinpath(exp_cfg.root, "logs") 
+
     t1 = time()
 
     # for i in eachindex(values)
     @threads for i in eachindex(values)
         idx = i
+        thread_id = threadid()
         try
             exp_value = values[i]
             
-            verbose && println("\nExperiment $idx on thread $(threadid())")
+            
+            # verbose && println("\nExperiment $idx on thread $(threadid())")
+            verbose && thread_logger("\nExperiment $idx on thread $(thread_id)", idx, thread_id, log_dir)
 
             exp_root = joinpath(exp_cfg.root, "data", string(idx))
             
             done_path = joinpath(exp_root, ".done")
             if isfile(done_path)
-                verbose && println("$idx: Experiment already completed")
+                # verbose && println("$idx: Experiment already completed")
+                verbose && thread_logger("$idx: Experiment already completed", idx, thread_id, log_dir)
                 results[i] = nothing
                 continue
             end
@@ -206,7 +239,8 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
             experiment = nothing
             try
                 experiment = load_experiment(exp_root, step_func)
-                verbose && println("$idx: Experiment Loaded!")
+                # verbose && println("$idx: Experiment Loaded!")
+                verbose && thread_logger("$idx: Experiment Loaded!", idx, thread_id, log_dir)
             catch e
                 exp_cfg_i = ExperimentCfg(
                     tf=exp_cfg.tf,
@@ -227,9 +261,10 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
                 run_experiment(experiment, stop_func, prog_kwargs=(formatter=formatter,))
             catch e
                 if verbose
-                    println("$idx: Error during experiment: ", e)
-                    println("Stacktrace:")
-                    showerror(stdout, e, catch_backtrace())
+                    # println("$idx: Error during experiment: ", e)
+                    # println("Stacktrace:")
+                    # showerror(stdout, e, catch_backtrace())
+                    thread_logger_error("Error during experiment", e, idx, thread_id, log_dir, catch_backtrace())
                 end
                 save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
                 Collectors.save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
@@ -239,9 +274,10 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
         catch e
             results[i] = e
             if verbose
-                println("$idx: Error setting up experiment: ", e)
-                println("Stacktrace:")
-                showerror(stdout, e, catch_backtrace())
+                # println("$idx: Error setting up experiment: ", e)
+                # println("Stacktrace:")
+                # showerror(stdout, e, catch_backtrace())
+                thread_logger_error("Error setting up experiment", e, idx, thread_id, log_dir, catch_backtrace())
             end
         end
     end
@@ -250,7 +286,7 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
     if verbose
         failed_experiments = findall(x -> x isa Exception, results)
         if !isempty(failed_experiments)
-            println("Failed experiments: ", failed_experiments)
+            println("\nFailed experiments: ", failed_experiments)
         end
 
         t2 = time()
