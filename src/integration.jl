@@ -15,6 +15,20 @@ using Mavi.States
 using Mavi.Configs
 using Mavi.ChunksMod
 
+const THREAD_ID_MAP::Dict{Int, Int} = Dict{Int, Int}()
+
+function initialize_thread_map!()
+    empty!(THREAD_ID_MAP)
+    Threads.@threads for i in 1:Threads.nthreads()
+        tid = Threads.threadid()
+        if !haskey(THREAD_ID_MAP, tid)
+            THREAD_ID_MAP[tid] = i
+        end
+    end
+end
+
+get_thread_index() = THREAD_ID_MAP[Threads.threadid()]
+
 "Position difference (r1 - r2)"
 @inline function calc_diff(r1, r2, space_cfg)
     @inbounds dr = r1 - r2
@@ -166,7 +180,7 @@ end
 
 function calc_forces!(system::System, chunks::Chunks, device::Threaded)
     Threads.@threads :static for col in 1:chunks.num_cols
-        forces = system.forces[Threads.threadid()]
+        forces = system.forces[get_thread_index()]
         for row in 1:chunks.num_rows
             np = chunks.num_particles_in_chunk[row, col]
             chunk = @view chunks.chunk_particles[:, row, col]
@@ -544,4 +558,8 @@ function get_step_function(::StandardSys, system)
     end
 end
 
+function __init__()
+    initialize_thread_map!()
 end
+
+end # Integration

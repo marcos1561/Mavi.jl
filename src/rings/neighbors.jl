@@ -38,7 +38,7 @@ function Neighbors(;num_entities, num_max_neighbors, device, cfg)
 end
 
 get_slide_idx(::Mavi.Configs.Sequencial) = 1
-get_slide_idx(::Mavi.Configs.Threaded) = Threads.threadid()
+get_slide_idx(::Mavi.Configs.Threaded) = Mavi.Integration.get_thread_index()
 
 """
 - type:  
