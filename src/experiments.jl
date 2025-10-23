@@ -162,39 +162,58 @@ function add_experiments(experiment_batch::ExperimentBatch, extra_values)
     ) 
 end
 
-function thread_logger(msg, idx, thread_id, log_dir)
-    log_file = joinpath(log_dir, "thread_$(thread_id)_exp_$(idx).log")
-    mkpath(dirname(log_file))
-    open(log_file, "a") do io  # "a" para append
-        # timestamp = now()
-        # println(io, "[$timestamp] Thread $thread_id, Exp $idx: $msg")
-        println(io, "Thread $thread_id, Exp $idx: $msg")
-        flush(io)
+abstract type LogType end
+
+function experiment_log(logger::Nothing, idx, mssg; before=nothing) end
+function experiment_log_error(logger::Nothing, idx, error, backtrace=nothing) end
+
+struct SequencialLog{T} <: LogType 
+    io::T
+end
+SequencialLog() = SequencialLog(stdout)
+
+function experiment_log(logger::SequencialLog, idx, mssg; before=nothing)
+    !isnothing(before) && println(before) 
+    println(logger.io, "$idx: ", mssg)
+end
+
+function experiment_log_error(logger::SequencialLog, idx, error, backtrace=nothing)
+    io = logger.io
+    println(io, "Error in experiment $idx: $error")
+    if !isnothing(backtrace)
+        println(io, "Stacktrace:")
+        showerror(io, error, backtrace)
+    end
+    println(io, "")
+end
+
+struct ThreadsLog <: LogType
+    thread_id::Int
+    log_file::String
+end
+function ThreadsLog(; thread_id, log_dir)
+    mkpath(log_dir)
+    log_file = joinpath(log_dir, "thread_$(thread_id).log")
+    ThreadsLog(thread_id, log_file)
+end
+
+function experiment_log(logger::ThreadsLog, idx, mssg; before=nothing)
+    open(logger.log_file, "a") do io
+        experiment_log(SequencialLog(io), idx, mssg, before=before)
     end
 end
 
-# Nova função para logging de erros com stacktrace
-function thread_logger_error(msg, error, idx, thread_id, log_dir, backtrace=nothing)
-    log_file = joinpath(log_dir, "thread_$(thread_id)_exp_$(idx).log")
-    mkpath(dirname(log_file))
-    open(log_file, "a") do io
-        println(io, "Thread $thread_id, Exp $idx: $msg")
-        println(io, "Error: $error")
-        if !isnothing(backtrace)
-            println(io, "Stacktrace:")
-            showerror(io, error, backtrace)
-        end
-        println(io, "")  # Linha em branco para separar
-        flush(io)
+function experiment_log_error(logger::ThreadsLog, idx, error, backtrace=nothing)
+    open(logger.log_file, "a") do io
+        experiment_log_error(SequencialLog(io), idx, error, backtrace)
     end
 end
 
-function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing; verbose=true)
+function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, stop_func=nothing; verbose=true, use_threads=true)
     exp_cfg = experiment_batch.exp_cfg
     col_cfg = experiment_batch.col_cfg
     init_system = experiment_batch.init_system
     values = experiment_batch.values
-    step_func = experiment_batch.custom_step
 
     mkpath(exp_cfg.root)
 
@@ -211,74 +230,26 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
 
     results = Vector{Union{Nothing, Exception}}(undef, length(values))
 
-    log_dir = joinpath(exp_cfg.root, "logs") 
-
     t1 = time()
 
-    # for i in eachindex(values)
-    @threads for i in eachindex(values)
-        idx = i
-        thread_id = threadid()
-        try
-            exp_value = values[i]
-            
-            
-            # verbose && println("\nExperiment $idx on thread $(threadid())")
-            verbose && thread_logger("\nExperiment $idx on thread $(thread_id)", idx, thread_id, log_dir)
+    logger = nothing
 
-            exp_root = joinpath(exp_cfg.root, "data", string(idx))
-            
-            done_path = joinpath(exp_root, ".done")
-            if isfile(done_path)
-                # verbose && println("$idx: Experiment already completed")
-                verbose && thread_logger("$idx: Experiment already completed", idx, thread_id, log_dir)
-                results[i] = nothing
-                continue
-            end
-            
-            experiment = nothing
-            try
-                experiment = load_experiment(exp_root, step_func)
-                # verbose && println("$idx: Experiment Loaded!")
-                verbose && thread_logger("$idx: Experiment Loaded!", idx, thread_id, log_dir)
-            catch e
-                exp_cfg_i = ExperimentCfg(
-                    tf=exp_cfg.tf,
-                    root=exp_root,
-                    save_final_state=exp_cfg.save_final_state,
-                    checkpoint_cfg=exp_cfg.checkpoint_cfg,
-                )
-
-                system = get_system(init_system, exp_value, idx)
-                experiment = Experiment(
-                    exp_cfg_i, col_cfg, system, 
-                    step_func,
-                )
-            end
-            
-            try
-                formatter = verbose ? NormalFormatter(string(idx)) : SilenceFormatter()
-                run_experiment(experiment, stop_func, prog_kwargs=(formatter=formatter,))
-            catch e
-                if verbose
-                    # println("$idx: Error during experiment: ", e)
-                    # println("Stacktrace:")
-                    # showerror(stdout, e, catch_backtrace())
-                    thread_logger_error("Error during experiment", e, idx, thread_id, log_dir, catch_backtrace())
-                end
-                save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
-                save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
-            end
-
-            results[i] = nothing
-        catch e
-            results[i] = e
+    if use_threads
+        @threads for i in eachindex(values)
             if verbose
-                # println("$idx: Error setting up experiment: ", e)
-                # println("Stacktrace:")
-                # showerror(stdout, e, catch_backtrace())
-                thread_logger_error("Error setting up experiment", e, idx, thread_id, log_dir, catch_backtrace())
+                logger = ThreadsLog(
+                    thread_id=Threads.threadid(), 
+                    log_dir=joinpath(exp_cfg.root, "logs"),
+                )
             end
+            process_experiment(i, experiment_batch, get_system, stop_func, results, logger)
+        end
+    else
+        for i in eachindex(values)
+            if verbose
+                logger = SequencialLog()
+            end
+            process_experiment(i, experiment_batch, get_system, stop_func, results, logger)
         end
     end
 
@@ -291,6 +262,63 @@ function run_experiment_batch(experiment_batch::ExperimentBatch, get_system, sto
 
         t2 = time()
         println("\nTotal time: ", Progress.seconds_to_hhmmss(t2 - t1))
+    end
+end
+
+function process_experiment(idx, experiment_batch, get_system, stop_func, results, exp_logger)
+    exp_cfg = experiment_batch.exp_cfg
+    col_cfg = experiment_batch.col_cfg
+    init_system = experiment_batch.init_system
+    values = experiment_batch.values
+    step_func = experiment_batch.custom_step
+    
+    try
+        exp_value = values[idx]
+
+        exp_root = joinpath(exp_cfg.root, "data", string(idx))
+        done_path = joinpath(exp_root, ".done")
+        
+        if isfile(done_path)
+            experiment_log(exp_logger, idx, "Experiment already completed")
+            results[idx] = nothing
+            return
+        end
+        
+        experiment = nothing
+        try
+            experiment = load_experiment(exp_root, step_func)
+            experiment_log(exp_logger, idx, "Experiment Loaded!")
+        catch e
+            exp_cfg_i = ExperimentCfg(
+                tf=exp_cfg.tf,
+                root=exp_root,
+                save_final_state=exp_cfg.save_final_state,
+                checkpoint_cfg=exp_cfg.checkpoint_cfg,
+            )
+
+            system = get_system(init_system, exp_value, idx)
+            experiment = Experiment(
+                exp_cfg_i, col_cfg, system, 
+                step_func,
+            )
+        end
+        
+        try
+            formatter = isnothing(exp_logger) ? SilenceFormatter() : NormalFormatter(string(idx))
+            run_experiment(experiment, stop_func, prog_kwargs=(formatter=formatter,))
+        catch e
+            experiment_log(exp_logger, idx, "Error during experiment", before="\n")
+            experiment_log_error(exp_logger, idx, e, catch_backtrace())
+            
+            save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
+            save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
+        end
+
+        results[idx] = nothing
+    catch e
+        results[idx] = e
+        experiment_log(exp_logger, idx, "Error setting up experiment", before="\n")
+        experiment_log_error(exp_logger, idx, e, catch_backtrace())
     end
 end
 

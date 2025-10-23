@@ -200,8 +200,8 @@ end
 
 function run_tests()
     tests_func = [
-        # experiment_batch,
-        # load_batch,
+        experiment_batch,
+        load_batch,
         add_experiments_to_batch
     ]
 
