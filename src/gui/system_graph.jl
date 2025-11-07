@@ -3,7 +3,6 @@ module SystemGraphs
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
 export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
 export drawn_borders, colors_from_cmap
-export RingsGraphs
 
 using GLMakie, ColorSchemes, DataStructures, Random
 using Mavi.Systems

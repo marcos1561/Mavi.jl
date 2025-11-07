@@ -1,7 +1,7 @@
 module Experiments
 
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
-export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values
+export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
 export DelayedCfg, ManyColsCfg
 export load_data
 
@@ -76,6 +76,21 @@ function Experiment(
     Experiment(cfg, get_collector(col_cfg, cfg, system), system, custom_step, checkpoint)
 end
 
+save_experiment_configs(experiment::Experiment) = save_experiment_configs(
+    experiment.col.cfg, experiment.cfg
+)
+
+function save_experiment_configs(col_cfg, exp_cfg)
+    open(joinpath(exp_cfg.root, EXP_COL_CONFIGS_NAME), "w") do io
+        JSON3.pretty(io, 
+            Dict(
+                "experiment" => get_obj_save_data_json(exp_cfg), 
+                "collector" => get_obj_save_data_json(col_cfg), 
+            ),
+        )
+    end
+end
+
 function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=nothing)
     if isnothing(prog_kwargs)
         prog_kwargs = ()
@@ -90,15 +105,7 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
     end
 
     save_system_configs(system, cfg.root)
-
-    open(joinpath(cfg.root, EXP_COL_CONFIGS_NAME), "w") do io
-        JSON3.pretty(io, 
-            Dict(
-                "experiment" => get_obj_save_data_json(cfg), 
-                "collector" => get_obj_save_data_json(col.cfg), 
-            ),
-        )
-    end
+    save_experiment_configs(experiment)
 
     col_path = mkpath(joinpath(cfg.root, COL_DIRNAME))
 
@@ -160,6 +167,33 @@ function add_experiments(experiment_batch::ExperimentBatch, extra_values)
         new_values,
         experiment_batch.custom_step,
     ) 
+end
+
+function set_final_time(experiment_batch::ExperimentBatch, tf)
+    experiment_batch = @set experiment_batch.exp_cfg.tf = tf
+
+    root = experiment_batch.exp_cfg.root 
+    for entry in readdir(joinpath(root, "data"), join=true)
+        done_path = joinpath(entry, ".done")
+        if isfile(done_path)
+            rm(done_path)
+        end
+
+        cfg_path = joinpath(entry, EXP_COL_CONFIGS_NAME)
+        if isfile(cfg_path)
+            configs = load_configs(cfg_path)
+            exp_cfg = configs[:experiment]
+            exp_cfg = @set exp_cfg.tf = tf
+            save_experiment_configs(configs[:collector], exp_cfg)
+        end
+    end
+
+    save_experiment_configs(
+        experiment_batch.col_cfg,
+        experiment_batch.exp_cfg,
+    )
+
+    return experiment_batch
 end
 
 abstract type LogType end
@@ -474,6 +508,8 @@ function load_experiment(root, custom_step=nothing)
     exp_cfg = configs[:experiment] 
     col_cfg = configs[:collector] 
     
+    exp_cfg = @set exp_cfg.root = root 
+
     system = load_system(joinpath(root, "configs.json"), joinpath(path, "sys_state"), joinpath(path, "time_info"))
     col_state = load_component_serial(joinpath(path, "col_state"))
 
@@ -489,6 +525,19 @@ function load_experiment_batch(root, custom_step=nothing)
     col_cfg = configs[:collector] 
     values = deserialize(joinpath(root, "values.bin"))
     init_system = load_system(joinpath(root, "init_system"))
+
+    if exp_cfg.root != root
+        exp_cfg = @set exp_cfg.root = root
+        for entry in readdir(joinpath(root, "data"), join=true)
+            cfg_path = joinpath(entry, EXP_COL_CONFIGS_NAME)
+            if isfile(cfg_path)
+                configs = load_configs(cfg_path)
+                exp_cfg_i = configs[:experiment]
+                exp_cfg_i = @set exp_cfg_i.root = entry
+                save_experiment_configs(configs[:collector], exp_cfg_i)
+            end
+        end
+    end
 
     ExperimentBatch(
         exp_cfg=exp_cfg, col_cfg=col_cfg,
