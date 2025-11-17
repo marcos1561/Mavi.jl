@@ -124,7 +124,7 @@ function load_configs(path)
     load_dic_configs(configs)
 end
 
-function load_system(configs, rng, ::StandardSys)
+function load_system(configs, rng, sys_type)
     configs_loaded = load_dic_configs(configs)
     System(
         state=configs_loaded[:state],
@@ -135,6 +135,7 @@ function load_system(configs, rng, ::StandardSys)
         time_info=configs_loaded[:time_info],
         debug_info=configs_loaded[:debug_info],
         rng=rng,
+        sys_type=sys_type
     )
 end
 

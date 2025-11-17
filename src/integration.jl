@@ -348,9 +348,9 @@ end
 function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, LinesCfg{T}}) where T
     state = system.state
     lines = space_cfg.geometry_cfg.lines
-    p_radius = particle_radius(system.dynamic_cfg)
     
     for pid in get_particles_ids(system)
+        p_radius = get_particle_radius(system.dynamic_cfg, state, pid)
         pos_i = state.pos[pid] 
         
         for line in lines

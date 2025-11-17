@@ -11,7 +11,7 @@ module Example
 using Mavi.Rings
 using Mavi.Visualization
 
-using Mavi.Visualization.RingsGraphs
+# using Mavi.Visualization.RingsGraphs
 
 function create_system(;num_particles, num_cols, num_rows)
     interaction_cfg = Configs.HarmTruncCfg(

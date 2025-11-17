@@ -16,13 +16,13 @@ export particle_radius, potential_force
 
 using StaticArrays, StructTypes
 
+# =
+# Geometries 
+# =
 abstract type SpaceData end
 
 get_space_data(space_cfg) = nothing  
     
-# =
-# Geometries 
-# =
 abstract type GeometryCfg end
 
 struct ManyGeometries{G <: Tuple} <: GeometryCfg
@@ -172,6 +172,12 @@ function check_intersection(r1::CircleCfg, r2::RectangleCfg)
     return distance_sqr <= r1.radius^2
 end
 
+function check_intersection(r1::CircleCfg, r2::CircleCfg)
+    diff = r1.center - r2.center
+    dist_sqr = sum(diff.^2)
+    return dist_sqr < (r1.radius + r2.radius)^2
+end
+
 "Return bounding RectangleCfg for given space_cfg."
 function get_bounding_box(geometry_cfg::CircleCfg)
     r = geometry_cfg.radius
@@ -278,8 +284,9 @@ get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cf
 # =
 
 abstract type DynamicCfg end
+abstract type PotentialCfg <: DynamicCfg end
 
-function potential_force(dr, potencial)
+function potential_force(dr, potencial::PotentialCfg)
     potential_force(dr, sqrt(sum(dr.^2)), potencial)
 end
 
@@ -287,32 +294,64 @@ end
 Truncated harmonic potencial configuration.
 
 # Arguments
-- ko:   
-    Coupling constant
+- k_rep:   
+    Repulsive force constant
 
-- ro:   
-    Oscillation center
+- k_atr:   
+    Attraction force constant
 
-- ra:   
-    Maximum distance for which the potential is nonzero
+- dist_eq:   
+    Equilibrium distance (where the force is zero)
+
+- dist_max:   
+    Distance beyond which the potencial is truncated
 """
-@kwdef struct HarmTruncCfg{T<:Number} <: DynamicCfg 
-    ko::T
-    ro::T
-    ra::T
+struct HarmTruncCfg{T<:Number} <: PotentialCfg
+    k_rep::T
+    k_atr::T
+    dist_eq::T
+    dist_max::T
+end
+function HarmTruncCfg(;k_rep, k_atr, dist_eq, dist_max)
+    HarmTruncCfg(promote(k_rep, k_atr, dist_eq, dist_max)...)
+end
+function HarmTruncCfg{T}(; k_rep, k_atr, dist_eq, dist_max) where {T<:Number}
+    HarmTruncCfg{T}(T(k_rep), T(k_atr), T(dist_eq), T(dist_max))
 end
 
 function potential_force(dr, dist, potencial::HarmTruncCfg)
-    if dist > potencial.ra
+    if dist > potencial.dist_max
         return zero(dr)
     end
 
-    fmod = -potencial.ko*(abs(dist) - potencial.ro)
+    dist_eq = potencial.dist_eq
 
-    # println(dist, ", ", fmod)
+    if dist < dist_eq
+        fmod = -potencial.k_rep * (dist/dist_eq - 1)
+    else
+        fmod = -potencial.k_atr * (dist/dist_eq - 1)
+    end
 
-    return fmod/dist * dr
+    return fmod / dist * dr
 end
+
+# @kwdef struct HarmTruncCfg{T<:Number} <: DynamicCfg 
+#     ko::T
+#     ro::T
+#     ra::T
+# end
+
+# function potential_force(dr, dist, potencial::HarmTruncCfg)
+#     if dist > potencial.ra
+#         return zero(dr)
+#     end
+
+#     fmod = -potencial.ko*(abs(dist) - potencial.ro)
+
+#     # println(dist, ", ", fmod)
+
+#     return fmod/dist * dr
+# end
 
 """
 Lennard-Jones potential.
@@ -324,7 +363,7 @@ Lennard-Jones potential.
 - epsilon:   
     Depth of the potential well.
 """
-struct LenJonesCfg{T<:Number} <: DynamicCfg
+struct LenJonesCfg{T<:Number} <: PotentialCfg
     sigma::T
     epsilon::T
 end
@@ -351,10 +390,41 @@ end
     tumble_rate::T
 end
 
-particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
+# particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
 particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
 particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
+particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.dist_eq / 2.0
+
+# ==
+# PotencialFinder
+# ==
+abstract type PotentialFinder{T} <: DynamicCfg end
+
+struct PotentialMatrix{T} <: PotentialFinder{T} 
+    matrix::Matrix{T}
+end
+
+list_potentials(potentials::PotentialCfg) = [potentials]
+
+function list_potentials(potentials::PotentialMatrix)
+    mat = potentials.matrix
+    return [mat[i, j] for i in 1:size(mat, 1) for j in i:size(mat, 2)]
+end
+
+list_self_potentials(potentials::PotentialCfg) = [potentials]
+
+function list_self_potentials(potentials::PotentialMatrix)
+    mat = potentials.matrix
+    return [mat[i, i] for i in axes(mat, 1)]
+end
+
+@inline function get_potential_cfg(type_1, type_2, potential_finder::PotentialMatrix)
+    potential_finder.matrix[type_1, type_2]
+end
+
+@inline get_potential_cfg(type_1, type_2, potential::PotentialCfg) = potential
+
 
 # =
 # Integration Configuration
