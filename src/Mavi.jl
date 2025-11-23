@@ -5,8 +5,8 @@ include("utils.jl")
 end
 
 # Core Stuff
-include("configs.jl")
 include("states.jl")
+include("configs.jl")
 include("init_states.jl")
 include("space_checks.jl")
 include("chunks.jl")
