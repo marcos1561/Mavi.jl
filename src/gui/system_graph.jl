@@ -236,6 +236,20 @@ get_comp_update_data(c::GraphCompDebug) = (_, _) -> DefaultDict{Symbol, Bool}(fa
 get_comp_obs_list(c::GraphComp) = c.obs_list
 get_comp_obs_list(c::GraphCompDebug) = ()
 
+"Returns the default number of unique types used to color particles."
+get_default_num_types(cfg::GraphCompCfg, state, system) = length(state.pos)
+
+"Returns the number of unique types used to color particles."
+function get_comp_num_types(cfg::GraphCompCfg, system)
+    if typeof(cfg.colors_map) <: AbstractArray
+        num_types = length(cfg.colors_map)
+    else
+        num_types = get_default_num_types(cfg, system.state, system)
+    end
+
+    return num_types
+end
+
 function notify_comp_observables(comp::GraphComp, update_list)
     update_all = isnothing(update_list)
     for (name, obs) in pairs(get_comp_obs_list(comp))
@@ -312,8 +326,10 @@ end
 function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
     num_total_particles = length(system.state.pos)
     
+    num_types = get_comp_num_types(cfg, system)
+
     types = get_graph_data(cfg, system.state, system)
-    cmap = get_color_map(cfg.colors_map, length(types), rng=cfg.rng)
+    cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     scatter_plot = scatter!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
@@ -424,8 +440,10 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
         end
     end
 
+    num_types = get_comp_num_types(cfg, system)
+
     types = get_graph_data(cfg, system.state, system)
-    cmap = get_color_map(cfg.colors_map, length(types), rng=cfg.rng)
+    cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
     if isnothing(cfg.stroke_cfg)

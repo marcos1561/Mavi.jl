@@ -468,7 +468,12 @@ function update_szabo!(system::System)
         
         speed = sqrt(sum(abs, vel))
     
-        cross_prod = (pol.x * vel.y - pol.y * vel.x) / speed 
+        if speed > 0
+            cross_prod = (pol.x * vel.y - pol.y * vel.x) / speed 
+        else
+            cross_prod = 0
+        end
+
         if abs(cross_prod) > 1
             cross_prod = sign(cross_prod)
         end

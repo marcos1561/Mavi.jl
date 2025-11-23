@@ -7,7 +7,7 @@ using GLMakie
 using Mavi.Rings
 using Mavi.Rings.States
 using Mavi.Rings.Configs
-import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph
+import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph, get_default_num_types
 
 function update_types_to_ring_id!(types, system)
     for ring_id in axes(system.rings_pos, 2)
@@ -65,6 +65,11 @@ function get_graph_data(cfg::GraphCompCfg, state::RingsState, system::Rings.Syst
     end
     return types
 end
+
+function get_default_num_types(cfg::GraphCompCfg, state::RingsState, system::Rings.System)
+    return size(state.rings_pos, 2)
+end
+
 
 @kwdef struct InvasionsGraphCfg{C, F} <: GraphCompCfg
     color::C = "black"

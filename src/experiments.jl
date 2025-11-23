@@ -423,7 +423,7 @@ struct DelayedCol{S} <: Collector
 end
 function get_collector(cfg::DelayedCfg, exp_cfg::ExperimentCfg, system::System, state=nothing)
     if isnothing(state)
-        item = (deepcopy(system.time_info), deepcopy(system.state))
+        item = (deepcopy(system.time_info), deepcopy(system.state), deepcopy(system.rng))
         past_states = CircularBuffer{typeof(item)}(2)
         push!(past_states, item)
         state = DelayedState(system.time_info.time, past_states)
@@ -439,16 +439,17 @@ function collect(col::DelayedCol, system::System)
     if time_to_last_save > col.cfg.delay_time
         col_state.last_save_time = t
         push!(col_state.sys_states,
-            (deepcopy(system.time_info), deepcopy(system.state))
+            (deepcopy(system.time_info), deepcopy(system.state), deepcopy(system.rng))
         ) 
     end
 end
 
 function save_data(col::DelayedCol, path)
-    times = [time_info.time for (time_info, _) in col.state.sys_states]
+    times = [time_info.time for (time_info, _, _) in col.state.sys_states]
     idx = argmin(times)
     save_component_json(col.state.sys_states[idx][1], path, "time_info")
     save_component_serial(col.state.sys_states[idx][2], path, "state")
+    serialize(joinpath(path, "state/rng.bin"), col.state.sys_states[idx][3])
 end
 
 # =

@@ -105,6 +105,13 @@ function VideoCfg(;path, duration, anim_cfg=nothing, save_configs=false)
         anim_cfg = AnimationCfg()
     end
 
+    valid_extensions = [".mp4", ".avi", ".mov", ".mkv", ".gif"]
+    if !any(endswith(path, ext) for ext in valid_extensions)
+        throw(ArgumentError("The path must point to a valid video file with one of the following extensions: $(join(valid_extensions, ", "))"))
+    end
+
+    mkpath(dirname(path))
+
     VideoCfg(path, duration, anim_cfg, save_configs)
 end
 
