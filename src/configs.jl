@@ -90,6 +90,11 @@ function is_inside(point, r::RectangleCfg; pad=0)
     return is_x && is_y
 end
 
+function is_inside(point, r::CircleCfg; pad=0)
+    dist_sqr = sum((point - r.center).^2)    
+    return dist_sqr <= (r.radius + pad)^2 
+end
+
 struct Line2D{T}
     p1::SVector{2, T}
     p2::SVector{2, T}

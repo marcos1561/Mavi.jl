@@ -128,6 +128,7 @@ function update_particle_chunk!(chunks, i)
     pos_i = pos[i]
     row_id = trunc(Int, div(-pos_i[2] + bottom_left[2] + space_h, chunk_h)) + 1
     col_id = trunc(Int, div(pos_i[1] - bottom_left[1], chunk_l)) + 1
+    
     # row_id = trunc(Int, div(-pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
     # col_id = trunc(Int, div(pos[1, i] - bottom_left[1], chunk_l)) + 1
     
