@@ -218,7 +218,7 @@ ring_num_particles(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, ring
 Returns the equilibrium area of the area force for
 the given number of particles, taking into account `p0`.
 """
-function get_area0(dynamic_cfg, type=nothing)
+function get_area0(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     num_particles = ring_num_particles(dynamic_cfg, type)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
     p0 = get_ring_prop_by_name(dynamic_cfg, :p0, type)
@@ -230,7 +230,7 @@ get_area0(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_
 Returns the p0 at which `area0` is equal to the equilibrium area
 considering only the springs.
 """
-function get_equilibrium_p0(dynamic_cfg::RingsCfg, type=nothing)
+function get_equilibrium_p0(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     num_particles = ring_num_particles(dynamic_cfg, type)
     theta = 2 * π  / num_particles
     return 2 * (num_particles * (1 - cos(theta))/sin(theta))^.5
@@ -243,7 +243,7 @@ Equilibrium area of the polygon formed by the centers of the ring particles.
 
 NOTE: The area contribution from the particles is not considered here.
 """
-function get_equilibrium_area(dynamic_cfg::RingsCfg, type=nothing)
+function get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
 
     num_particles = ring_num_particles(dynamic_cfg, type) 
@@ -300,7 +300,7 @@ The area of a ring is the area of the polygon formed by the centers of its parti
 plus the area of the particles that lies outside this polygon (A_c); this
 function returns A_c.
 """
-function get_particles_area_contribution(dynamic_cfg::RingsCfg, type=nothing)
+function get_particles_area_contribution(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     n = ring_num_particles(dynamic_cfg, type)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
     diameter = get_particle_radius(dynamic_cfg, type) * 2
@@ -317,7 +317,7 @@ get_particles_area_contribution(dynamic_cfg::RingsCfg{U, T, I}) where {U<:Abstra
 Equilibrium radius of the ring, from the center to the outer edge of the particles.
 It is calculated assuming its equilibrium area.
 """
-function get_ring_radius(dynamic_cfg::RingsCfg, type=nothing)
+function get_ring_radius(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     area_eq = get_equilibrium_area(dynamic_cfg, type)
     p_radius = get_particle_radius(dynamic_cfg, type)
     num_particles = ring_num_particles(dynamic_cfg, type)
