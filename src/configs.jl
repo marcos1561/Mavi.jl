@@ -5,9 +5,10 @@ export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg, ManyGeometries 
 export get_bounding_box, check_intersection, signed_pos, is_inside
 export RigidWalls, PeriodicWalls, SlipperyWalls, ManyWalls
-export ForceWalls, PotentialWalls
+export ForceWalls, PotentialWalls, process_dist
 export get_main_wall, get_main_geometry
 export get_space_data, SpaceData
+export get_potential_cfg
 
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksCfg, has_chunks
@@ -15,6 +16,7 @@ export DeviceMode, Sequencial, Threaded
 export particle_radius, potential_force
 
 using StaticArrays, StructTypes
+using Mavi.States
 
 # =
 # Geometries 
@@ -90,11 +92,6 @@ function is_inside(point, r::RectangleCfg; pad=0)
     return is_x && is_y
 end
 
-function is_inside(point, r::CircleCfg; pad=0)
-    dist_sqr = sum((point - r.center).^2)    
-    return dist_sqr <= (r.radius + pad)^2 
-end
-
 struct Line2D{T}
     p1::SVector{2, T}
     p2::SVector{2, T}
@@ -134,7 +131,7 @@ function signed_pos(point, line::Line2D)
         end
     end
 
-    return dr, sqrt(sum(dr.^2))
+    return dr, sqrt(sum(dr.^2)), 1
 end
 
 @kwdef struct LinesCfg{T} <: GeometryCfg
@@ -162,7 +159,12 @@ function signed_pos(point, geometry_cfg::CircleCfg)
     dr = dr - dr_hat * geometry_cfg.radius
     sign_dist = dist - geometry_cfg.radius 
 
-    return dr, sign_dist
+    return dr, abs(sign_dist), sign(sign_dist)
+end
+
+function is_inside(point, r::CircleCfg; pad=0)
+    dist_sqr = sum((point - r.center).^2)    
+    return dist_sqr <= (r.radius + pad)^2 
 end
 
 check_intersection(r1::RectangleCfg, r2::CircleCfg) = check_intersection(r2, r1)
@@ -247,8 +249,33 @@ end
 
 abstract type ForceWalls <: WallType end
 
-struct PotentialWalls{P} <: ForceWalls 
+abstract type PotencialWallMode end
+StructTypes.StructType(::Type{P}) where P <: PotencialWallMode = StructTypes.Struct()
+
+struct Outside <: PotencialWallMode end
+struct Inside <: PotencialWallMode end
+struct Repulsion <: PotencialWallMode end
+
+process_dist(mode::Outside, dist, inside_flag) = inside_flag * dist
+process_dist(mode::Inside, dist, inside_flag) = -inside_flag * dist
+process_dist(mode::Repulsion, dist, inside_flag) = dist
+
+struct PotentialWalls{P, M<:PotencialWallMode} <: ForceWalls 
     potencial::P
+    mode::M
+end
+function PotentialWalls(;potential, mode=:repulsion)
+    if mode isa Symbol
+        mode_map = (
+            outside=Outside(),
+            inside=Inside(),
+            repulsion=Repulsion(),
+        )
+        
+        mode = mode_map[mode]
+    end
+
+    PotentialWalls(potential, mode)
 end
     
 # =
@@ -429,6 +456,19 @@ end
 end
 
 @inline get_potential_cfg(type_1, type_2, potential::PotentialCfg) = potential
+@inline get_potential_cfg(potential, state, pid) = potential
+
+
+struct PotentialVector{T} <: PotentialFinder{T} 
+    vector::Vector{T}
+end
+
+list_potentials(potentials::PotentialVector) = potentials.vector
+
+function get_potential_cfg(potentials::PotentialVector, state, pid) 
+    p_type = get_particle_type(state, pid)
+    return potentials.vector[p_type]
+end 
 
 
 # =

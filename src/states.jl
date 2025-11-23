@@ -5,7 +5,7 @@ export StaticArrays
 using StaticArrays
 
 export SecondLawState, SelfPropelledState, State
-export ActiveState, get_particles_ids, get_num_total_particles, update_ids!
+export ActiveState, get_particles_ids, get_num_total_particles, get_particle_type, update_ids!
 
 # = 
 # Active State used by users
@@ -128,5 +128,7 @@ update_ids!(state) = update_part_ids!(state.part_ids)
 
 get_particles_ids(state) = get_ids(state.part_ids)
 get_num_total_particles(state) = get_num(state.part_ids)
+
+function get_particle_type(state, idx) end
 
 end

@@ -256,23 +256,14 @@ function calc_walls_forces!(system, space_cfg::SpaceCfg, device) end
 
 function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:GeometryCfg} 
     forces = get_forces(system)
+    wall_pot = space_cfg.wall_type
     for i in get_particles_ids(system.state)
         pos = system.state.pos[i]
-        dr, dist = signed_pos(pos, space_cfg.geometry_cfg)
-        f = potential_force(dr, dist, space_cfg.wall_type.potencial)
+        dr, dist, inside_flag = signed_pos(pos, space_cfg.geometry_cfg)
+        dist = process_dist(wall_pot.mode, dist, inside_flag)
+        potential = get_potential_cfg(wall_pot.potencial, system.state, i) 
+        f = potential_force(dr, dist, potential)
         forces[i] += f
-    end
-end
-
-function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:LinesCfg} 
-    forces = get_forces(system)
-    for i in get_particles_ids(system.state)
-        for line in space_cfg.geometry_cfg.lines
-            pos = system.state.pos[i]
-            dr, dist = signed_pos(pos, line)
-            f = potential_force(dr, dist, space_cfg.wall_type.potencial)
-            forces[i] += f
-        end
     end
 end
 

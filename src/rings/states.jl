@@ -4,7 +4,7 @@ export RingsState, ActiveState
 export FixRingsIds, VarRingsIds, get_rings_ids, get_num_active, get_particles_ids, get_num_total_particles, update_ids!
 export has_types_func, add_ring!, remove_ring!
 export num_max_particles, get_ring_id, get_particle_id, get_particle_ring_id, to_scalar_idx, get_inner_neigh_ids
-export ring_num_particles, get_num_active
+export ring_num_particles
 
 using StaticArrays
 
@@ -144,6 +144,8 @@ to_scalar_idx(state::RingsState, ring_id, particle_id) = to_scalar_idx(ring_id, 
 
 @inline get_particle_id(idx, num_max_particles) = idx - (get_ring_id(idx, num_max_particles) - 1) * num_max_particles
 @inline get_particle_id(idx, num_max_particles, ring_id) = idx - (ring_id - 1) * num_max_particles
+
+@inline mv_states.get_particle_type(state::RingsState, idx) = state.types[get_ring_id(state, idx)]
 
 function get_inner_neigh_ids(idx, num_max_particles)
     num_p = num_max_particles
