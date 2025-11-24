@@ -118,6 +118,8 @@ function main(test=false)
         num_rows = 6,
     )
     
+    # Red and bue colors
+    # 
     # colors_map = [:red, :blue]
     # colors::Vector{Symbol} = []
     # for ring_id in 1:size(system.state.rings_pos, 3)
@@ -125,6 +127,8 @@ function main(test=false)
     #     push!(colors, colors_map[t])
     # end
     
+    # Colors from the ends of a color map
+    # 
     colors_map = ColorSchemes.bam
     # colors_map = ColorSchemes.vik
     colors::Vector{RGBf} = []
@@ -141,16 +145,6 @@ function main(test=false)
     anim_cfg = AnimationCfg(
         graph_cfg=CircleGraphCfg(colors_map=colors),
     )
-
-    # num_particles = system.state.num_particles
-    # sum = 0
-    # for ring_id in Rings.States.get_rings_ids(system.state)
-    #     sum += num_particles[system.state.types[ring_id]]
-    # end
-
-
-    # println("num_particles: $(Rings.States.get_num_total_particles(system))")
-    # println("num_particles_check: $sum")
 
     if !test
         animate(system, anim_cfg)

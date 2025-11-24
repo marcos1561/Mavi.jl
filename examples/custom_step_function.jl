@@ -29,7 +29,12 @@ function main(test=false)
                 height=5,
             ), 
         ),
-        dynamic_cfg=HarmTruncCfg(1, 1, 1),
+        dynamic_cfg=HarmTruncCfg(
+            k_rep=1, 
+            k_atr=1, 
+            dist_eq=1,
+            dist_max=1.1,
+        ),
         int_cfg=IntCfg(
             dt=0.1
         ),
@@ -44,7 +49,7 @@ function main(test=false)
 
         # Rigid walls collisions
         geometry_cfg = system.space_cfg.geometry_cfg
-        r = system.dynamic_cfg.ro/2
+        r = system.dynamic_cfg.dist_eq/2
         for i in 1:get_num_total_particles(system)
             if ((state.pos[i].x+r) > geometry_cfg.length) || ((state.pos[i].x-r) < 0)
                 state.vel[i] = state.vel[i] .* SVector(-1, 1)

@@ -39,7 +39,7 @@ function main(test=false)
         pe = potential_energy(system, system.dynamic_cfg)
         ke = kinetic_energy(state)
         
-        push!(energys, ("Potencial", @sprintf("%7.3f", pe)))
+        push!(energys, ("Potential", @sprintf("%7.3f", pe)))
         push!(energys, ("Kinetic", @sprintf("%7.3f", ke)))
         push!(energys, ("Total", @sprintf("%7.3f", pe + ke)))
 

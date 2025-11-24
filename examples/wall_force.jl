@@ -8,7 +8,8 @@ using Mavi.Configs
 using Mavi.InitStates
 using Mavi.Visualization
 
-using StaticArrays, StatsBase
+using StaticArrays
+# StatsBase
 
 function main(test=false)
     # Init state configs
@@ -17,7 +18,12 @@ function main(test=false)
     offset = 0.4
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = HarmTruncCfg(10, 1, 1)
+    dynamic_cfg = HarmTruncCfg(
+        k_rep=10, 
+        k_atr=1,
+        dist_eq=1,
+        dist_max=1.2,
+    )
     radius = particle_radius(dynamic_cfg)
 
     pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
@@ -53,12 +59,21 @@ function main(test=false)
         chunks_cfg=chunks_cfg,
     )
 
+    radius = particle_radius(dynamic_cfg)
+
+    wall_potential = HarmTruncCfg(
+        k_rep=20,
+        k_atr=0,
+        dist_eq=radius,
+        dist_max=radius*1.1,
+    )
+
     system = System(
         state=state, 
         space_cfg=SpaceCfg((
             (RigidWalls(), geometry_cfg),
-            (PotentialWalls(HarmTruncCfg(20.0, radius, radius)), circle_cfg),
-            (PotentialWalls(HarmTruncCfg(20.0, radius, radius)), lines_cfg),
+            (PotentialWalls(potential=wall_potential, mode=:outside), circle_cfg),
+            (PotentialWalls(potential=wall_potential), lines_cfg),
         )),
         dynamic_cfg=dynamic_cfg,
         int_cfg=int_cfg,

@@ -249,19 +249,19 @@ end
 
 abstract type ForceWalls <: WallType end
 
-abstract type PotencialWallMode end
-StructTypes.StructType(::Type{P}) where P <: PotencialWallMode = StructTypes.Struct()
+abstract type PotentialWallMode end
+StructTypes.StructType(::Type{P}) where P <: PotentialWallMode = StructTypes.Struct()
 
-struct Outside <: PotencialWallMode end
-struct Inside <: PotencialWallMode end
-struct Repulsion <: PotencialWallMode end
+struct Outside <: PotentialWallMode end
+struct Inside <: PotentialWallMode end
+struct Repulsion <: PotentialWallMode end
 
 process_dist(mode::Outside, dist, inside_flag) = inside_flag * dist
 process_dist(mode::Inside, dist, inside_flag) = -inside_flag * dist
 process_dist(mode::Repulsion, dist, inside_flag) = dist
 
-struct PotentialWalls{P, M<:PotencialWallMode} <: ForceWalls 
-    potencial::P
+struct PotentialWalls{P, M<:PotentialWallMode} <: ForceWalls 
+    potential::P
     mode::M
 end
 function PotentialWalls(;potential, mode=:repulsion)
@@ -318,12 +318,12 @@ get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cf
 abstract type DynamicCfg end
 abstract type PotentialCfg <: DynamicCfg end
 
-function potential_force(dr, potencial::PotentialCfg)
-    potential_force(dr, sqrt(sum(dr.^2)), potencial)
+function potential_force(dr, potential::PotentialCfg)
+    potential_force(dr, sqrt(sum(dr.^2)), potential)
 end
 
 """
-Truncated harmonic potencial configuration.
+Truncated harmonic potential configuration.
 
 # Arguments
 - k_rep:   
@@ -336,7 +336,7 @@ Truncated harmonic potencial configuration.
     Equilibrium distance (where the force is zero)
 
 - dist_max:   
-    Distance beyond which the potencial is truncated
+    Distance beyond which the potential is truncated
 """
 struct HarmTruncCfg{T<:Number} <: PotentialCfg
     k_rep::T
@@ -351,39 +351,21 @@ function HarmTruncCfg{T}(; k_rep, k_atr, dist_eq, dist_max) where {T<:Number}
     HarmTruncCfg{T}(T(k_rep), T(k_atr), T(dist_eq), T(dist_max))
 end
 
-function potential_force(dr, dist, potencial::HarmTruncCfg)
-    if dist > potencial.dist_max
+function potential_force(dr, dist, potential::HarmTruncCfg)
+    if dist > potential.dist_max
         return zero(dr)
     end
 
-    dist_eq = potencial.dist_eq
+    dist_eq = potential.dist_eq
 
     if dist < dist_eq
-        fmod = -potencial.k_rep * (dist/dist_eq - 1)
+        fmod = -potential.k_rep * (dist/dist_eq - 1)
     else
-        fmod = -potencial.k_atr * (dist/dist_eq - 1)
+        fmod = -potential.k_atr * (dist/dist_eq - 1)
     end
 
     return fmod / dist * dr
 end
-
-# @kwdef struct HarmTruncCfg{T<:Number} <: DynamicCfg 
-#     ko::T
-#     ro::T
-#     ra::T
-# end
-
-# function potential_force(dr, dist, potencial::HarmTruncCfg)
-#     if dist > potencial.ra
-#         return zero(dr)
-#     end
-
-#     fmod = -potencial.ko*(abs(dist) - potencial.ro)
-
-#     # println(dist, ", ", fmod)
-
-#     return fmod/dist * dr
-# end
 
 """
 Lennard-Jones potential.
@@ -402,6 +384,16 @@ end
 function LenJonesCfg(;sigma, epsilon)
     sigma, epsilon = promote(sigma, epsilon)
     LenJonesCfg(sigma, epsilon)
+end
+
+function potential_force(dr, dist, potential::LenJonesCfg)
+    sigma = potential.sigma
+    epsilon = potential.epsilon
+
+    # Force modulus
+    fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
+
+    return fmod/dist * dr 
 end
 
 @kwdef struct SzaboCfg{T<:Number} <: DynamicCfg
@@ -429,7 +421,7 @@ particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.dist_eq / 2.0
 
 # ==
-# PotencialFinder
+# Potential Finder
 # ==
 abstract type PotentialFinder{T} <: DynamicCfg end
 

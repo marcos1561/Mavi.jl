@@ -29,7 +29,7 @@ Here are some `Mavi.jl` features:
 In addition to the core `Mavi` module, there is a module named `Mavi.Rings`, which implements active rings — a model used in this paper: ["Segregation in Binary Mixture with Differential Contraction among Active Rings"](https://link.aps.org/doi/10.1103/PhysRevLett.134.138401) by Teixeira, E., et al (Physical Review Letters, 2025).
 
 - Check out `Mavi.jl` examples in [this folder](/examples/). Animations of these examples can be seen [here](https://www.youtube.com/watch?v=VgV9Pwx5TTA).
-- Mavi Blogs:
+- Blogs posts:
     - [Mavi's Space System](docs/_posts/2025-09-14-space_system.md)
 
 # Index
@@ -77,11 +77,11 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
-    # a rectangular geometry configuration that contains all position (geometry_cfg)
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
     pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
     
     # Creating a state compatible with Newton's Second Law
@@ -106,11 +106,11 @@ function main()
     offset = 0.4 # Space between particles
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential Between particles
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
-    # a rectangular geometry configuration that contains all position (geometry_cfg)
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
     pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
     
     # Creating a state compatible with Newton's Second Law
@@ -147,7 +147,7 @@ function main()
     radius = particle_radius(dynamic_cfg)
 
     # rectangular_grid returns positions in a rectangular grid (`pos`) and
-    # a rectangular geometry configuration that contains all position (geometry_cfg)
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
     pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
     
     # Creating a state compatible with Newton's Second Law
@@ -256,7 +256,7 @@ As examples, `Mavi.Configs` module has these potential structures:
 
 Details about parameters can be found in [configs.jl](src/configs.jl).
 
-`DynamicCfg` is used to calculate forces, users should only implement a method for `calc_interaction(i, j, dynamic_cfg, space_cfg)` (inside module `Mavi.Integration`), where i and j are particles indices (more info in its documentation [`integration.jl`](src/integration.jl)).
+`DynamicCfg` is used to calculate forces, users should only implement a method for `calc_interaction(i, j, dynamic_cfg, space_cfg)` (inside module `Mavi.Integration`), where i and j are particle indices (more info in its documentation [`integration.jl`](src/integration.jl)).
 
 Also, particles radius should be inferred from these configurations, so there exists a function `particle_radius(dynamic_cfg)`. 
 
@@ -336,7 +336,7 @@ Mavi already has functions to integrate some equations of motion, such as:
 - `update_szabo!`: Szabo particles, which follow the equations of motion introduced in the paper ["Phase transition in the collective migration of tissue cells: experiment and model"](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.74.061908) by Szabó, B., et al. (Physical Review E, 2006).
 
 ## How do wall collisions work?
-The method `walls!(system, space_cfg)` (inside module `Mavi.Integration`) is responsible to resolve wall collisions. It dispatches on `space_cfg`, therefore, for instance, to implement rigid walls in a retangular geometry (this method is already implemented on `Mavi.jl`), one should create the method
+The method `walls!(system, space_cfg)` (inside module `Mavi.Integration`) is responsible for resolving wall collisions. It dispatches on `space_cfg`, therefore, for instance, to implement rigid walls in a rectangular geometry (this method is already implemented on `Mavi.jl`), one should create the method
 
 ```julia
 function walls!(system, space_cfg::SpaceCfg{RigidWalls, RectangleCfg})
@@ -346,7 +346,7 @@ end
 
 `walls!` should directly change the state in `system`, resolving the collisions.
 
->Note: See more about how `Mavi` deals with walls collisions in the blog post [Mavi's Space System](docs/_posts/2025-09-14-space_system.md).
+>Note: See more about how `Mavi` deals with wall collisions in the blog post [Mavi's Space System](docs/_posts/2025-09-14-space_system.md).
 # Physical Quantities
 The `Quantities` module contains functions that return physical quantities of interest. Currently, two of them are defined:
 
@@ -360,7 +360,7 @@ The `Quantities` module contains functions that return physical quantities of in
 The example [print_energy.jl](examples/print_energy.jl) uses these functions.
 
 # Running Experiments
-To collect data with simulations, we need to run an experiment. To create an experiment, one needs a system and a `Collector` (object that collect data while the simulation is running). Let's demonstrate how to run an experiment in `Mavi`:
+To collect data with simulations, we need to run an experiment. To create an experiment, one needs a system and a `Collector` (object that collects data while the simulation is running). Let's demonstrate how to run an experiment in `Mavi`:
 
 Given we have a function `create_system` (which creates a system), the first thing to do is to create the experiment configurations
 
@@ -384,11 +384,11 @@ system = create_system()
 
 experiment_cfg = ExperimentCfg(
     tf=10, # Final simulation time
-    root="experiment_data", # Where the experiment date will be sabes
+    root="experiment_data", # Where the experiment data will be saved
 )
 
 collector_cfg = DelayedCfg(
-    delay_time=4, # How much in the past the state is
+    delay_time=4, # How far in the past the state is
 )
 ```
 
@@ -401,11 +401,11 @@ system = create_system()
 
 experiment_cfg = ExperimentCfg(
     tf=10, # Final simulation time
-    root="experiment_data", # Where the experiment date will be sabes
+    root="experiment_data", # Where the experiment data will be saved
 )
 
 collector_cfg = DelayedCfg(
-    delay_time=4, # How much in the past the state is
+    delay_time=4, # How far in the past the state is
 )
 
 experiment = Experiment(experiment_cfg, collector_cfg, system)
@@ -413,15 +413,15 @@ experiment = Experiment(experiment_cfg, collector_cfg, system)
 run_experiment(experiment)
 ```
 
-all data collect by the `Collector` and other things will be inside the `root` path specified when creating `ExperimentCfg`. Here's a list (not complete) of what is saved in an experiment:
+all data collected by the `Collector` and other things will be inside in the `root` path, specified when creating `ExperimentCfg`. Here's a list (not complete) of what is saved in an experiment:
 
 - data: data collected by the `Collector`.
-- final_state: system state just after the experimente finished.
+- final_state: system state just after the experiment finished.
 - configs.json: system configurations used.
 - experiment_configs.json: experiment configurations used.
 
 ## Using checkpoints
-If your experiment takes a lot of time, it's a good ideia to run the experiment with checkpoints, in that way, an experimente can be resumed from a checkpoint if something bad happens. To do that, simply pass a `CheckpointCfg` to `ExperimentCfg`
+If your experiment takes a lot of time, it's a good ideia to run the experiment with checkpoints, in that way, an experiment can be resumed from a checkpoint if something bad happens. To do that, simply pass a `CheckpointCfg` to `ExperimentCfg`
 
 ```julia
 experiment_cfg = ExperimentCfg(
@@ -522,7 +522,7 @@ anim_cfg = AnimationCfg(
     ),
     graph_cfg=MainGraphCfg((
         CircleGraphCfg(), # Render particles as circles
-        NumsGraphCfg(), # Show particles indices
+        NumsGraphCfg(), # Show particle indices
     ))
 )
 

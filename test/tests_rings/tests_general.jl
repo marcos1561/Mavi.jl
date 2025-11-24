@@ -7,7 +7,7 @@ using Mavi.Rings.NeighborsMod
 using Mavi.Rings.Integration: step!
 
 using Mavi.Visualization
-using Mavi.Visualization.RingsGraphs
+# using Mavi.Visualization.RingsGraphs
 
 include("rings_utils.jl")
 using .RingsUtils

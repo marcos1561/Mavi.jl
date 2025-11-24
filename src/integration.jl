@@ -58,38 +58,11 @@ function ChunksMod.update_chunks!(chunks::Chunks{N, T, P, InfoT}) where {N, T, P
     end
 end
 
-"Return force on particle with id `i` exerted by particle with id `j`."
-function calc_interaction(i, j, dynamic_cfg::HarmTruncCfg, system::System)
+"Returns force on particle with id `i` exerted by particle with id `j`."
+function calc_interaction(i, j, dynamic_cfg::Configs.PotentialCfg, system::System)
     pos = system.state.pos
-    space_cfg = system.space_cfg
-
-    dr = calc_diff(pos[i], pos[j], space_cfg)
-    dist = sqrt(sum(dr.^2))
-
-    # Check interaction range
-    if dist > dynamic_cfg.ra
-        return zero(dr)
-    end
-
-    fmod = -dynamic_cfg.ko*(dist - dynamic_cfg.ro) # restoring force
-
-    return fmod/dist * dr
-end
-
-function calc_interaction(i, j, dynamic_cfg::LenJonesCfg, system::System)
-    pos = system.state.pos
-    space_cfg = system.space_cfg
-    
-    dr = calc_diff(pos[i], pos[j], space_cfg)
-    dist = sqrt(sum(dr.^2))
-
-    sigma = dynamic_cfg.sigma
-    epsilon = dynamic_cfg.epsilon
-
-    # Force modulus
-    fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
-
-    return fmod/dist * dr
+    dr = calc_diff(pos[i], pos[j], system.space_cfg)
+    return potential_force(dr, dynamic_cfg)
 end
 
 function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
@@ -261,9 +234,24 @@ function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<
         pos = system.state.pos[i]
         dr, dist, inside_flag = signed_pos(pos, space_cfg.geometry_cfg)
         dist = process_dist(wall_pot.mode, dist, inside_flag)
-        potential = get_potential_cfg(wall_pot.potencial, system.state, i) 
+        potential = get_potential_cfg(wall_pot.potential, system.state, i) 
         f = potential_force(dr, dist, potential)
         forces[i] += f
+    end
+end
+
+function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:LinesCfg} 
+    forces = get_forces(system)
+    wall_pot = space_cfg.wall_type
+    for i in get_particles_ids(system.state)
+        pos = system.state.pos[i]
+        potential = get_potential_cfg(wall_pot.potential, system.state, i) 
+        for line in space_cfg.geometry_cfg.lines
+            dr, dist, inside_flag = signed_pos(pos, line)
+            dist = process_dist(wall_pot.mode, dist, inside_flag)
+            f = potential_force(dr, dist, potential)
+            forces[i] += f
+        end
     end
 end
 

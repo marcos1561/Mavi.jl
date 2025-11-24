@@ -12,7 +12,12 @@ function get_init_system(num_p)
     num_p_x = num_p_y = round(Int, sqrt(num_p))
     num_p = num_p_x * num_p_y
 
-    dynamic_cfg = HarmTruncCfg(10.0, 1.0, 1.0)
+    dynamic_cfg = HarmTruncCfg(
+        k_rep=10.0, 
+        k_atr=3.0, 
+        dist_eq=1.0,
+        dist_max=1.2,
+    )
     radius = particle_radius(dynamic_cfg)
     
     offset = 4 * radius
@@ -47,7 +52,7 @@ end
 
 function get_system(init_system, value, idx)
     system = deepcopy(init_system)
-    system = @set system.dynamic_cfg.ko = Float64(value.ko)
+    system = @set system.dynamic_cfg.k_rep = Float64(value.k_rep)
     system = @set system.int_cfg.dt = Float64(value.dt)
     return system
 end
@@ -75,7 +80,7 @@ function experiment_batch(; remove_data=true, verbose=false)
 
     init_system = get_init_system(30)
 
-    values = [(ko=ko_i, dt=dt_i) for (ko_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
+    values = [(k_rep=k_rep_i, dt=dt_i) for (k_rep_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
 
     exp_batch = ExperimentBatch(
         exp_cfg=exp_cfg,
@@ -115,7 +120,7 @@ function load_batch(; verbose=false)
 
     init_system = get_init_system(10)
 
-    values = [(ko=ko_i, dt=dt_i) for (ko_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
+    values = [(k_rep=k_rep_i, dt=dt_i) for (k_rep_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
 
     exp_batch = ExperimentBatch(
         exp_cfg=exp_cfg,
@@ -151,7 +156,7 @@ function add_experiments_to_batch(verbose=false)
 
     init_system = get_init_system(10)
 
-    values = [(ko=ko_i, dt=dt_i) for (ko_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
+    values = [(k_rep=k_rep_i, dt=dt_i) for (k_rep_i, dt_i) in zip(LinRange(7, 13, 3), LinRange(0.001, 0.01, 3))]
 
     exp_batch = ExperimentBatch(
         exp_cfg=exp_cfg,
@@ -164,7 +169,7 @@ function add_experiments_to_batch(verbose=false)
 
     exp_batch = load_experiment_batch(exp_cfg.root)
     
-    new_values = [(ko=10.0, dt=0.0012), (ko=10.69, dt=0.0021)]
+    new_values = [(k_rep=10.0, dt=0.0012), (k_rep=10.69, dt=0.0021)]
     exp_batch = add_experiments(exp_batch, new_values)
 
     run_experiment_batch(exp_batch, get_system, verbose=verbose)
@@ -174,8 +179,8 @@ function add_experiments_to_batch(verbose=false)
     system4 = load_system(joinpath(exp_cfg.root, "data/4", "final_state"))
     system5 = load_system(joinpath(exp_cfg.root, "data/5", "final_state"))
     
-    correct_configs_4 = system4.dynamic_cfg.ko == new_values[1].ko && system4.int_cfg.dt == new_values[1].dt
-    correct_configs_5 = system5.dynamic_cfg.ko == new_values[2].ko && system5.int_cfg.dt == new_values[2].dt
+    correct_configs_4 = system4.dynamic_cfg.k_rep == new_values[1].k_rep && system4.int_cfg.dt == new_values[1].dt
+    correct_configs_5 = system5.dynamic_cfg.k_rep == new_values[2].k_rep && system5.int_cfg.dt == new_values[2].dt
 
     isdir(exp_cfg.root) && rm(exp_cfg.root, recursive=true)
 
@@ -226,7 +231,7 @@ end
 end # TestExperiments
 
 # TestExperiments.run_tests()
-# TestExperiments.experiment_batch()
+# TestExperiments.experiment_batch(verbose=true)
 # TestExperiments.load_batch()
 # TestExperiments.add_experiments_to_batch()
 # TestExperiments.load_batch()
