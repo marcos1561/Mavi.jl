@@ -31,6 +31,7 @@ In addition to the core `Mavi` module, there is a module named `Mavi.Rings`, whi
 - Check out `Mavi.jl` examples in [this folder](/examples/). Animations of these examples can be seen [here](https://www.youtube.com/watch?v=VgV9Pwx5TTA).
 - Blogs posts:
     - [Mavi's Space System](docs/_posts/2025-09-14-space_system.md)
+    - [How to use the Rings Model](docs/_posts/2025-11-11_rings.md)
 
 # Index
 
