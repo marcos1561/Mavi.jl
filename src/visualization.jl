@@ -145,6 +145,8 @@ ExecInfo(buffer_size) = ExecInfo(
     CircularBuffer{Float64}(buffer_size),
 )
 
+function update_widget(widget, system) end
+
 get_anim_cfg(cfg::AnimationCfg) = cfg
 get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 
@@ -154,7 +156,7 @@ get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:GraphCfg, T} = image_cfg.grap
 get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, cfg=nothing; step_func=nothing)
+function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing)
     if isnothing(step_func)
         step_func = get_step_function(system)
     end
@@ -308,6 +310,13 @@ function animate(system::System, cfg=nothing; step_func=nothing)
             end
         end
 
+        on(events(system_ax).mousebutton) do event
+            if event.button == Mouse.left && event.action == Mouse.press
+                pos = mouseposition(system_ax.scene)
+                println("Data coordinates: ", pos)
+            end
+        end
+
         # Box(main_sidebar_gl[:, 1], cornerradius=5)
         # Box(sidebar_gl[1, 1], color = (:blue, 0.1), strokecolor = :transparent)
         # Box(sidebar_gl[2, 1], color = (:red, 0.1), strokecolor = :transparent)
@@ -320,15 +329,19 @@ function animate(system::System, cfg=nothing; step_func=nothing)
         rowsize!(sidebar_gl, 1, Relative(1/2))
         rowsize!(sidebar_gl, 2, Relative(1/2))
         
-        
         info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
         InfoUIs.update_info_ui(info, exec_info, system)
     else
         system_ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
     end
 
-    graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
+    if isnothing(create_widget)
+        custom_widget = nothing
+    else
+        custom_widget = create_widget(fig, system)
+    end
 
+    graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
 
     context = (
         anim_cfg=anim_cfg,
@@ -350,6 +363,7 @@ function animate(system::System, cfg=nothing; step_func=nothing)
         end
         
         SystemGraphs.update_graph(graph, system)
+        update_widget(custom_widget, system)
     end
 
     function video_frame!(ax, system::System)

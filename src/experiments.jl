@@ -128,6 +128,7 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
         end
     end
     save_data(col, col_path)
+    check_checkpoint(cfg.checkpoint_cfg, experiment, force_save=true)
     
     if cfg.save_final_state
         save_system(system, joinpath(cfg.root, FINAL_STATE_NAME))
@@ -167,6 +168,19 @@ function add_experiments(experiment_batch::ExperimentBatch, extra_values)
         new_values,
         experiment_batch.custom_step,
     ) 
+end
+
+function set_final_time(experiment::Experiment, tf)
+    experiment = @set experiment.cfg.tf = tf
+    
+    done_path = joinpath(experiment.cfg.root, ".done")
+    if isfile(done_path)
+        rm(done_path)
+    end
+
+    save_experiment_configs(experiment)
+
+    return experiment
 end
 
 function set_final_time(experiment_batch::ExperimentBatch, tf)
@@ -456,12 +470,12 @@ end
 # Checkpoint
 # =
 
-function check_checkpoint(cp::Nothing, experiment) end
+function check_checkpoint(cp::Nothing, experiment; force_save=false) end
 
-function check_checkpoint(cfg::CheckpointCfg, experiment) 
+function check_checkpoint(cfg::CheckpointCfg, experiment; force_save=false) 
     cp = experiment.checkpoint
     t = experiment.system.time_info.time
-    if t - cp.last_time < cfg.delta_time
+    if !force_save && t - cp.last_time < cfg.delta_time
         return
     end
     cp.last_time = t
