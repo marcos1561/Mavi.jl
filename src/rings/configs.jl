@@ -23,12 +23,27 @@ using Reexport
 
 abstract type InteractionCfg end
 
+"""
+Harmonic truncated potential. This radial potencial will generate
+a force of the following form
+```
+if dist < dist_eq
+    force_magnitude = -k_rep * (dist/dist_eq - 1)
+elseif dist < dist_max
+    force_magnitude = k_atr * (dist/dist_eq - 1)
+else
+    force_magnitude = 0
+end
+```
+where `dist` is the distance between particles.
+"""
 struct HarmTruncCfg{T<:Number} <: InteractionCfg
     k_rep::T
     k_atr::T
     dist_eq::T
     dist_max::T
 end
+
 function HarmTruncCfg(;k_rep, k_atr, dist_eq, dist_max)
     HarmTruncCfg(promote(k_rep, k_atr, dist_eq, dist_max)...)
 end
@@ -105,6 +120,75 @@ struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFind
     num_types::Int
     interaction_finder::InteracFinderT
 end
+
+"""
+Rings configurations.
+
+# Arguments
+- p0:
+    Parameter controlling how flexible the ring membrane is. It is define as
+    
+    p0 = n * l / A^(1/2) 
+    
+    where n is the number of particles, l the spring length and A the ring
+    area (viewing the ring as a polygon with vertices at its particles positions).
+    
+    It has an equilibrium value p_eq (see docs for `get_equilibrium_p0`), if
+    - p0 > p_eq: The ring is inflated and its membrane is not very flexible.
+    - p0 < p_eq: The ring can be deformed without resistance, therefore its membrane is very flexible.
+
+- relax_time:
+    Relaxation time between the polarization and ring velocity. Lower values
+    induce more collective motion.  
+
+- vo:
+    Activity parameter: specifically, `vo` is the magnitude of the ring's velocity.
+
+- mobility:
+    Factor controlling how important the forces are to dynamics.
+
+- rot_diff:
+    Noise intensity applied to the polarization angle (θ). The noise
+    is added to the time derivative of θ, as a term of the form 
+
+    sqrt(2 * rot_diff) * ξ
+
+    where ξ is a gaussian white noise.
+
+- k_area: 
+    Ring area stiffness. This parameters enters in the potential which
+    tends to preserve the ring area
+    
+    k_area/2 * (A - A_0)^2
+
+    where A is the ring area and A_0 its equilibrium value.
+
+- k_spring:
+    Stiffness of the springs that connect adjacent particles in a ring.
+
+- l_spring:
+    Equilibrium length of the springs that connect adjacent particles in a ring.
+    
+- interaction_finder:
+    An object defining the interaction between different rings. It can be
+    
+    - A potential configuration: It this case, this potential will be used by every
+    interaction between rings.
+    
+    - A potential finder: This object is used when there are different types of rings
+    that interact differently depending on the type. This object defines the potential
+    configuration given the types interacting. Currently, the only potential finder available
+    is the `InteractionMatrix`, which is a matrix of potential configuration, where the element
+    with index (i, j) has the potential configuration for an interaction between types i and j.
+
+- num_particles:
+    How many particles a ring has. If there are more than one type of ring, then a vector
+    must be provided, where the i-th element is the number of particles for the i-th ring type.
+    If not given, this parameter will be automatically inferred by the number of particles in `state`.
+        
+- NumType:
+    Numerical type used. By default, it is automatically calculated using the parameters types. 
+"""
 function RingsCfg(;
     p0, relax_time, vo, mobility, rot_diff, k_area, k_spring, l_spring, 
     interaction_finder, num_particles=-1, NumType=nothing,
