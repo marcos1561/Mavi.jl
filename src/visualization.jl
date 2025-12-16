@@ -16,7 +16,7 @@ using Mavi.Systems
 using Mavi.Configs
 using Mavi.MaviSerder
 using Mavi.Utils.Progress
-using Mavi.Integration: get_step_function
+using Mavi.Integration: get_step_function, system_initialization
 
 include("gui/info_ui.jl")
 include("gui/system_graph.jl")
@@ -160,6 +160,8 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
     if isnothing(step_func)
         step_func = get_step_function(system)
     end
+
+    system_initialization(system)
 
     GLMakie.activate!(; title="Mavi")
 
@@ -424,6 +426,8 @@ function animate(system::System, cfg::ImageCfg, step! = nothing)
     if isnothing(step!)
         step! = get_step_function(system)
     end
+
+    system_initialization(system)
 
     GLMakie.activate!(; title="Mavi")
 

@@ -21,12 +21,12 @@ function main(test=false)
     offset = 0.4
 
     num_p = num_p_x * num_p_y
-    dynamic_cfg = HarmTruncCfg(
-        k_rep=10, 
-        k_atr=1, 
-        dist_eq=1, 
-        dist_max=1.2,
-    )
+    # dynamic_cfg = HarmTruncCfg(
+    #     k_rep=10, 
+    #     k_atr=1, 
+    #     dist_eq=1, 
+    #     dist_max=1.2,
+    # )
     dynamic_cfg = LenJonesCfg(sigma=2, epsilon=4)
 
     radius = particle_radius(dynamic_cfg)

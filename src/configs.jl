@@ -380,18 +380,28 @@ Lennard-Jones potential.
 struct LenJonesCfg{T<:Number} <: PotentialCfg
     sigma::T
     epsilon::T
+    sigma6::T
+    sigma12::T
 end
-function LenJonesCfg(;sigma, epsilon)
+function LenJonesCfg(sigma, epsilon)
     sigma, epsilon = promote(sigma, epsilon)
-    LenJonesCfg(sigma, epsilon)
+    LenJonesCfg(sigma, epsilon, sigma^6, sigma^12)
 end
+LenJonesCfg(;sigma, epsilon) = LenJonesCfg(sigma, epsilon)
 
 function potential_force(dr, dist, potential::LenJonesCfg)
-    sigma = potential.sigma
+    sigma6 = potential.sigma6
+    sigma12 = potential.sigma12
     epsilon = potential.epsilon
 
+    d2 = dist * dist
+    d4 = d2 * d2
+    d6 = d4 * d2
+    d7 = d6 * dist
+    d13 = d6 * d7
+
     # Force modulus
-    fmod = 4*epsilon*(12*sigma^12/dist^13 - 6*sigma^6/dist^7)
+    fmod = 4*epsilon*(12*sigma12/d13 - 6*sigma6/d7)
 
     return fmod/dist * dr 
 end

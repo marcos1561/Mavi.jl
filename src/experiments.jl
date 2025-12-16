@@ -10,7 +10,7 @@ using Base.Threads
 
 using Mavi.Systems
 using Mavi.MaviSerder
-using Mavi.Integration: get_step_function
+using Mavi.Integration: get_step_function, system_initialization
 
 using Mavi.Utils.Progress
 
@@ -27,6 +27,7 @@ abstract type Collector end
 
 function get_collector(col_cfg::ColCfg, exp_cfg, system, state=nothing) end
 function collect(col::Collector, system) end
+function final_collect(col::Collector, system) end
 function save_data(col::Collector, path) end
 function load_data(::Type{ColCfg}, path) end
 
@@ -115,8 +116,9 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
     end
 
     experiment_step! = experiment.custom_step
-
     prog = ProgContinuos(init=system.time_info.time, final=cfg.tf; prog_kwargs...)
+
+    system_initialization(system)
     while system.time_info.time < cfg.tf
         experiment_step!(system)
         collect(col, system)
@@ -128,6 +130,7 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
         end
     end
     save_data(col, col_path)
+    final_collect(col, system)
     check_checkpoint(cfg.checkpoint_cfg, experiment, force_save=true)
     
     if cfg.save_final_state

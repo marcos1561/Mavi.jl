@@ -4,7 +4,7 @@ export newton_step!, szabo_step!, rtp_step!
 export calc_forces!, calc_interaction, walls!
 export calc_diff, calc_diffs_and_dists!
 export update_verlet!, update_rtp!, update_szabo!
-export get_step_function
+export get_step_function, system_initialization
 
 using Base.Threads
 using StaticArrays
@@ -223,8 +223,6 @@ function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
     end
 end
 
-@inline calc_forces!(system::System) = calc_forces!(system, system.chunks, system.int_cfg.device)
-
 function calc_walls_forces!(system, space_cfg::SpaceCfg, device) end
 
 function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<:PotentialWalls, G<:GeometryCfg} 
@@ -264,6 +262,11 @@ function calc_walls_forces!(system::System, space_cfg::SpaceCfg{W, G}, device) w
 end
 
 @inline calc_walls_forces!(system::System) = calc_walls_forces!(system, system.space_cfg, system.int_cfg.device)
+
+function calc_forces!(system::System) 
+    calc_forces!(system, system.chunks, system.int_cfg.device)
+    calc_walls_forces!(system)
+end
 
 function walls!(system::System, space_cfg::SpaceCfg) end
 
@@ -412,7 +415,7 @@ end
 @inline walls!(system::System, space_cfg::SpaceCfg, ::Any) = walls!(system, space_cfg)
 
 "Update state using Velocity-Verlet"
-function update_verlet!(system::System, calc_forces_in!)
+function update_verlet!(system::System)
     state = system.state
     forces = get_forces(system)
     old_forces = copy(forces)
@@ -420,11 +423,12 @@ function update_verlet!(system::System, calc_forces_in!)
     dt = system.int_cfg.dt
 
     # Update positions
-    term = dt^2/2 # quadratic term on accelerated movement
+    term = dt*dt/2 # quadratic term on accelerated movement
     @. state.pos += state.vel * dt + forces * term
 
+    walls!(system)
     clean_forces!(system)
-    calc_forces_in!(system)
+    calc_forces!(system)
 
     # Update velocities
     @. state.vel += dt/2 * (forces + old_forces)
@@ -502,36 +506,38 @@ function update_time!(system)
     system.time_info.num_steps += 1
 end
 
+system_initialization(system) = system_initialization(system, system.type)
+
+function system_initialization(system, sys_type) end
+
+function system_initialization(system, sys_type::StandardSys)
+    update_chunks!(system.chunks)
+    clean_forces!(system)
+    calc_forces!(system)
+end
 
 "Advance system one time step."
-function newton_step!(system::System)
-    clean_forces!(system)
+newton_step!(system::System) = newton_step!(system, system.int_cfg)
+    
+"Advance system one time step."
+function newton_step!(system::System, int_cfg::IntCfg)
+    update_verlet!(system)
     update_chunks!(system.chunks)
-    calc_forces!(system)
-    calc_walls_forces!(system)
-    update_verlet!(system, calc_forces!)
-    walls!(system, system.space_cfg)
     update_time!(system)
 end
 
 function szabo_step!(system::System)
-    clean_forces!(system)
-    update_chunks!(system.chunks)
-    calc_forces!(system)
-    calc_walls_forces!(system)
     update_szabo!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
+    system_initialization(system)
 end
 
 function rtp_step!(system::System)
-    clean_forces!(system)
-    update_chunks!(system.chunks)
-    calc_forces!(system)
-    calc_walls_forces!(system)
     update_rtp!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
+    system_initialization(system)
 end
 
 get_step_function(system) = get_step_function(system.type, system)
