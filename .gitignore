@@ -8,5 +8,6 @@ main
 temp
 test/tmp
 experiments
+docs/build
 count_lines.py
 

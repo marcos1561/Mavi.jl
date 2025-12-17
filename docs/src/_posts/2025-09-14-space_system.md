@@ -1,7 +1,3 @@
----
-title: Mavi's Space System
-author: Marcos Pasa
----
 # Mavi's Space System
 Here's a quick post explain how Mavi deals with systems in spaces with different geometries and border conditions.
 

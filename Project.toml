@@ -19,6 +19,9 @@ Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
+[workspaces]
+projects = ["docs"]
+
 [compat]
 Dates = "1.11.0"
 JSON3 = "1.14.3"
