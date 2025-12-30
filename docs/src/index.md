@@ -20,7 +20,6 @@ Here are some `Mavi.jl` features:
 - Experiment system to collect data from simulations.
 
 - Visualization:
-
     - Real-time rendering of simulations using [Makie](https://docs.makie.org/v0.21/).
 
     - Video generation of simulations.
