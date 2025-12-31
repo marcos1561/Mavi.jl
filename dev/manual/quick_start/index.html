@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quick Start · Mavi Documentation</title><meta name="title" content="Quick Start · Mavi Documentation"/><meta property="og:title" content="Quick Start · Mavi Documentation"/><meta property="twitter:title" content="Quick Start · Mavi Documentation"/><meta name="description" content="Documentation for Mavi Documentation."/><meta property="og:description" content="Documentation for Mavi Documentation."/><meta property="twitter:description" content="Documentation for Mavi Documentation."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Mavi Documentation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Mavi.jl</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../installation/">Installation</a></li><li class="is-active"><a class="tocitem" href>Quick Start</a></li><li><a class="tocitem" href="../philosophy/">Mavi Philosophy</a></li><li><a class="tocitem" href="../expanding_mavi/">Expanding Mavi</a></li><li><a class="tocitem" href="../physical_quantities/">Physical Quantities</a></li><li><a class="tocitem" href="../experiments/">Running Experiments</a></li><li><a class="tocitem" href="../visual_interface/">Visual Interface</a></li></ul></li><li><span class="tocitem">Blog</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Posts</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../posts/2025-11-11_rings/">How to use the Rings system</a></li><li><a class="tocitem" href="../../posts/2025-09-14-space_system/">Mavi&#39;s Space System</a></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Quick Start</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Quick Start</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/marcos1561/Mavi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/marcos1561/Mavi.jl/blob/main/docs/src/manual/quick_start.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Quick-Start"><a class="docs-heading-anchor" href="#Quick-Start">Quick Start</a><a id="Quick-Start-1"></a><a class="docs-heading-anchor-permalink" href="#Quick-Start" title="Permalink"></a></h1><p>Let&#39;s create a gas of particles. The first thing we need to do is create the system&#39;s state. Particles&#39; positions will be initialized at the vertices of a rectangular grid with random velocities. To initialize the positions, we need to know the particle radius, which is defined by the interaction potential between them (in this example we will use a Lennard-Jones potential). The particle radius can be accessed via the <code>particle_radius()</code> function:  </p><pre><code class="language-julia hljs">using Mavi.Configs
+using Mavi.States
+using Mavi.InitStates
+
+function main()
+    # Init state configs
+    num_p_x = 10 # Number of particles in the x direction
+    num_p_y = 10 # Number of particles in the y direction
+    offset = 0.4 # Space between particles
+
+    num_p = num_p_x * num_p_y
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
+    radius = particle_radius(dynamic_cfg)
+
+    # rectangular_grid returns positions in a rectangular grid (`pos`) and
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
+    pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
+    
+    # Creating a state compatible with Newton&#39;s Second Law
+    state = SecondLawState(
+        pos=pos,
+        vel=random_vel(num_p, 1/5),
+    )
+end</code></pre><p>Next, we need to specify the space where the particles live. Luckily, <code>rectangular_grid()</code> already gives us a geometry configuration that contains all the positions created, we only need to specify how the walls behave (we will use rigid walls)</p><pre><code class="language-julia hljs">using Mavi.Configs
+using Mavi.States
+using Mavi.InitStates
+
+function main()
+    # Init state configs
+    num_p_x = 25 # Number of particles in the x direction
+    num_p_y = 25 # Number of particles in the y direction
+    offset = 0.4 # Space between particles
+
+    num_p = num_p_x * num_p_y
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
+    radius = particle_radius(dynamic_cfg)
+
+    # rectangular_grid returns positions in a rectangular grid (`pos`) and
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
+    pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
+    
+    # Creating a state compatible with Newton&#39;s Second Law
+    state = SecondLawState(
+        pos=pos,
+        vel=random_vel(num_p, 1/5),
+    )
+
+    # Creating space configurations
+    space_cfg = SpaceCfg(
+        wall_type=RigidWalls(),
+        geometry_cfg=geometry_cfg,
+    )
+end</code></pre><p>Now we can put it all together in a <code>System</code> and animate! </p><pre><code class="language-julia hljs">using Mavi
+using Mavi.Configs
+using Mavi.States
+using Mavi.InitStates
+
+using Mavi.Visualization
+
+function main()
+    # Init state configs
+    num_p_x = 10 # Number of particles in the x direction
+    num_p_y = 10 # Number of particles in the y direction
+    offset = 0.4 # Space between particles
+
+    num_p = num_p_x * num_p_y
+    dynamic_cfg = LenJonesCfg(sigma=1, epsilon=1) # Interaction potential between particles
+    radius = particle_radius(dynamic_cfg)
+
+    # rectangular_grid returns positions in a rectangular grid (`pos`) and
+    # a rectangular geometry configuration that contains all positions (geometry_cfg)
+    pos, geometry_cfg = rectangular_grid(num_p_x, num_p_y, offset, radius)
+    
+    # Creating a state compatible with Newton&#39;s Second Law
+    state = SecondLawState(
+        pos=pos,
+        vel=random_vel(num_p, 1/5),
+    )
+
+    # Creating space configurations
+    space_cfg = SpaceCfg(
+        wall_type=RigidWalls(),
+        geometry_cfg=geometry_cfg,
+    )
+
+    system = System(
+        state=state, 
+        space_cfg=space_cfg,
+        dynamic_cfg=dynamic_cfg,
+        int_cfg=IntCfg(dt=0.01), # Configurations related to how the system is integrated, such as the time step (dt)
+    )
+
+    animate(system)
+end</code></pre><p>After running <code>main()</code>, you should see this:</p><p><img src="../../images/quick_start.png" alt="Quick Start simulation snapshot"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../installation/">« Installation</a><a class="docs-footer-nextpage" href="../philosophy/">Mavi Philosophy »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 31 December 2025 12:32">Wednesday 31 December 2025</span>. Using Julia version 1.12.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
