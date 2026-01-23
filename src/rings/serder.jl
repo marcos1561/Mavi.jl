@@ -98,21 +98,18 @@ end
 # ==
 
 function MaviSerder.load_system(configs, rng, ::RingsSys)
-    configs_loaded = load_dic_configs(configs)
-
     RingsSystem(
-        state=configs_loaded[:state],
-        space_cfg=configs_loaded[:space_cfg],
-        dynamic_cfg=configs_loaded[:dynamic_cfg],
-        int_cfg=configs_loaded[:int_cfg],
-        p_neighbors_cfg=configs_loaded[:info][:p_neighbors_cfg],
-        r_neighbors_cfg=configs_loaded[:info][:r_neighbors_cfg],
-        source_cfg=configs_loaded[:info][:source_cfg],
-        user_data=configs_loaded[:info][:user_data],
-        time_info=configs_loaded[:time_info],
+        state=configs[:state],
+        space_cfg=configs[:space_cfg],
+        dynamic_cfg=configs[:dynamic_cfg],
+        int_cfg=configs[:int_cfg],
+        p_neighbors_cfg=configs[:info][:p_neighbors_cfg],
+        r_neighbors_cfg=configs[:info][:r_neighbors_cfg],
+        source_cfg=configs[:info][:source_cfg],
+        user_data=configs[:info][:user_data],
+        time_info=configs[:time_info],
         rng=rng,
     )
-
 end
 
 

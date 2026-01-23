@@ -1,7 +1,7 @@
 module MaviSerder
 
 export save_system, save_system_configs, save_component_serial, save_component_json, get_obj_save_data_json
-export load_system, load_dic_configs, load_component, load_component_serial, load_component_json, load_configs
+export load_system, load_dic_configs, load_component, load_component_serial, load_component_json, load_configs, load_system_configs, load_state
 
 using Serialization, JSON3, Random
 using StaticArrays
@@ -124,8 +124,21 @@ function load_configs(path)
     load_dic_configs(configs)
 end
 
+function load_system_configs(path) 
+    configs = JSON3.read(path)
+    configs = convert(Dict{Symbol, Any}, configs)
+    sys_type = eval(Meta.parse(configs[:sys_type]))
+    configs = load_dic_configs(configs)
+    configs[:sys_type] = sys_type
+    return configs
+end
+
+function load_state(path)
+    load_info = get_load_info_serial(path)
+    load_component(get_saved_type(load_info), get_saved_data(load_info))
+end
+
 function load_system(configs, rng, sys_type)
-    configs_loaded = load_dic_configs(configs)
     System(
         state=configs_loaded[:state],
         space_cfg=configs_loaded[:space_cfg],
@@ -158,6 +171,7 @@ function load_system(configs_path::String, state_path::String, time_info_path=no
     end
     # rng = deserialize(joinpath(state_path, "rng.bin"))
 
+    configs = load_dic_configs(configs)
     load_system(configs, rng, sys_type)
 end
 

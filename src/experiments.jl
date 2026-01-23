@@ -129,8 +129,8 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
             break
         end
     end
-    save_data(col, col_path)
     final_collect(col, system)
+    save_data(col, col_path)
     check_checkpoint(cfg.checkpoint_cfg, experiment, force_save=true)
     
     if cfg.save_final_state

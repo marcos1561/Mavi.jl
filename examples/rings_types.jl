@@ -8,7 +8,7 @@ Simulation with Rings using different ring types. Description:
 """
 module Example
 
-using ColorSchemes
+import Mavi.Visualization.SystemGraphs: ColorSchemes
 
 using Mavi.Rings
 using Mavi.Rings.Configs 

@@ -18,7 +18,7 @@ function update_types_to_ring_id!(types, system)
     end
 end
 
-function get_graph_data(cfg::GraphCfg, state::RingsState, system::Rings.System)
+function get_graph_data(cfg::GraphCfg, state::RingsState)
     num_p = length(state.pos)
 
     types = Vector{Int}(undef, num_p)
@@ -39,7 +39,7 @@ function get_graph_data(cfg::GraphCfg, state::RingsState, system::Rings.System)
     return (pos=pos, types=types)
 end
 
-function update_graph_data(cfg::MainGraph, state::RingsState, system::Rings.System)
+function update_graph_data(cfg::MainGraph, state::RingsState)
     pos = cfg.pos
     idx = 1
     num_total_particles = 0
@@ -55,7 +55,7 @@ function update_graph_data(cfg::MainGraph, state::RingsState, system::Rings.Syst
     cfg.pos_obs[] = @view pos[1:num_total_particles]
 end
 
-function get_graph_data(cfg::GraphCompCfg, state::RingsState, system::Rings.System)
+function get_graph_data(cfg::GraphCompCfg, state::RingsState)
     types = Vector{Int}(undef, length(state.pos))
     num_max_p = num_max_particles(state)
     for ring_id in axes(state.rings_pos, 2)
@@ -66,7 +66,7 @@ function get_graph_data(cfg::GraphCompCfg, state::RingsState, system::Rings.Syst
     return types
 end
 
-function get_default_num_types(cfg::GraphCompCfg, state::RingsState, system::Rings.System)
+function get_default_num_types(cfg::GraphCompCfg, state::RingsState)
     return size(state.rings_pos, 2)
 end
 

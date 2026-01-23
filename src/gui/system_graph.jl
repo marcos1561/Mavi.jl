@@ -112,6 +112,8 @@ function get_color_map(cmap::Symbol, num_types; rng=nothing)
     end
 end
 
+get_color_map(cmap::ColorScheme, num_types; rng=nothing) = cmap
+
 """
 Returns a list of colors for the given particles, to be used in plotting.
 
@@ -178,6 +180,9 @@ function get_graph(ax, system, cfg::GraphCfg) end
 "Updates the graph to the next frame."
 function update_graph(graph::Graph, system) end
 
+
+@inline get_graph_data(graph_cfg, system::System) = get_graph_data(graph_cfg, get_particles_state(system.state))
+
 """
 Data used by Graph.
 
@@ -189,11 +194,12 @@ Data used by Graph.
 
     OBS: pos is a reference to system.state.pos
 """
-function get_graph_data(graph_cfg::GraphCfg, state::State, system)
-    num_p = length(system.state.pos)
+function get_graph_data(graph_cfg::GraphCfg, state::State)
+    num_p = length(state.pos)
     return (pos=state.pos, types=Vector(1:num_p))
 end
-@inline get_graph_data(graph::GraphCfg, system) = get_graph_data(graph, system.state, system)
+
+@inline update_graph_data(graph, system::System) = update_graph_data(graph, get_particles_state(system.state))
 
 """
 Updates the graph data but do not notify observables, only return a
@@ -209,8 +215,7 @@ There are two return options:
 - Nothing  
     Informs that every observable should be notified.
 """
-update_graph_data(graph::Graph, state::State, system::System) = DefaultDict{Symbol, Bool}(false)
-@inline update_graph_data(graph::Graph, system) = update_graph_data(graph, system.state, system)
+update_graph_data(graph::Graph, state::State) = DefaultDict{Symbol, Bool}(false)
 
 # =
 # Graph Components
@@ -226,7 +231,7 @@ Data used by a component Graph.
 # Returns
     Vector with particles indices in the pos Vector.
 """
-get_graph_data(graph_cfg::GraphCompCfg, state::State, system) = Vector(1:length(state.pos))
+get_graph_data(graph_cfg::GraphCompCfg, state::State) = Vector(1:length(state.pos))
 
 "Returns the function to update the graph component data (particles types)."
 get_comp_update_data(c::GraphComp) = c.cfg.update_data
@@ -237,14 +242,14 @@ get_comp_obs_list(c::GraphComp) = c.obs_list
 get_comp_obs_list(c::GraphCompDebug) = ()
 
 "Returns the default number of unique types used to color particles."
-get_default_num_types(cfg::GraphCompCfg, state, system) = length(state.pos)
+get_default_num_types(cfg::GraphCompCfg, state) = length(state.pos)
 
 "Returns the number of unique types used to color particles."
 function get_comp_num_types(cfg::GraphCompCfg, system)
     if typeof(cfg.colors_map) <: AbstractArray
         num_types = length(cfg.colors_map)
     else
-        num_types = get_default_num_types(cfg, system.state, system)
+        num_types = get_default_num_types(cfg, get_particles_state(system.state))
     end
 
     return num_types
@@ -277,7 +282,7 @@ Drawn particles using scatter.
 
 # Arguments
 - `colors_map`:  
-    Mapping for types to colors. It can be:
+    Mapping of types to colors. It can be:
     - :random  
         Random colors for each type
     - A colormap name as symbol  
@@ -313,10 +318,10 @@ function ScatterGraphCfg(;colors_map=:random, update_data=nothing, kwargs=nothin
     ScatterGraphCfg(colors_map, kwargs, update_data, rng)
 end
 
-struct ScatterGraph{O, C, P, PosObs} <: GraphComp
-    types::Vector{Int}
+struct ScatterGraph{T, C, CMAP, P, O, PosObs} <: GraphComp
+    types::Vector{T}
     colors::Vector{C}
-    cmap::Vector{C}
+    cmap::CMAP
     plot::P
     obs_list::O
     pos_obs::PosObs
@@ -324,13 +329,17 @@ struct ScatterGraph{O, C, P, PosObs} <: GraphComp
 end
 
 function get_graph(ax, pos_obs, system, cfg::ScatterGraphCfg)
-    num_total_particles = length(system.state.pos)
+    num_total_particles = length(get_particles_state(system.state).pos)
     
     num_types = get_comp_num_types(cfg, system)
 
-    types = get_graph_data(cfg, system.state, system)
+    types = get_graph_data(cfg, system)
     cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
+
+    if cmap isa ColorScheme
+        types = Float64.(types)
+    end
 
     scatter_plot = scatter!(ax, [zero(eltype(pos_obs[]))]; cfg.kwargs...)
 
@@ -424,25 +433,27 @@ struct CircleGraph{C, P, O, PosObs} <: GraphComp
 end
 
 function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
-    num_total_particles = length(system.state.pos)
+    num_total_particles = length(get_particles_state(system.state).pos)
 
     # TODO: Make cfg.circle_radius work with dispatch system
     if cfg.circle_radius == -1
         radius = Vector{Float64}(undef, num_total_particles)
     else
-        if cfg.circle_radius <: Number
+        if typeof(cfg.circle_radius) <: Number
             radius = fill(Float64(cfg.circle_radius), num_total_particles) 
         elseif length(cfg.circle_radius) != num_total_particles
             throw(ArgumentError(
                 "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
                 "the same as number of particles ($(num_total_particles))"
             ))
+        else
+            radius = cfg.circle_radius
         end
     end
 
     num_types = get_comp_num_types(cfg, system)
 
-    types = get_graph_data(cfg, system.state, system)
+    types = get_graph_data(cfg, system)
     cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
     colors = Vector{eltype(cmap)}(undef, num_total_particles)
 
@@ -467,7 +478,12 @@ function update_graph(comp::CircleGraph, system)
 
     particles_ids = get_particles_ids(system)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
-    radius = get_radius!(comp.radius, system.dynamic_cfg, system.state, particles_ids)
+    
+    if comp.cfg.circle_radius == -1
+        radius = get_radius!(comp.radius, system.dynamic_cfg, get_particles_state(system.state), particles_ids)
+    else
+        radius = comp.radius[1:length(particles_ids)]
+    end
 
     pos = comp.pos_obs[]
     
@@ -536,7 +552,7 @@ end
 
 "Build the Graph respective to `cfg` using the given `grid_layout` from Makie."
 function get_graph(ax, system, cfg::MainGraphCfg)
-    data = get_graph_data(cfg, system.state, system)
+    data = get_graph_data(cfg, system)
     pos_obs = Observable(data.pos)
 
     drawn_borders(ax, system.space_cfg.geometry_cfg)
@@ -573,7 +589,7 @@ function update_graph_data(graph::MainGraph, part_ids::States.AbstractParticleId
     graph.pos_obs[] = @view pos[1:get_num_total_particles(state)]
 end
 
-function update_graph_data(graph::MainGraph, state::State, system::System)
+function update_graph_data(graph::MainGraph, state::State)
     update_graph_data(graph, state.part_ids, state)
 end
 
