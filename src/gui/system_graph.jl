@@ -1,8 +1,8 @@
 module SystemGraphs
 
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
-export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
-export drawn_borders, colors_from_cmap
+export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
+export drawn_borders, colors_from_cmap, get_graph_cfg
 
 using GLMakie, ColorSchemes, DataStructures, Random
 using Mavi.Systems
@@ -268,6 +268,9 @@ function update_graph(comp::GraphComp, system)
     update_list = get_comp_update_data(comp)(comp, system)
     notify_comp_observables(comp, update_list)
 end
+
+get_graph_cfg(cfg) = cfg
+get_graph_cfg(cfg::G) where {G<:GraphCompCfg} = MainGraphCfg(cfg)
 
 
 struct ScatterGraphCfg{C, KW, F} <: GraphCompCfg
@@ -599,6 +602,28 @@ function update_graph(graph::MainGraph, system)
         update_graph(c, system)
     end
     notify(graph.pos_obs)
+end
+
+# ==
+# ManyGraphs
+# ==
+
+struct ManyGraphsCfg{T<:Tuple} <: GraphCfg
+    graphs_cfg::T
+end
+
+struct ManyGraphs{T<:Tuple} <: Graph
+    graphs::T
+end
+
+function get_graph(ax, system, cfg::ManyGraphsCfg)
+    ManyGraphs(tuple([get_graph(ax, system, get_graph_cfg(cfg_i)) for cfg_i in cfg.graphs_cfg]...))
+end
+
+function update_graph(graph::ManyGraphs, system)
+    for graph_i in graph.graphs
+        update_graph(graph_i, system)
+    end
 end
 
 include("../rings/view.jl")

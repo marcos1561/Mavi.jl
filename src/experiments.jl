@@ -409,8 +409,14 @@ function get_collector(cfg::ManyColsCfg, exp_cfg::ExperimentCfg, system::System,
 end
 
 function collect(col::ManyCols, system::System)
-    for col in values(col.cols)
-        collect(col, system)
+    for col_i in values(col.cols)
+        collect(col_i, system)
+    end
+end
+
+function final_collect(col::ManyCols, system)
+    for col_i in values(col.cols)
+        final_collect(col_i, system)
     end
 end
 

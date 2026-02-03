@@ -4,7 +4,7 @@ module Visualization
 export animate, random_colors
 export AnimationCfg, VideoCfg, ImageCfg, UiSettings
 export DefaultInfoUICfg
-export MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
+export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
 export drawn_borders, colors_from_cmap
 
 using GLMakie
@@ -150,10 +150,12 @@ function update_widget(widget, system) end
 get_anim_cfg(cfg::AnimationCfg) = cfg
 get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 
-get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:GraphCfg, I} = anim_cfg.graph_cfg
-get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:SystemGraphs.GraphCompCfg, I} = MainGraphCfg(anim_cfg.graph_cfg)
-get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:GraphCfg, T} = image_cfg.graph_cfg
-get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
+# get_graph_cfg(cfg) = cfg
+# get_graph_cfg(cfg::G) where {G<:SystemGraphs.GraphCompCfg} = MainGraphCfg(cfg)
+# get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:GraphCfg, I} = anim_cfg.graph_cfg
+# get_graph_cfg(anim_cfg::AnimationCfg{G, I}) where {G<:SystemGraphs.GraphCompCfg, I} = MainGraphCfg(anim_cfg.graph_cfg)
+# get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:GraphCfg, T} = image_cfg.graph_cfg
+# get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
 function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing)
@@ -343,7 +345,7 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
         custom_widget = create_widget(fig, system)
     end
 
-    graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg))
+    graph = SystemGraphs.get_graph(system_ax, system, get_graph_cfg(anim_cfg.graph_cfg))
 
     context = (
         anim_cfg=anim_cfg,
@@ -444,7 +446,7 @@ function animate(system::System, cfg::ImageCfg, step! = nothing)
     fig = Figure(; fig_kwargs...)
     ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
 
-    graph = SystemGraphs.get_graph(ax, system, get_graph_cfg(cfg))
+    graph = SystemGraphs.get_graph(ax, system, get_graph_cfg(cfg.graph_cfg))
 
     ti = system.time_info.time
     while system.time_info.time - ti < cfg.tf
