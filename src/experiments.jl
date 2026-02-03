@@ -3,6 +3,8 @@ module Experiments
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
 export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
 export DelayedCfg, ManyColsCfg
+export CartesianProdVals
+export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range
 export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
@@ -147,6 +149,69 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
     return
 end
 
+abstract type ExpValues end
+
+Base.length(exp_values::ExpValues) = length(exp_values.values)
+Base.eachindex(exp_values::ExpValues) = eachindex(exp_values.values)
+get_exp_value(exp_values::ExpValues, idx) = exp_values.values[idx] 
+get_all_exp_value(exp_values::ExpValues) = exp_values.values 
+
+function add_exp_values!(exp_values::ExpValues, new_vals)
+    for v in new_vals
+        push!(exp_values.values, v)
+    end
+end
+
+struct VectorVals{T} <: ExpValues 
+    values::Vector{T}
+end
+
+struct CartesianProdVals{RT, V} <: ExpValues
+    names::Vector{Symbol}
+    ranges::Vector{RT}
+    values::V
+end
+function CartesianProdVals(; names, ranges)
+    prod = Base.collect(Iterators.product(ranges...))
+    CartesianProdVals(names, ranges, vec(prod))
+end
+
+function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, Int})
+    name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
+    fixed_values = Dict(name_to_idx[n] => exp_values.ranges[name_to_idx[n]][i] for (n, i) in pairs(fixed))
+    result = Int[]
+    for (idx, val) in enumerate(exp_values.values)
+        if all(val[k] == v for (k, v) in fixed_values)
+            push!(result, idx)
+        end
+    end
+    return result
+end
+
+# function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, Int})
+#     name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
+#     fixed = Dict(name_to_idx[n] => i for (n, i) in pairs(fixed))
+#     sizes = [length(vs) for vs in exp_values.ranges]
+
+#     result = Int[]
+#     total = prod(sizes)
+#     for idx in 1:total
+#         # Convert linear index to cartesian indices
+#         inds = CartesianIndices(Tuple(sizes))[idx]
+#         inds_tuple = Tuple(inds)
+#         match = all(inds_tuple[k] == v for (k,v) in fixed)
+#         if match
+#             push!(result, idx)
+#         end
+#     end
+#     return result
+# end
+
+function get_exp_range(exp_values::CartesianProdVals, name) 
+    name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
+    return exp_values.ranges[name_to_idx[name]]
+end
+
 struct ExperimentBatch{C<:ColCfg, S<:System, V, F}
     exp_cfg::ExperimentCfg
     col_cfg::C
@@ -158,19 +223,25 @@ function ExperimentBatch(; exp_cfg, col_cfg, init_system, values, custom_step=no
     if isnothing(custom_step)
         custom_step = get_step_function(init_system.type, init_system)
     end
+
+    if values isa Vector
+        values = VectorVals(values)
+    end
+
     ExperimentBatch(exp_cfg, col_cfg, init_system, values, custom_step)
 end
 
 function add_experiments(experiment_batch::ExperimentBatch, extra_values)
-    new_values = vcat(experiment_batch.values, extra_values)
+    add_exp_values!(experiment_batch.values, extra_values)
+    # new_values = vcat(experiment_batch.values, extra_values)
 
-    ExperimentBatch(
-        experiment_batch.exp_cfg,
-        experiment_batch.col_cfg,
-        experiment_batch.init_system,
-        new_values,
-        experiment_batch.custom_step,
-    ) 
+    # ExperimentBatch(
+    #     experiment_batch.exp_cfg,
+    #     experiment_batch.col_cfg,
+    #     experiment_batch.init_system,
+    #     new_values,
+    #     experiment_batch.custom_step,
+    # ) 
 end
 
 function set_final_time(experiment::Experiment, tf)
@@ -324,7 +395,7 @@ function process_experiment(idx, experiment_batch, get_system, stop_func, result
     step_func = experiment_batch.custom_step
     
     try
-        exp_value = values[idx]
+        exp_value = get_exp_value(values, idx)
 
         exp_root = joinpath(exp_cfg.root, "data", string(idx))
         done_path = joinpath(exp_root, ".done")
