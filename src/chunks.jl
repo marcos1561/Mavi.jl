@@ -7,12 +7,12 @@ using StaticArrays
 # using Mavi.States: State, get_particles_ids
 using Mavi.Configs
 
-struct Chunks{N, T, P, InfoT}
+struct Chunks{N, T, W, P, InfoT}
     num_cols::Int
     num_rows::Int
     chunk_length::Float64
     chunk_height::Float64
-    geometry_cfg::RectangleCfg{N, T}
+    space_cfg::SpaceCfg{W, RectangleCfg{N, T}}
     steps_to_update::Int
 
     pos::P
@@ -24,7 +24,16 @@ struct Chunks{N, T, P, InfoT}
     num_particles_in_chunk::Array{Int, 2}
 end
 function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, pos, particle_r; extra_info=nothing) where {W, N, T}
-    neighbors = get_neighbors(num_rows, num_cols, get_main_wall(space_cfg.wall_type))
+    wall_type = get_main_wall(space_cfg.wall_type)
+    
+    num_rows_all = num_rows
+    num_cols_all = num_cols
+    # if !(wall_type isa PeriodicWalls)
+    #     num_rows_all = num_rows + 2
+    #     num_cols_all = num_cols + 2
+    # end
+   
+    neighbors = get_neighbors(num_rows_all, num_cols_all, wall_type)
     
     chunk_length = space_cfg.geometry_cfg.length / num_cols
     chunk_height = space_cfg.geometry_cfg.height / num_rows
@@ -32,10 +41,11 @@ function Chunks(num_cols, num_rows, space_cfg::SpaceCfg{W, RectangleCfg{N, T}}, 
     nc = (ceil(0.5*chunk_length/particle_r) + 1) * ((ceil(0.5*chunk_height/particle_r) + 1))
     # nc = trunc(Int, ceil(nc*1.1))
     nc = trunc(Int, ceil(nc*2))
-    chunk_particles = Array{Int}(undef, nc, num_rows, num_cols)
-    num_particles_in_chunk = zeros(Int, num_rows, num_cols)
+    
+    chunk_particles = Array{Int}(undef, nc, num_rows_all, num_cols_all)
+    num_particles_in_chunk = zeros(Int, num_rows_all, num_cols_all)
 
-    Chunks(num_cols, num_rows, chunk_length, chunk_height, space_cfg.geometry_cfg, 1, 
+    Chunks(num_cols_all, num_rows_all, chunk_length, chunk_height, space_cfg, 1, 
         pos, extra_info, neighbors, chunk_particles, num_particles_in_chunk)
 end
 
@@ -49,7 +59,8 @@ end
 get_chunk_rect(chunks::Chunks, id) = get_chunk_rect(chunks, Tuple(id)...)
 function get_chunk_rect(chunks::Chunks, row_id, col_id)
     up, right = SVector(0, 1), SVector(1, 0) 
-    tl = chunks.geometry_cfg.bottom_left + chunks.geometry_cfg.height * up
+    geometry_cfg = chunks.space_cfg.geometry_cfg
+    tl = geometry_cfg.bottom_left + geometry_cfg.height * up
     l, h = chunks.chunk_length, chunks.chunk_height
     return RectangleCfg(
         length=l,
@@ -117,29 +128,54 @@ function get_neighbors(num_rows, num_cols, wall_type)
     return neighbors
 end
 
+function process_grid_pos(wall_type, chunks::Chunks, row, col)
+    # row, col = row+1, col+1
+    
+    if row > chunks.num_rows
+        row = chunks.num_rows
+    elseif row < 1
+        row = 1
+    end
+    if col > chunks.num_cols
+        col = chunks.num_cols
+    elseif col < 1
+        col = 1
+    end
+
+    return row, col
+end
+process_grid_pos(wall_type::PeriodicWalls, chunks::Chunks, row, col) = mod(row - 1, chunks.num_rows) + 1, mod(col - 1, chunks.num_cols) + 1
+
 function update_particle_chunk!(chunks, i)
     pos = chunks.pos
 
-    space_h = chunks.geometry_cfg.height
-    bottom_left = chunks.geometry_cfg.bottom_left
+    wall_type, geometry_cfg = chunks.space_cfg.wall_type, chunks.space_cfg.geometry_cfg
+
+    space_h = geometry_cfg.height
+    bottom_left = geometry_cfg.bottom_left
     chunk_l, chunk_h = chunks.chunk_length, chunks.chunk_height
 
-    
     pos_i = pos[i]
-    row_id = trunc(Int, div(-pos_i[2] + bottom_left[2] + space_h, chunk_h)) + 1
-    col_id = trunc(Int, div(pos_i[1] - bottom_left[1], chunk_l)) + 1
-    
-    # row_id = trunc(Int, div(-pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
-    # col_id = trunc(Int, div(pos[1, i] - bottom_left[1], chunk_l)) + 1
-    
+    # row_id = trunc(Int, div(-pos_i[2] + bottom_left[2] + space_h, chunk_h)) + 1
+    # col_id = trunc(Int, div(pos_i[1] - bottom_left[1], chunk_l)) + 1
+
+    # @show pos_i
+    # @show bottom_left
+    # @show space_h
+    # @show chunk_h
+
+    row_id = trunc(Int, fld(-pos_i[2] + bottom_left[2] + space_h, chunk_h) + 1)
+    col_id = trunc(Int, fld(pos_i[1] - bottom_left[1], chunk_l) + 1)
+
     # if occursin("RingsState", string(typeof(chunks.extra_info)))
     #     println(pos_i)
     #     println(row_id, ", ", col_id)
     #     println("====")
     # end
-
-    row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
-    col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
+    
+    # row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
+    # col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
+    row_id, col_id = process_grid_pos(wall_type, chunks, row_id, col_id)
 
     p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
     chunks.chunk_particles[p_i, row_id, col_id] = i 

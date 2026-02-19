@@ -138,7 +138,7 @@ function load_state(path)
     load_component(get_saved_type(load_info), get_saved_data(load_info))
 end
 
-function load_system(configs, rng, sys_type)
+function load_system(configs_loaded, rng, sys_type)
     System(
         state=configs_loaded[:state],
         space_cfg=configs_loaded[:space_cfg],

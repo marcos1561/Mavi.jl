@@ -3,7 +3,7 @@ module Experiments
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
 export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
 export DelayedCfg, ManyColsCfg
-export CartesianProdVals
+export CartesianProdVals, VectorVals
 export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range
 export load_data
 

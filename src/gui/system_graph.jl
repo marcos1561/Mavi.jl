@@ -4,7 +4,7 @@ export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
 export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
-using GLMakie, ColorSchemes, DataStructures, Random
+using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
 using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
@@ -358,7 +358,7 @@ function update_graph(comp::ScatterGraph, system)
     particles_ids = get_particles_ids(system)
     colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
     pos = comp.pos_obs[]
-    points = [Point2f(p) for p in pos]
+    points = [Point(p...) for p in pos]
 
     Makie.update!(comp.plot, points; color=colors)
 end

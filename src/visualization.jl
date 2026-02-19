@@ -158,7 +158,7 @@ get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 # get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing)
+function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing, is_3D=false)
     if isnothing(step_func)
         step_func = get_step_function(system)
     end
@@ -198,7 +198,13 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
 
     if !is_video
         system_gl = fig[1, 2] = GridLayout()
-        system_ax = Axis(system_gl[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        
+        if is_3D
+            system_ax = Axis3(system_gl[1, 1]; ax_kwargs...)
+        else
+            system_ax = Axis(system_gl[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        end
+
         # system_ax = Axis(system_gl[1, 1]; aspect=DataAspect())
 
         main_sidebar_gl = fig[1, 1] = GridLayout()
@@ -336,7 +342,11 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
         info = InfoUIs.get_info_ui(info_gl, anim_cfg.info_cfg)
         InfoUIs.update_info_ui(info, exec_info, system)
     else
-        system_ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        if is_3D
+            system_ax = Axis3(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        else
+            system_ax = Axis(fig[1, 1]; aspect=DataAspect(), ax_kwargs...)
+        end
     end
 
     if isnothing(create_widget)
