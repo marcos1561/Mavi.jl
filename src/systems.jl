@@ -1,7 +1,7 @@
 module Systems
 
 export System, StandardSys
-export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius
+export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius, get_cm, reset_time
 
 using StaticArrays, Serialization, JSON3, StructTypes, Random
 
@@ -30,6 +30,10 @@ end
 mutable struct TimeInfo
     num_steps::Int
     time::Float64
+end
+function reset(time_info::TimeInfo) 
+    time_info.num_steps = 0
+    time_info.time = 0
 end
 
 abstract type SystemType end
@@ -113,6 +117,8 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
     System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, space_data, time_info, info, debug_info, sys_type, rng)
 end
 
+reset_time(system) = reset(system.time_info)
+
 # @inline get_forces(system) = @view system.forces[:, :, 1]
 @inline get_forces(system) = system.forces[1]
 
@@ -134,9 +140,12 @@ get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cf
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
+get_cm(system, state, entity_id) = state.pos[entity_id]
+
 States.get_num_total_particles(system::System) = get_num_total_particles(system.state)
 
 States.get_particles_ids(system::System) = get_particles_ids(system.state)
+States.get_entities_ids(system::System) = get_entities_ids(system.state)
 
 States.update_ids!(system::System) = update_ids!(system.state)
 

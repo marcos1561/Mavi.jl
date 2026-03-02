@@ -28,10 +28,11 @@ export run_system
 using .States
 export StaticArrays
 
+include("experiments.jl")
+
 # Special Systems 
 include("rings/rings.jl")
 
-include("experiments.jl")
 include("visualization.jl")
 
 end

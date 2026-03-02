@@ -461,7 +461,7 @@ function update_szabo!(system::System)
             cross_prod = sign(cross_prod)
         end
 
-        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn()
+        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn(system.rng)
         
         state.pos[i] += vel * dt
         state.pol_angle[i] += d_theta

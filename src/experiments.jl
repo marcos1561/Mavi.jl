@@ -4,7 +4,7 @@ export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
 export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
 export DelayedCfg, ManyColsCfg
 export CartesianProdVals, VectorVals
-export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range
+export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range, add_exp_values, add_exp_values!
 export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
@@ -186,6 +186,30 @@ function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, I
         end
     end
     return result
+end
+
+function add_exp_values!(exp_values::CartesianProdVals, name, new_vals)
+    ranges_for_new_values = []
+    # ranges_new = []
+    for (idx, r) in enumerate(exp_values.ranges)
+        if exp_values.names[idx] == name
+            push!(ranges_for_new_values, new_vals)
+            exp_values.ranges[idx] = vcat(r, new_vals)
+            # push!(ranges_new, vcat(r, new_vals))
+        else
+            push!(ranges_for_new_values, r)
+            # push!(ranges_new, r)
+        end
+    end
+
+    extra_values = vec(Base.collect(Iterators.product(ranges_for_new_values...)))
+    append!(exp_values.values, extra_values)
+    return exp_values
+    # return CartesianProdVals(
+    #     exp_values.names,
+    #     ranges_new,
+    #     vcat(exp_values.values, extra_values),
+    # )
 end
 
 # function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, Int})
@@ -645,6 +669,6 @@ function load_experiment_batch_values(root)
     return deserialize(joinpath(root, "values.bin"))
 end
 
-include("rings/collectors.jl")
+include("collectors/cm_quantities.jl")
 
 end # Collectors

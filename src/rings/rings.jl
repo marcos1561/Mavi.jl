@@ -222,7 +222,7 @@ include("integration.jl")
 include("utils.jl")
 include("init_states.jl")
 include("serder.jl")
-include("collectors.jl")
+# include("collectors.jl")
 
 # =
 # Rings System
@@ -289,6 +289,8 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
 
     return system
 end
+
+Mavi.Systems.get_cm(system, state::RingsState, entity_id) = system.info.cms[entity_id]
 
 function system_deepcopy(system::System, sys_type::RingsSys)
     sources = system.info.sources

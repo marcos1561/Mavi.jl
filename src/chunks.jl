@@ -159,10 +159,13 @@ function update_particle_chunk!(chunks, i)
     # row_id = trunc(Int, div(-pos_i[2] + bottom_left[2] + space_h, chunk_h)) + 1
     # col_id = trunc(Int, div(pos_i[1] - bottom_left[1], chunk_l)) + 1
 
+    # println("pos[$i] = $pos_i")
+    # @show any(isnan, pos_i)
     # @show pos_i
-    # @show bottom_left
     # @show space_h
+    # @show bottom_left
     # @show chunk_h
+    # @show chunk_l
 
     row_id = trunc(Int, fld(-pos_i[2] + bottom_left[2] + space_h, chunk_h) + 1)
     col_id = trunc(Int, fld(pos_i[1] - bottom_left[1], chunk_l) + 1)

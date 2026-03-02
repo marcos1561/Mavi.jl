@@ -227,6 +227,7 @@ function mv_states.update_ids!(state::RingsState)
 end
 
 mv_states.get_particles_ids(state::RingsState) = mv_states.get_ids(state.rings_ids)
+mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state)
 mv_states.get_num_total_particles(state::RingsState) = mv_states.get_num(state.rings_ids)
 
 end
