@@ -188,6 +188,11 @@ function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, I
     return result
 end
 
+function get_exp_value(exp_values::CartesianProdVals, idx, name::Symbol)
+    name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
+    return exp_values.values[idx][name_to_idx[name]]
+end
+
 function add_exp_values!(exp_values::CartesianProdVals, name, new_vals)
     ranges_for_new_values = []
     # ranges_new = []
