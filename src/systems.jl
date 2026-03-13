@@ -149,7 +149,7 @@ States.get_entities_ids(system::System) = get_entities_ids(system.state)
 
 States.update_ids!(system::System) = update_ids!(system.state)
 
-function system_deepcopy(system, sys_type::StandardSys)
+function system_deepcopy(system, sys_type)
     System(
         state=deepcopy(system.state),
         space_cfg=deepcopy(system.space_cfg),

@@ -32,6 +32,7 @@ function collect(col::Collector, system) end
 function final_collect(col::Collector, system) end
 function save_data(col::Collector, path) end
 function load_data(::Type{ColCfg}, path) end
+stop_col_func(col::Collector) = false
 
 # = 
 # Experiment
@@ -126,6 +127,10 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
         collect(col, system)
         check_checkpoint(cfg.checkpoint_cfg, experiment)
         show_progress(prog, system.time_info.time)
+
+        if stop_col_func(col)
+            break
+        end
 
         if stop_func(system)
             break
@@ -253,8 +258,8 @@ function ExperimentBatch(; exp_cfg, col_cfg, init_system, values, custom_step=no
         custom_step = get_step_function(init_system.type, init_system)
     end
 
-    if values isa Vector
-        values = VectorVals(values)
+    if values isa Union{Vector, LinRange}
+        values = VectorVals(Base.collect(values))
     end
 
     ExperimentBatch(exp_cfg, col_cfg, init_system, values, custom_step)

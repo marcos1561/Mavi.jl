@@ -9,7 +9,6 @@ using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
 
-
 "Drawn the borders of `geometry_cfg`."
 function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
     l, h = geometry_cfg.length, geometry_cfg.height

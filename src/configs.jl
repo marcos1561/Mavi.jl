@@ -11,11 +11,11 @@ export get_space_data, SpaceData
 export get_potential_cfg
 
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
-export IntCfg, ChunksCfg, has_chunks
+export IntCfg, ChunksCfg, has_chunks, get_chunks_cfg_from_cell_size
 export DeviceMode, Sequencial, Threaded
 export particle_radius, potential_force
 
-using StaticArrays, StructTypes
+using StaticArrays, StructTypes, Random
 using Mavi.States
 
 # =
@@ -90,6 +90,16 @@ function is_inside(point, r::RectangleCfg; pad=0)
     is_x = r.bottom_left[1] - pad <= point[1] <= r.bottom_left[1] + r.length + pad
     is_y = r.bottom_left[2] - pad <= point[2] <= r.bottom_left[2] + r.height + pad
     return is_x && is_y
+end
+
+function random_points(geometry_cfg::RectangleCfg, n)
+    T = eltype(geometry_cfg.bottom_left)
+    num_dims = length(geometry_cfg.bottom_left)
+    points = Vector{SVector{num_dims, T}}(undef, n)
+    for i in 1:n
+        points[i] = geometry_cfg.bottom_left + rand(SVector{num_dims, T}) .* geometry_cfg.size
+    end
+    return points
 end
 
 struct Line2D{T}
@@ -487,6 +497,10 @@ struct Sequencial <: DeviceMode end
 @kwdef struct ChunksCfg
     num_cols::Int
     num_rows::Int
+end
+function get_chunks_cfg_from_cell_size(cell_size, rect_cfg::RectangleCfg)
+    num_cells = floor.(Int, rect_cfg.size ./ cell_size)
+    return ChunksCfg(num_cells...)
 end
 
 @kwdef struct IntCfg{T<:Number, ChunkT<:Union{ChunksCfg, Nothing}, Device<:DeviceMode, ExtraT} <: AbstractIntCfg 

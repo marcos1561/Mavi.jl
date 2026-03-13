@@ -506,11 +506,11 @@ function update_time!(system)
     system.time_info.num_steps += 1
 end
 
-system_initialization(system) = system_initialization(system, system.type)
+system_initialization(system) = system_initialization(system.type, system)
 
-function system_initialization(system, sys_type) end
+function system_initialization(sys_type, system) end
 
-function system_initialization(system, sys_type::StandardSys)
+function system_initialization(sys_type::StandardSys, system)
     update_chunks!(system.chunks)
     clean_forces!(system)
     calc_forces!(system)
