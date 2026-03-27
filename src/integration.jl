@@ -13,6 +13,7 @@ using DataStructures
 using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
+using Mavi.MovableObjects
 using Mavi.ChunksMod
 
 const THREAD_ID_MAP::Dict{Int, Int} = Dict{Int, Int}()
@@ -263,9 +264,32 @@ end
 
 @inline calc_walls_forces!(system::System) = calc_walls_forces!(system, system.space_cfg, system.int_cfg.device)
 
+function calc_movable_objects_forces!(system, movable_objects) end
+
+function calc_movable_objects_forces!(system, movable_objects::Vector{M}) where M <: MovableObject 
+    forces = get_forces(system)
+    for object in movable_objects
+        potential = object.potential
+        state = object.state
+        for i in get_particles_ids(system.state)
+            pos = system.state.pos[i]
+            dr, dist, inside_flag = signed_pos(pos, state)
+            # dist = process_dist(wall_pot.mode, dist, inside_flag)
+            # potential = get_potential_cfg(wall_pot.potential, system.state, i) 
+            f = potential_force(dr, dist, potential)
+            # @show f
+            forces[i] += f
+            object.force -= f
+        end
+    end
+end
+
+calc_movable_objects_forces!(system) = calc_movable_objects_forces!(system, get_movable_objects(system.state))
+
 function calc_forces!(system::System) 
     calc_forces!(system, system.chunks, system.int_cfg.device)
     calc_walls_forces!(system)
+    calc_movable_objects_forces!(system)
 end
 
 function walls!(system::System, space_cfg::SpaceCfg) end
@@ -434,6 +458,15 @@ function update_verlet!(system::System)
     @. state.vel += dt/2 * (forces + old_forces)
 end
 
+function update_movable_objects!(movable_objects::Nothing, dynamic_cfg, int_cfg) end
+function update_movable_objects!(movable_objects::Vector{M}, int_cfg) where M <: MovableObject 
+    for object in movable_objects
+        update_object!(object, int_cfg)
+    end
+end
+
+update_movable_objects!(system) = update_movable_objects!(get_movable_objects(system.state), system.int_cfg)
+
 function update_szabo!(system::System)
     state::SelfPropelledState = system.state
     forces = get_forces(system)
@@ -466,6 +499,8 @@ function update_szabo!(system::System)
         state.pos[i] += vel * dt
         state.pol_angle[i] += d_theta
     end
+
+    update_movable_objects!(system)
 end
 
 function update_rtp!(system::System)

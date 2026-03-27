@@ -1,13 +1,14 @@
 module SystemGraphs
 
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
-export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg
+export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
 using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
 using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
+using Mavi.MovableObjects
 
 "Drawn the borders of `geometry_cfg`."
 function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
@@ -622,6 +623,43 @@ end
 function update_graph(graph::ManyGraphs, system)
     for graph_i in graph.graphs
         update_graph(graph_i, system)
+    end
+end
+
+# ==
+# MovableObjects
+# ==
+struct MovableObjectsCfg{M <: MovableObject} <: GraphCfg 
+    movable_objects::Vector{M}
+end
+
+struct MovableObjectsGraph <: Graph 
+    cfg::MovableObjectsCfg
+    objects_states::Vector
+end
+
+function init_movable_object_graph(state::LineState, object::MovableObject, ax)
+    line_obs = Observable(state)
+    lines!(ax, lift(l -> [l.p1, l.p2], line_obs), color="black")
+
+    return line_obs
+end
+
+function update_movable_object_graph(graph_state::Observable, object)
+    graph_state[] = object.state
+end
+
+function get_graph(ax, system, cfg::MovableObjectsCfg)
+    graph_states = []
+    for object in cfg.movable_objects
+        push!(graph_states, init_movable_object_graph(object.state, object, ax)) 
+    end
+    MovableObjectsGraph(cfg, graph_states)
+end
+
+function update_graph(graph::MovableObjectsGraph, system)
+    for (graph_state, object) in zip(graph.objects_states, graph.cfg.movable_objects)
+        update_movable_object_graph(graph_state, object)
     end
 end
 

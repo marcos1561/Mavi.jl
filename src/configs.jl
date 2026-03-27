@@ -102,7 +102,9 @@ function random_points(geometry_cfg::RectangleCfg, n)
     return points
 end
 
-struct Line2D{T}
+abstract type AbstractLine end
+
+struct Line2D{T} <: AbstractLine
     p1::SVector{2, T}
     p2::SVector{2, T}
     normal::SVector{2, T}

@@ -10,6 +10,7 @@ using Mavi.States
 using Mavi.SpaceChecks
 using Mavi.ChunksMod
 using Mavi.Configs
+using Mavi.MovableObjects
 
 function get_chunks(chunks_cfg::Union{ChunksCfg, Nothing}, space_cfg::SpaceCfg, pos, dynamic_cfg, extra_info=nothing)
     if isnothing(chunks_cfg)
@@ -122,10 +123,20 @@ reset_time(system) = reset(system.time_info)
 # @inline get_forces(system) = @view system.forces[:, :, 1]
 @inline get_forces(system) = system.forces[1]
 
+function clean_movable_objects_forces!(movable_objects) end
+function clean_movable_objects_forces!(movable_objects::Vector{M}) where M <: MovableObject
+    zero_force = zero(movable_objects[1].force)
+    for object in movable_objects
+        object.force = zero_force
+    end
+end
+clean_movable_objects_forces!(system::System) = clean_movable_objects_forces!(get_movable_objects(system.state))
+
 @inline function clean_forces!(system)
     for f in system.forces
         f .= Scalar(zero(eltype(f)))
     end
+    clean_movable_objects_forces!(system)
 end
 
 function particles_radius(dynamic_cfg, state)

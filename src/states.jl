@@ -6,6 +6,7 @@ using StaticArrays
 
 export SecondLawState, SelfPropelledState, State
 export ActiveState, get_particles_ids, get_num_total_particles, get_particle_type, update_ids!, get_particles_state, get_entities_ids
+export get_movable_objects
 
 # = 
 # Active State used by users
@@ -101,12 +102,13 @@ end
 SecondLawState(; pos, vel, active_state=nothing) = SecondLawState(pos, vel, active_state)
 
 "Overdamped and self propelled state (positions and polarizations)"
-struct SelfPropelledState{N, T, PID <: Union{ParticleIds, AbstractVector}} <: State{N, T}
+struct SelfPropelledState{N, T, PID <: Union{ParticleIds, AbstractVector}, MO} <: State{N, T}
     pos::Vector{SVector{N, T}}
     pol_angle::Vector{T}
     part_ids::PID
+    movable_objects::MO
 end
-function SelfPropelledState(;pos, pol_angle, active_state=nothing)
+function SelfPropelledState(;pos, pol_angle, active_state=nothing, movable_objects=nothing)
     if pos isa Matrix
         pos = copy(reinterpret(SVector{size(pos, 1), eltype(pos)}, vec(pos)))
     end
@@ -121,6 +123,7 @@ function SelfPropelledState(;pos, pol_angle, active_state=nothing)
         pos,
         pol_angle,
         get_particles_ids_obj(active_state, pos),
+        movable_objects,
     )
 end
 
@@ -131,6 +134,9 @@ get_entities_ids(state) = get_particles_ids(state)
 get_num_total_particles(state) = get_num(state.part_ids)
 
 get_particles_state(state) = state
+
+get_movable_objects(state) = nothing
+get_movable_objects(state::SelfPropelledState) = state.movable_objects
 
 function get_particle_type(state, idx) end
 
