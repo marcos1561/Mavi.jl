@@ -629,12 +629,11 @@ end
 # ==
 # MovableObjects
 # ==
-struct MovableObjectsCfg{M <: MovableObject} <: GraphCfg 
-    movable_objects::Vector{M}
-end
+struct MovableObjectsCfg <: GraphCfg end
 
-struct MovableObjectsGraph <: Graph 
+struct MovableObjectsGraph{M <: MovableObject} <: Graph 
     cfg::MovableObjectsCfg
+    movable_objects::Vector{M}
     objects_states::Vector
 end
 
@@ -651,14 +650,15 @@ end
 
 function get_graph(ax, system, cfg::MovableObjectsCfg)
     graph_states = []
-    for object in cfg.movable_objects
+    movable_objects = get_movable_objects(system.state)
+    for object in movable_objects
         push!(graph_states, init_movable_object_graph(object.state, object, ax)) 
     end
-    MovableObjectsGraph(cfg, graph_states)
+    MovableObjectsGraph(cfg, movable_objects, graph_states)
 end
 
 function update_graph(graph::MovableObjectsGraph, system)
-    for (graph_state, object) in zip(graph.objects_states, graph.cfg.movable_objects)
+    for (graph_state, object) in zip(graph.objects_states, graph.movable_objects)
         update_movable_object_graph(graph_state, object)
     end
 end

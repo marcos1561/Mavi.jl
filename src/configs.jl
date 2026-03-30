@@ -27,6 +27,79 @@ get_space_data(space_cfg) = nothing
     
 abstract type GeometryCfg end
 
+function is_inside(point, geometry::GeometryCfg; pad) 
+    throw(NotImplementedError("is_inside not implemented for $(typeof(geometry))"))
+end
+
+function num_dimensions(geometry::GeometryCfg) 
+    throw(NotImplementedError("num_dimensions not implemented for $(typeof(geometry))"))
+end
+
+function check_intersection(geometry_1::GeometryCfg, geometry_2::GeometryCfg)
+    throw(NotImplementedError("check_intersection not implemented for $(typeof(geometry_1))-$(typeof(geometry_2))"))
+end
+
+function get_bounding_box(geometry::GeometryCfg)
+    throw(NotImplementedError("get_bounding_box not implemented for $(typeof(geometry))"))
+end
+
+function signed_pos(point, geometry::GeometryCfg)
+    throw(NotImplementedError("signed_pos not implemented for $(typeof(geometry_1))"))
+end
+
+function random_point(geometry::GeometryCfg)
+    throw(NotImplementedError("random_point not implemented for $(typeof(geometry))"))
+end
+
+function get_numerical_type(geometry::GeometryCfg) 
+    throw(NotImplementedError("get_numerical_type not implemented for $(typeof(geometry))"))
+end 
+
+function get_num_dimensions(geometry::GeometryCfg) 
+    throw(NotImplementedError("get_num_dimensions not implemented for $(typeof(geometry))"))
+end
+    
+function random_points(geometry::GeometryCfg, n)
+    T, D = get_numerical_type(geometry), get_num_dimensions(geometry)
+    points = Vector{SVector{D, T}}(undef, n)
+    for i in 1:n
+        points[i] = random_point(geometry)
+    end
+    return points
+end
+
+function random_points_no_overlap(geometry::GeometryCfg, n; radius=0, max_attempts=10, offset=0)
+    T, D = get_numerical_type(geometry), get_num_dimensions(geometry)
+    points = Vector{SVector{D, T}}(undef, n)
+    r2 = radius^2
+    for i in 1:n
+        found_point = false
+        num_attempts = 0
+        while !found_point
+            if num_attempts >= max_attempts
+                error("Could not find a valid point!")
+            end
+            num_attempts += 1
+
+            found_point = true
+            p_try = random_point(geometry)
+            for p in points[1:(i-1)]
+                if sum((p_try - p).^2) < r2
+                    found_point = false
+                    break
+                end
+            end
+            
+            if signed_pos(p_try, geometry)[2] < offset
+                found_point = false
+            else
+                points[i] = p_try
+            end
+        end
+    end
+    return points
+end
+
 struct ManyGeometries{G <: Tuple} <: GeometryCfg
     list::G
 end
@@ -65,6 +138,9 @@ function RectangleCfg(points; offset=0)
     )
 end
 
+get_numerical_type(geometry::RectangleCfg{N, T}) where {N, T} = T 
+get_num_dimensions(geometry::RectangleCfg{N, T}) where {N, T} = N 
+
 function Base.:+(a::RectangleCfg, b::RectangleCfg)
     max_x = max(a.bottom_left[1] + a.length, b.bottom_left[1] + b.length)
     max_y = max(a.bottom_left[2] + a.height, b.bottom_left[2] + b.height)
@@ -92,14 +168,27 @@ function is_inside(point, r::RectangleCfg; pad=0)
     return is_x && is_y
 end
 
-function random_points(geometry_cfg::RectangleCfg, n)
-    T = eltype(geometry_cfg.bottom_left)
-    num_dims = length(geometry_cfg.bottom_left)
-    points = Vector{SVector{num_dims, T}}(undef, n)
-    for i in 1:n
-        points[i] = geometry_cfg.bottom_left + rand(SVector{num_dims, T}) .* geometry_cfg.size
-    end
-    return points
+function random_point(geometry_cfg::RectangleCfg{N, T}) where {N, T}
+    geometry_cfg.bottom_left + rand(SVector{N, T}) .* geometry_cfg.size
+end
+
+function signed_pos(point, geometry_cfg::RectangleCfg)
+    dr = point - geometry_cfg.bottom_left
+
+    dist_faces_1 = -dr 
+    dist_faces_2 = dr - geometry_cfg.size
+    dist_faces = vcat(dist_faces_1, dist_faces_2)
+
+    min_dist, idx = findmin(abs.(dist_faces))
+    sign_dist = dist_faces[idx] 
+
+    D = length(dr)
+    dr = zeros(eltype(dr), D)
+    face_type = idx <= D ? 1 : 2
+    possible_signs = [-1, 1]
+    dr[mod1(idx, D)] = possible_signs[face_type] * sign_dist
+
+    return dr, min_dist, sign_dist
 end
 
 abstract type AbstractLine end

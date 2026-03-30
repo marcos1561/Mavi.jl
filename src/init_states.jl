@@ -5,7 +5,7 @@ export rectangular_grid, random_vel
 using StaticArrays
 using Random
 
-using Mavi.Configs: RectangleCfg
+using Mavi.Configs: RectangleCfg, GeometryCfg
 
 """
 Return particles positions in a rectangle grid with spacing between

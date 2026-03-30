@@ -98,15 +98,23 @@ end
 
 mutable struct MovableObject{S, T, D, G<:MovableObjectState, P, R}
     force::SVector{S, T}
+    external_force::SVector{S, T}
     dynamic_cfg::D
     state::G
     potential::P
     restriction::R
 end
-function MovableObject(; state, dynamic_cfg, potential, restriction)
+function MovableObject(; state, dynamic_cfg, potential, restriction, external_force=nothing)
     S, T = num_dimensions(state), numerical_type(state)
     force = SVector{S, T}(zeros(T, S))
-    MovableObject(force, dynamic_cfg, state, potential, restriction)
+
+    if external_force === nothing
+        external_force = zero(force)
+    else
+        external_force = SVector{S, T}(external_force...)
+    end
+
+    MovableObject(force, external_force, dynamic_cfg, state, potential, restriction)
 end
 
 function update_object!(object::MovableObject, int_cfg)

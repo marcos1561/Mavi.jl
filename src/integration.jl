@@ -281,6 +281,7 @@ function calc_movable_objects_forces!(system, movable_objects::Vector{M}) where 
             forces[i] += f
             object.force -= f
         end
+        object.force += object.external_force
     end
 end
 
@@ -427,6 +428,21 @@ function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, G}) where G <
     end
 end
 
+function walls!(system::System, space_cfg::SpaceCfg{SlipperyWalls, G}) where G <: RectangleCfg
+    pos = system.state.pos
+    dynamic_cfg = system.dynamic_cfg
+    state = system.state
+    rect = space_cfg.geometry_cfg
+    rect_size = rect.size 
+    base_corner = rect.bottom_left
+    for pid in get_particles_ids(system)
+        p = pos[pid]
+        
+        pr = get_particle_radius(dynamic_cfg, state, pid)
+        pos[pid] = clamp.(p - base_corner, pr, rect_size .- pr)
+    end
+end
+    
 "Multiple Geometries"
 function walls!(system::System, space_cfg::SpaceCfg{W, G}) where {W <: ManyWalls, G <: ManyGeometries}
     for (wall_cfg, geom_cfg) in zip(space_cfg.wall_type.list, space_cfg.geometry_cfg.list)
@@ -458,7 +474,7 @@ function update_verlet!(system::System)
     @. state.vel += dt/2 * (forces + old_forces)
 end
 
-function update_movable_objects!(movable_objects::Nothing, dynamic_cfg, int_cfg) end
+function update_movable_objects!(movable_objects::Nothing, int_cfg) end
 function update_movable_objects!(movable_objects::Vector{M}, int_cfg) where M <: MovableObject 
     for object in movable_objects
         update_object!(object, int_cfg)
