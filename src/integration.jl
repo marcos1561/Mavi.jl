@@ -78,13 +78,12 @@ function calc_interaction(i, j, dynamic_cfg::SzaboCfg, system::System)
     end
 
     if dist > dynamic_cfg.r_eq
-        f_mod = dynamic_cfg.k_adh / (dynamic_cfg.r_eq)
+        f_mod = -dynamic_cfg.k_adh * (dist/dynamic_cfg.r_eq - 1)
     else
-        f_mod = dynamic_cfg.k_rep / (dynamic_cfg.r_max - dynamic_cfg.r_eq)
+        f_mod = -dynamic_cfg.k_rep * (dist/dynamic_cfg.r_eq - 1)
     end
 
-    r = dist - dynamic_cfg.r_eq
-    return -f_mod * r * dr
+    return f_mod * dr / dist
 end
 
 function calc_interaction(i, j, dynamic_cfg::RunTumbleCfg, system::System)

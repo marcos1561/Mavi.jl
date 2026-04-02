@@ -532,19 +532,21 @@ end
 List of components to be drawn. Defaults to
 drawn particles as circles.
 """
-struct MainGraphCfg{T<:Tuple} <: GraphCfg
+struct MainGraphCfg{T<:Tuple, G} <: GraphCfg
     comps_cfgs::T
+    geometry_kwargs::G
 end
-function MainGraphCfg(comps::AbstractVector)
-    MainGraphCfg(tuple(comps...))
-end
-function MainGraphCfg(comp::GraphCompCfg)
-    MainGraphCfg((comp,))
-end
-function MainGraphCfg()
-    MainGraphCfg(CircleGraphCfg())
+function MainGraphCfg(comps=nothing; geometry_kwargs=nothing)
+    if geometry_kwargs === nothing
+        geometry_kwargs = ()
+    end
+    MainGraphCfg(get_main_graph_components(comps), geometry_kwargs)
 end
 
+get_main_graph_components(comps::AbstractVector) = tuple(comps...)
+get_main_graph_components(comps::GraphCompCfg) = (comps,)
+get_main_graph_components(comps) = get_main_graph_components(CircleGraphCfg())
+    
 struct MainGraph{A, P, O, C<:Tuple} <: Graph
     ax::A
     pos::P
@@ -558,7 +560,7 @@ function get_graph(ax, system, cfg::MainGraphCfg)
     data = get_graph_data(cfg, system)
     pos_obs = Observable(data.pos)
 
-    drawn_borders(ax, system.space_cfg.geometry_cfg)
+    drawn_borders(ax, system.space_cfg.geometry_cfg; cfg.geometry_kwargs...)
     
     graphs = Vector{GraphComp}()
     for g in cfg.comps_cfgs
