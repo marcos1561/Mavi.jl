@@ -1,7 +1,7 @@
 module SystemGraphs
 
 export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
-export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg
+export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
 using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
@@ -664,6 +664,49 @@ function update_graph(graph::MovableObjectsGraph, system)
         update_movable_object_graph(graph_state, object)
     end
 end
+
+# = 
+# Forces
+# =
+@kwdef struct TotalForceGraphCfg{C} <: GraphCompCfg
+    color::C = "black"
+    lengthscale::Float64 = 1.0
+end
+
+struct TotalForceGraph{P, C} <: GraphCompDebug
+    arrows::P
+    cfg::C
+end
+
+function SystemGraphs.get_graph(ax, pos_obs, system, cfg::TotalForceGraphCfg)
+    plot = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0], lengthscale=cfg.lengthscale)
+    graph = TotalForceGraph(plot, cfg)
+    SystemGraphs.update_graph(graph, system)
+    return graph
+end
+
+function SystemGraphs.update_graph(graph::TotalForceGraph, system)
+    pos = system.state.pos
+    p_forces = get_forces(system)
+    
+    n = length(get_entities_ids(system))
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    u = Vector{Float64}(undef, n)
+    v = Vector{Float64}(undef, n)
+    
+    idx = 1
+    for i in get_entities_ids(system)
+        x[idx] = pos[i][1]
+        y[idx] = pos[i][2]
+        u[idx] = p_forces[i][1]
+        v[idx] = p_forces[i][2]
+        idx += 1
+    end
+
+    Makie.update!(graph.arrows, x, y, u, v)
+end
+
 
 include("../rings/view.jl")
 

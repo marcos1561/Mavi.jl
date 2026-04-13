@@ -434,9 +434,9 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
     end
 end
 
-function animate(system::System, cfg::ImageCfg, step! = nothing)
-    if isnothing(step!)
-        step! = get_step_function(system)
+function animate(system::System, cfg::ImageCfg; step_func=nothing)
+    if isnothing(step_func)
+        step_func = get_step_function(system)
     end
 
     system_initialization(system)
@@ -460,13 +460,21 @@ function animate(system::System, cfg::ImageCfg, step! = nothing)
 
     ti = system.time_info.time
     while system.time_info.time - ti < cfg.tf
-        step!(system)
+        step_func(system)
     end
 
     SystemGraphs.update_graph(graph, system)
 
     save(cfg.path, fig)
 end
+
+function animate(system::System, cfg::Vector{I}; step_func=nothing) where I <: ImageCfg
+    for image_cfg in cfg
+        animate(system, image_cfg, step_func=step_func)
+    end
+end
+# animate(system::System, cfg::Vector{I}; step_func=nothing) where I <: ImageCfg = animate(system, cfg, step_func)
+    
 
 # include("rings/view.jl")
 

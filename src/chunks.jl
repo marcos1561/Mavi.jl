@@ -1,6 +1,6 @@
 module ChunksMod
 
-export Chunks, update_chunks!, get_chunk_particles, get_chunk_rect
+export Chunks, update_chunks!, get_chunk_particles, get_chunk_rect, iterate_over_pais
 
 using StaticArrays
 
@@ -201,27 +201,40 @@ end
 
 function update_chunks!(chunks::Nothing) end
 
-# function update_chunks!(chunks::Chunks)
-#     pos = chunks.pos
-
-#     space_h = chunks.geometry_cfg.height
-#     bottom_left = chunks.geometry_cfg.bottom_left
-#     chunk_l, chunk_h = chunks.chunk_length, chunks.chunk_height
-
-#     chunks.num_particles_in_chunk .= 0
-
-#     num_p = size(pos)[2]
-#     for i in 1:num_p
-#         row_id = trunc(Int, div(-pos[2, i] + bottom_left[2] + space_h, chunk_h)) + 1
-#         col_id = trunc(Int, div(pos[1, i] - bottom_left[1], chunk_l)) + 1
-        
-#         row_id -= row_id == (chunks.num_rows + 1) ? 1 : 0
-#         col_id -= col_id == (chunks.num_cols + 1) ? 1 : 0
-
-#         p_i = chunks.num_particles_in_chunk[row_id, col_id] + 1
-#         chunks.chunk_particles[p_i, row_id, col_id] = i 
-#         chunks.num_particles_in_chunk[row_id, col_id] += 1
-#     end
-# end
-
+"""
+Iterate over all pairs of entities once and execute the function `func(i, j, chunk_id)`, where `i` and `j` are the entities ids. The pair (i, j) will be in the iteration if i and j are in the same chunk or in neighboring chunks, this pair will only be in the iteration once, not twice.
+"""
+function iterate_over_pais(chunks::Chunks, func)
+    for col in 1:chunks.num_cols
+        for row in 1:chunks.num_rows
+            chunk_id = (col, row)
+            np = chunks.num_particles_in_chunk[row, col]
+            chunk = @view chunks.chunk_particles[:, row, col]
+            neighbors = chunks.neighbors[row, col]
+            
+            # Iteration over all particles in current chunk
+            for i in 1:np
+                p1_id = chunk[i]
+                
+                # Interaction between particles in the same chunk
+                for j in (i+1):np
+                    p2_id = chunk[j]
+                    func(p1_id, p2_id, chunk_id)
+                end
+                
+                # Interaction of particles in neighboring chunks
+                for neighbor_id in neighbors
+                    nei_np = chunks.num_particles_in_chunk[neighbor_id]
+                    nei_chunk = @view chunks.chunk_particles[:, neighbor_id]
+                    
+                    for j in 1:nei_np
+                        p2_id = nei_chunk[j]
+                        func(p1_id, p2_id, chunk_id)
+                    end
+                end
+            end
+        end
+    end
 end
+
+end # ChunksMod

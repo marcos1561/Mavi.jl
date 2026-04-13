@@ -141,7 +141,11 @@ end
 
 function particles_radius(dynamic_cfg, state)
     p_radius = particle_radius(dynamic_cfg)
-    fill(p_radius, get_num_total_particles(state))
+    if p_radius isa Number
+        return fill(p_radius, get_num_total_particles(state))
+    else
+        return p_radius
+    end
 end
 particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.state)
 

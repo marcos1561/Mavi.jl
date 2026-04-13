@@ -419,6 +419,8 @@ get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cf
 abstract type DynamicCfg end
 abstract type PotentialCfg <: DynamicCfg end
 
+potential_force(dr, dist, potential::PotentialCfg, system, p_id) = potential_force(dr, dist, potential)
+
 function potential_force(dr, potential::PotentialCfg)
     potential_force(dr, sqrt(sum(dr.^2)), potential)
 end

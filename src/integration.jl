@@ -233,7 +233,8 @@ function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<
         dr, dist, inside_flag = signed_pos(pos, space_cfg.geometry_cfg)
         dist = process_dist(wall_pot.mode, dist, inside_flag)
         potential = get_potential_cfg(wall_pot.potential, system.state, i) 
-        f = potential_force(dr, dist, potential)
+        f = potential_force(dr, dist, potential, system, i)
+        # f = potential_force(dr, dist, potential)
         forces[i] += f
     end
 end
@@ -247,7 +248,8 @@ function calc_walls_forces!(system, space_cfg::SpaceCfg{W, G}, device) where {W<
         for line in space_cfg.geometry_cfg.lines
             dr, dist, inside_flag = signed_pos(pos, line)
             dist = process_dist(wall_pot.mode, dist, inside_flag)
-            f = potential_force(dr, dist, potential)
+            # f = potential_force(dr, dist, potential)
+            f = potential_force(dr, dist, potential, system, i)
             forces[i] += f
         end
     end
@@ -275,7 +277,8 @@ function calc_movable_objects_forces!(system, movable_objects::Vector{M}) where 
             dr, dist, inside_flag = signed_pos(pos, state)
             # dist = process_dist(wall_pot.mode, dist, inside_flag)
             # potential = get_potential_cfg(wall_pot.potential, system.state, i) 
-            f = potential_force(dr, dist, potential)
+            f = potential_force(dr, dist, potential, system, i)
+            # f = potential_force(dr, dist, potential)
             # @show f
             forces[i] += f
             object.force -= f
