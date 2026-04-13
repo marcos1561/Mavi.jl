@@ -3,7 +3,7 @@ module Experiments
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
 export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
 export DelayedCfg, ManyColsCfg
-export CartesianProdVals, VectorVals
+export CartesianProdVals, VectorVals, CurveVals
 export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range, add_exp_values!
 export load_data
 
@@ -222,28 +222,84 @@ function add_exp_values!(exp_values::CartesianProdVals, name, new_vals)
     # )
 end
 
-# function indices_with_fixed(exp_values::CartesianProdVals, fixed::Dict{Symbol, Int})
-#     name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
-#     fixed = Dict(name_to_idx[n] => i for (n, i) in pairs(fixed))
-#     sizes = [length(vs) for vs in exp_values.ranges]
-
-#     result = Int[]
-#     total = prod(sizes)
-#     for idx in 1:total
-#         # Convert linear index to cartesian indices
-#         inds = CartesianIndices(Tuple(sizes))[idx]
-#         inds_tuple = Tuple(inds)
-#         match = all(inds_tuple[k] == v for (k,v) in fixed)
-#         if match
-#             push!(result, idx)
-#         end
-#     end
-#     return result
-# end
-
 function get_exp_range(exp_values::CartesianProdVals, name) 
     name_to_idx = Dict(s => i for (i, s) in enumerate(exp_values.names))
     return exp_values.ranges[name_to_idx[name]]
+end
+
+struct CurveVals{T1, T2, V} <: ExpValues
+    parameter_name::Union{Symbol, Nothing}
+    parameter_range::Vector{T1}
+    curve_values::Vector{Vector{T2}}
+    values_idx::Vector{Tuple{Int, Int}}
+    values::V
+end
+function CurveVals(; parameter_range, curve_values, parameter_name=nothing)
+    if length(parameter_range) != length(curve_values)
+        error("Length of parameter_range ($(length(parameter_range))) must match length of curve_values ($(length(curve_values)))")
+    end
+    
+    parameter_range = Base.collect(parameter_range)
+    curve_values_new = Vector{eltype(curve_values[1])}[]
+    for c_values in curve_values
+        push!(curve_values_new, Base.collect(c_values))
+    end
+    curve_values = curve_values_new
+
+    values = Tuple{eltype(parameter_range), eltype(curve_values[1])}[]
+    values_idx = Tuple{Int, Int}[]
+    for (p_idx, p) in enumerate(parameter_range)
+        for (c_idx, c_value) in enumerate(curve_values[p_idx])
+            push!(values, (p, c_value))
+            push!(values_idx, (p_idx, c_idx))
+        end
+    end
+
+    CurveVals(parameter_name, parameter_range, curve_values, values_idx, values)
+end
+
+function add_curve_values!(exp_values::CurveVals; parameter_idx, new_values)
+    c_values = exp_values.curve_values[parameter_idx]
+    values = exp_values.values
+    values_idx = exp_values.values_idx
+    par_value = exp_values.parameter_range[parameter_idx]
+    for nv in new_values
+        if nv in c_values
+            continue
+        end 
+        push!(c_values, nv)
+        push!(values, (par_value, nv))
+        push!(values_idx, (parameter_idx, length(c_values)))
+    end
+end
+
+function add_new_curve!(exp_values::CurveVals; parameter_value, curve_values)
+    push!(exp_values.parameter_range, parameter_value)
+    push!(exp_values.curve_values, curve_values)
+
+    values = exp_values.values
+    values_idx = exp_values.values_idx
+
+    par_idx = length(exp_values.parameter_range)
+    for (c_idx, c_value) in enumerate(curve_values)
+        push!(values, (parameter_value, c_value))
+        push!(values_idx, (par_idx, c_idx))
+    end
+end
+
+function curve_indices(exp_values::CurveVals, parameter_idx)
+    exp_indices = []
+    for (exp_idx, v_idx) in enumerate(exp_values.values_idx)
+        if v_idx[1] == parameter_idx
+            push!(exp_indices, exp_idx)
+        end
+    end
+
+    return exp_indices
+end
+
+function curve_values(exp_values::CurveVals, parameter_idx)
+    exp_values.curve_values[parameter_idx]
 end
 
 struct ExperimentBatch{C<:ColCfg, S<:System, V, F}
