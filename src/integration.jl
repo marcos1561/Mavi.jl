@@ -52,6 +52,10 @@ end
     calc_diff(r1, r2, SpaceCfg(space_cfg.wall_type.list[1], space_cfg.geometry_cfg.list[1]))
 end
 
+function calc_diff(l1::Configs.Line2D, l2::Configs.Line2D, space_cfg)
+    
+end
+
 function ChunksMod.update_chunks!(chunks::Chunks{N, T, W, P, InfoT}) where {N, T, W, P, InfoT<:States.State}
     chunks.num_particles_in_chunk .= 0
     for idx in States.get_particles_ids(chunks.extra_info)
@@ -217,6 +221,13 @@ function calc_forces!(system::System, chunks::Nothing, device::Sequencial)
             p_i = p_ids[i]
             p_j = p_ids[j]
             f = calc_interaction(p_i, p_j, system.dynamic_cfg, system)
+            
+            # if i == 697 || j == 697
+            #     @show i, j
+            #     @show f
+            #     println("===========")
+            # end
+
             forces[p_i] += f
             forces[p_j] -= f
         end
