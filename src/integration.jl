@@ -2,7 +2,7 @@ module Integration
 
 export newton_step!, szabo_step!, rtp_step!
 export calc_forces!, calc_interaction, walls!
-export calc_diff, calc_diffs_and_dists!
+export calc_diff
 export update_verlet!, update_rtp!, update_szabo!
 export get_step_function, system_initialization
 

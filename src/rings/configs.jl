@@ -370,11 +370,12 @@ function get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) wher
 
     a0_sol = f_sol * a0 
 
-    if a0_sol < a0
-        return a0
-    else
-        return a0_sol
-    end
+    # if a0_sol < a0
+    #     return a0
+    # else
+    #     return a0_sol
+    # end
+    return a0_sol
 end
 get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_equilibrium_area)
 

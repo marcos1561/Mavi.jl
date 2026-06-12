@@ -119,6 +119,10 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
     end
 
     experiment_step! = experiment.custom_step
+    if isnothing(experiment_step!)
+        experiment_step! = get_step_function(system)
+    end
+
     prog = ProgContinuos(init=system.time_info.time, final=cfg.tf; prog_kwargs...)
 
     system_initialization(system)
