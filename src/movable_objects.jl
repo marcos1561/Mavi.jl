@@ -15,6 +15,8 @@ abstract type Restriction end
 
 abstract type MovableObjectState end
 
+function update_object!(obj_state::MovableObjectState, dynamic_cfg::Nothing, restriction, force, int_cfg) end
+
 mutable struct LineState{S, T} <: MovableObjectState
     p1::SVector{S, T}
     p2::SVector{S, T}
@@ -38,10 +40,18 @@ function LineState(; p1, p2, vel)
     p2 = SVector{D, T}(p2...)
     vel = SVector{D, T}(vel...)
     
-    dr = p2 - p1
+    PT = typeof(p1)
+    line = LineState(p1, p2, zero(PT), zero(PT), zero(T), vel)
+
+    update_state!(line)
+    return line
+end
+
+function update_state!(line::LineState)
+    dr = line.p2 - line.p1
     norm = sqrt(sum(abs2, dr))
 
-    D = length(p1)
+    D = num_dimensions(line)
     if D == 2
         n = SVector(-dr[2], dr[1]) / norm
     elseif D == 3
@@ -54,12 +64,43 @@ function LineState(; p1, p2, vel)
     end
     
     t = dr / norm
-
-    return LineState(p1, p2, n, t, norm, vel)
+    
+    line.normal = n
+    line.tangent = t
+    line.length = norm
 end
 
 num_dimensions(line::LineState) = length(line.p1)
 numerical_type(line::LineState) = eltype(line.p1)
+
+function move_rigid!(line::LineState, dp)
+    line.p1 += dp
+    line.p2 += dp
+end
+
+function move!(line::LineState; dp1=nothing, dp2=nothing)
+    if dp1 !== nothing
+        line.p1 += dp1
+    end
+    if dp2 !== nothing
+        line.p2 += dp2
+    end
+    update_state!(line)
+end
+
+function update_object!(line::LineState, dynamic_cfg::OverdampedCfg, restriction::Nothing, force, int_cfg)
+    line.vel = dynamic_cfg.mu * force
+
+    dt = int_cfg.dt
+    cm = (line.p1 + line.p2) / 2
+
+    new_cm = cm + dt * line.vel
+    
+    dr = new_cm - cm
+    move_rigid!(line, dr)
+    # line.p1 += dr
+    # line.p2 += dr
+end
 
 function update_object!(line::LineState, dynamic_cfg::OverdampedCfg, restriction::Configs.Line2D, force, int_cfg)
     line.vel = dynamic_cfg.mu * force
@@ -74,8 +115,9 @@ function update_object!(line::LineState, dynamic_cfg::OverdampedCfg, restriction
     new_cm = rest_po + dot((new_cm - rest_po), rest_tan) * rest_tan
 
     dr = new_cm - cm
-    line.p1 += dr
-    line.p2 += dr
+    move_rigid!(line, dr)
+    # line.p1 += dr
+    # line.p2 += dr
 end
 
 function Configs.signed_pos(point, line::LineState)

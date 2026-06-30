@@ -399,8 +399,8 @@ end
 get_particles_area_contribution(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_particles_area_contribution)
 
 """
-Equilibrium radius of the ring, from the center to the outer edge of the particles.
-It is calculated assuming its equilibrium area.
+Equilibrium ring radius, calculated as follow: assuming the ring has its equilibrium area and 
+its shape is a regular polygon, the radius is the segment length from the center to a vertex plus the particle radius.
 """
 function get_ring_radius(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     area_eq = get_equilibrium_area(dynamic_cfg, type)

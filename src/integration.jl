@@ -288,9 +288,10 @@ function calc_movable_objects_forces!(system, movable_objects::Vector{M}) where 
             dr, dist, inside_flag = signed_pos(pos, state)
             # dist = process_dist(wall_pot.mode, dist, inside_flag)
             # potential = get_potential_cfg(wall_pot.potential, system.state, i) 
+
             f = potential_force(dr, dist, potential, system, i)
+            
             # f = potential_force(dr, dist, potential)
-            # @show f
             forces[i] += f
             object.force -= f
         end

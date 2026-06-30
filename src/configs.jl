@@ -188,7 +188,7 @@ function signed_pos(point, geometry_cfg::RectangleCfg)
     possible_signs = [-1, 1]
     dr[mod1(idx, D)] = possible_signs[face_type] * sign_dist
 
-    return dr, min_dist, sign_dist
+    return dr, min_dist, sign(sign_dist)
 end
 
 abstract type AbstractLine end
@@ -258,7 +258,7 @@ function signed_pos(point, geometry_cfg::CircleCfg)
     dr_hat = dr / dist
 
     dr = dr - dr_hat * geometry_cfg.radius
-    sign_dist = dist - geometry_cfg.radius 
+    sign_dist = dist - geometry_cfg.radius
 
     return dr, abs(sign_dist), sign(sign_dist)
 end
