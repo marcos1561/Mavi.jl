@@ -4,7 +4,7 @@ module Visualization
 export animate, random_colors
 export AnimationCfg, VideoCfg, ImageCfg, UiSettings
 export DefaultInfoUICfg
-export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg
+export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg
 export drawn_borders, colors_from_cmap
 
 using GLMakie
@@ -45,7 +45,7 @@ Animation configurations.
     Configuration for how the system is rendered.
     More info in "gui/system_graph.jl".
 
-info_cfg:  
+- info_cfg:  
     Configuration for the information UI.
     More info in "gui/info_ui.jl".
 
@@ -67,18 +67,36 @@ info_cfg:
 - ui_settings:  
     General settings for the UI window.
 """
-@kwdef struct AnimationCfg{GraphT, InfoT}
-    graph_cfg::GraphT = MainGraphCfg()
-    info_cfg::InfoT = DefaultInfoUICfg()
-    fps = 30
-    num_steps_per_frame = 10
-    slider_spf_range = nothing
-    exec_times_size = 100
-    begin_paused = false
-    ui_settings = UiSettings()
-    fig_kwargs::Union{Dict, Nothing} = nothing
-    ax_kwargs::Union{Dict, Nothing} = nothing
-    save_fig_path::Union{String, Nothing} = "image.png"
+struct AnimationCfg{GraphT, InfoT}
+    graph_cfg::GraphT
+    info_cfg::InfoT
+    fps::Int
+    num_steps_per_frame::Int
+    slider_spf_range
+    exec_times_size::Int
+    begin_paused::Bool
+    ui_settings::UiSettings
+    fig_kwargs::Union{Dict, Nothing}
+    ax_kwargs::Union{Dict, Nothing}
+    save_fig_path::Union{String, Nothing}
+end
+function AnimationCfg(;
+    graph_cfg=MainGraphCfg(),
+    info_cfg=DefaultInfoUICfg(),
+    fps=30,
+    num_steps_per_frame=10,
+    slider_spf_range=nothing,
+    exec_times_size=100,
+    begin_paused=false,
+    ui_settings=UiSettings(),
+    fig_kwargs=nothing,
+    ax_kwargs=nothing,
+    save_fig_path="image.png",
+)
+    AnimationCfg(
+        get_graph_cfg(graph_cfg), info_cfg, fps, num_steps_per_frame, slider_spf_range, exec_times_size,
+        begin_paused, ui_settings, fig_kwargs, ax_kwargs, save_fig_path,
+    )
 end
 
 """
@@ -103,6 +121,8 @@ end
 function VideoCfg(;path, duration, anim_cfg=nothing, save_configs=false)
     if anim_cfg === nothing
         anim_cfg = AnimationCfg()
+    elseif !(anim_cfg isa AnimationCfg)
+        anim_cfg = AnimationCfg(graph_cfg=anim_cfg)
     end
 
     valid_extensions = [".mp4", ".avi", ".mov", ".mkv", ".gif"]
@@ -115,12 +135,21 @@ function VideoCfg(;path, duration, anim_cfg=nothing, save_configs=false)
     VideoCfg(path, duration, anim_cfg, save_configs)
 end
 
-@kwdef struct ImageCfg{GraphT, T<:Number}
+struct ImageCfg{GraphT, T<:Number}
     path::String
-    tf::T = 0
-    graph_cfg::GraphT = MainGraphCfg()
-    fig_kwargs::Union{Dict, Nothing} = nothing
-    ax_kwargs::Union{Dict, Nothing} = nothing
+    tf::T
+    graph_cfg::GraphT
+    fig_kwargs::Union{Dict, Nothing}
+    ax_kwargs::Union{Dict, Nothing}
+end
+function ImageCfg(;
+    path,
+    tf=0,
+    graph_cfg=MainGraphCfg(),
+    fig_kwargs=nothing,
+    ax_kwargs=nothing,
+)
+    ImageCfg(path, tf, get_graph_cfg(graph_cfg), fig_kwargs, ax_kwargs)    
 end
 
 """
@@ -158,7 +187,7 @@ get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 # get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing, is_3D=false)
+function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing, is_3D=false, return_graph=false)
     if isnothing(step_func)
         step_func = get_step_function(system)
     end
@@ -169,6 +198,8 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
 
     if cfg === nothing
         cfg = AnimationCfg()
+    elseif cfg isa SystemGraphs.GraphCfg
+        cfg = AnimationCfg(graph_cfg=cfg)
     end
 
     is_video = typeof(cfg) <: VideoCfg
@@ -431,6 +462,10 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
             sleep(time_wait/2)
             push!(exec_info.times_ui, time() - t1)
         end
+    end
+
+    if return_graph
+        return graph
     end
 end
 

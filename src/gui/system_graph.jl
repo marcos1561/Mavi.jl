@@ -175,7 +175,9 @@ abstract type GraphCfg end
 abstract type Graph end
 
 "Construct a Graph for `ax` given its configurations `cfg`."
-function get_graph(ax, system, cfg::GraphCfg) end
+function get_graph(ax, system, cfg::GraphCfg) 
+    @error "No graph constructor for $(typeof(cfg))"
+end
 
 "Updates the graph to the next frame."
 function update_graph(graph::Graph, system) end
@@ -271,6 +273,7 @@ end
 
 get_graph_cfg(cfg) = cfg
 get_graph_cfg(cfg::G) where {G<:GraphCompCfg} = MainGraphCfg(cfg)
+get_graph_cfg(cfg::Union{Vector, Tuple}) = ManyGraphsCfg(Tuple(cfg))
 
 
 struct ScatterGraphCfg{C, KW, F} <: GraphCompCfg
@@ -543,7 +546,7 @@ function MainGraphCfg(comps=nothing; geometry_kwargs=nothing)
     MainGraphCfg(get_main_graph_components(comps), geometry_kwargs)
 end
 
-get_main_graph_components(comps::AbstractVector) = tuple(comps...)
+get_main_graph_components(comps::Union{Vector, Tuple}) = tuple(comps...)
 get_main_graph_components(comps::GraphCompCfg) = (comps,)
 get_main_graph_components(comps) = get_main_graph_components(CircleGraphCfg())
     
@@ -689,14 +692,14 @@ function SystemGraphs.update_graph(graph::TotalForceGraph, system)
     pos = system.state.pos
     p_forces = get_forces(system)
     
-    n = length(get_entities_ids(system))
+    n = length(get_particles_ids(system))
     x = Vector{Float64}(undef, n)
     y = Vector{Float64}(undef, n)
     u = Vector{Float64}(undef, n)
     v = Vector{Float64}(undef, n)
     
     idx = 1
-    for i in get_entities_ids(system)
+    for i in get_particles_ids(system)
         x[idx] = pos[i][1]
         y[idx] = pos[i][2]
         u[idx] = p_forces[i][1]
@@ -706,7 +709,6 @@ function SystemGraphs.update_graph(graph::TotalForceGraph, system)
 
     Makie.update!(graph.arrows, x, y, u, v)
 end
-
 
 include("../rings/view.jl")
 

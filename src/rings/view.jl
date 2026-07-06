@@ -1,12 +1,13 @@
 module RingsGraphs
 
-export InvasionsGraphCfg, RingsNumsGraphCfg
+export InvasionsGraphCfg, RingsNumsGraphCfg, RingForceGraphCfg
 
 using GLMakie
 
 using Mavi.Rings
 using Mavi.Rings.States
 using Mavi.Rings.Configs
+using Mavi.Rings.RingsDebug
 import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph, get_default_num_types
 
 function update_types_to_ring_id!(types, system)
@@ -131,5 +132,110 @@ function update_graph(comp::RingsNumsGraph, system)
     Makie.update!(comp.plot, points; text=text)
 end
 
+
+# = 
+# Single Ring Forces
+# =
+struct ForceCfg{C}
+    color::C
+    lengthscale::Float64
+    kwargs::Dict
+end
+function ForceCfg(name; color=nothing, lengthscale=nothing, kwargs=())
+    kwargs = Dict(kwargs)
+
+    if lengthscale === nothing
+        lengthscale = 1.0
+    end
+
+    name_to_color = (
+        area="green",
+        spring="red",
+        pairwise="blue",
+    )
+    if color === nothing
+        color = name_to_color[name]
+    end
+
+    kwargs = merge(Dict(kwargs), Dict(:color=>color, :lengthscale=>lengthscale))
+    ForceCfg(color, lengthscale, kwargs)
+end
+
+struct RingForceGraphCfg <: GraphCfg
+    ring_forces::DebugRingForces
+    area_cfg::ForceCfg
+    spring_cfg::ForceCfg
+    pairwise_cfg::ForceCfg
+    show_list::Tuple
+    pairwise_mode::Symbol
+end
+function RingForceGraphCfg(;
+    ring_forces,
+    area_cfg=nothing,
+    spring_cfg=nothing,
+    pairwise_cfg=nothing,
+    show_list=(:area, :spring, :pairwise),
+    lengthscale=nothing,
+    pairwise_mode=:all,
+)
+    if area_cfg === nothing
+        area_cfg = ForceCfg(:area, lengthscale=lengthscale)
+    end
+    if spring_cfg === nothing
+        spring_cfg = ForceCfg(:spring, lengthscale=lengthscale)
+    end
+    if pairwise_cfg === nothing
+        pairwise_cfg = ForceCfg(:pairwise, lengthscale=lengthscale)
+    end
+    RingForceGraphCfg(ring_forces, area_cfg, spring_cfg, pairwise_cfg, show_list, pairwise_mode)
+end
+
+struct RingForceGraph{P, C} <: GraphComp
+    arrows::P
+    cfg::C
+end
+
+function get_graph(ax, system, cfg::RingForceGraphCfg)
+    plot_pairwise = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0]; cfg.pairwise_cfg.kwargs...)
+    plot_spring = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0]; cfg.spring_cfg.kwargs...)
+    plot_area = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0]; cfg.area_cfg.kwargs...)
+    plots = (area=plot_area, spring=plot_spring, pairwise=plot_pairwise)
+    graph = RingForceGraph(plots, cfg)
+    update_graph(graph, system)
+    return graph
+end
+
+function update_graph(graph::RingForceGraph, system)
+    pos = system.state.pos
+    ring_forces = graph.cfg.ring_forces
+    ring_id = ring_forces.ring_id
+    n = States.ring_num_particles(system, ring_id)
+
+    pairwise_forces = zeros(eltype(ring_forces.area_forces), n)
+    if graph.cfg.pairwise_mode === :all
+        for forces_from_another_ring in ring_forces.interaction_forces
+            pairwise_forces .+= forces_from_another_ring[1:n]
+        end
+    end
+
+    forces = (spring=ring_forces.spring_forces, area=ring_forces.area_forces, pairwise=pairwise_forces)
+
+    for name in (:spring, :area, :pairwise)
+        x = Vector{Float64}(undef, n)
+        y = Vector{Float64}(undef, n)
+        u = Vector{Float64}(undef, n)
+        v = Vector{Float64}(undef, n)
+
+        forces_i = forces[name]
+        for p_i in 1:n
+            idx = States.to_scalar_idx(system.state, ring_id, p_i)
+            x[p_i] = pos[idx][1]
+            y[p_i] = pos[idx][2]
+            u[p_i] = forces_i[p_i][1]
+            v[p_i] = forces_i[p_i][2]
+        end
+        Makie.update!(graph.arrows[name], x, y, u, v)
+    end
+end
 
 end # RingsGraphs

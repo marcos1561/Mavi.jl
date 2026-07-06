@@ -16,6 +16,7 @@ import Mavi.ChunksMod: Chunks, update_chunks!
 include("states.jl")
 include("configs.jl")
 include("neighbors.jl")
+include("debug.jl")
 using .States
 using .Configs
 using .NeighborsMod
@@ -229,7 +230,7 @@ include("serder.jl")
 # = 
 
 function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=nothing,
-    r_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing, time_info=nothing, rng=nothing)
+    r_neighbors_cfg=nothing, source_cfg=nothing, user_data=nothing, time_info=nothing, debug_info=nothing, rng=nothing)
     if has_types_cfg(dynamic_cfg) != has_types_func(state)
         if has_types_cfg(dynamic_cfg)
             error("DynamicCfg has multiple types, but state.types is nothing!")
@@ -269,6 +270,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         chunks=chunks, 
         info=info, 
         time_info=time_info,
+        debug_info=debug_info,
         sys_type=RingsSys(),
         rng=rng,
     )
@@ -278,15 +280,7 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
     end
 
     Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
-    Integration.update_ids!(system)
-    Integration.update_cms!(system)
-    Integration.update_chunks_all!(system)
-    Integration.update_invasions!(system) 
-
-    Integration.cleaning!(system)
-    Integration.forces!(system)
-    Integration.neigh_sum_buffers(system.info.p_neigh)
-
+    Integration.system_initialization(system)
     return system
 end
 

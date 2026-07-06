@@ -314,11 +314,11 @@ get_area0(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_
 Returns the p0 at which `area0` is equal to the equilibrium area
 considering only the springs.
 """
-function get_equilibrium_p0(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
-    num_particles = ring_num_particles(dynamic_cfg, type)
+function get_equilibrium_p0(num_particles::Int) 
     theta = 2 * π  / num_particles
     return 2 * (num_particles * (1 - cos(theta))/sin(theta))^.5
 end
+get_equilibrium_p0(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I} = get_equilibrium_p0(ring_num_particles(dynamic_cfg, type))
 get_equilibrium_p0(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_equilibrium_p0)
 
 
@@ -329,7 +329,6 @@ NOTE: The area contribution from the particles is not considered here.
 """
 function get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
-
     num_particles = ring_num_particles(dynamic_cfg, type) 
     a0 = get_area0(dynamic_cfg, type)
 
@@ -343,39 +342,49 @@ function get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) wher
 
     k_a = get_ring_prop_by_name(dynamic_cfg, :k_area, type)
     k_m = get_ring_prop_by_name(dynamic_cfg, :k_spring, type)
+    angle = π * (1 - 2 / num_particles)
 
-    function get_r(f)
-        sqrt(f * 2 * a0 / (num_particles * sin(theta)))
+    get_area(l) = num_particles * l^2 / (4 * tan(π / num_particles))
+    function get_fa(l)
+        a = get_area(l)
+        return k_a * (a0 - a) * l * sin(angle / 2)
     end
 
-    function get_fm(f)
-        k_m * (get_r(f) * sqrt(2 * (1 - cos(theta))) - l_spring)
+    get_fl(l) = k_m * (l - l_spring)
+
+    function func!(F, l_sqrt)
+        l = l_sqrt[1]^2
+        F[1] = get_fa(l) -  2 * get_fl(l)
     end
+    sol = nlsolve(func!, [sqrt(l_spring * 1.1)])
+    l_sol = sol.zero[1]^2
+    return get_area(l_sol)
 
-    function get_fm_total(f)
-        2 * get_fm(f) * sin(theta / 2)
-    end
-
-    function get_fa(f)
-        r = get_r(f)
-        k_a * (a0 - 10/2 * r^2 * sin(theta)) * r * sin(theta)
-    end
-
-    function func!(F, f)
-        F[1] = get_fa(f[1]^2) - get_fm_total(f[1]^2)
-    end
-
-    sol = nlsolve(func!, [sqrt(0.5)])
-    f_sol = sol.zero[1]^2
-
-    a0_sol = f_sol * a0 
-
-    # if a0_sol < a0
-    #     return a0
-    # else
-    #     return a0_sol
+    # function get_r(f)
+    #     sqrt(f * 2 * a0 / (num_particles * sin(theta)))
     # end
-    return a0_sol
+
+    # function get_fm(f)
+    #     k_m * (get_r(f) * sqrt(2 * (1 - cos(theta))) - l_spring)
+    # end
+
+    # function get_fm_total(f)
+    #     2 * get_fm(f) * sin(theta / 2)
+    # end
+
+    # function get_fa(f)
+    #     r = get_r(f)
+    #     k_a * (a0 - 10/2 * r^2 * sin(theta)) * r * sin(theta)
+    # end
+
+    # function func!(F, f)
+    #     F[1] = get_fa(f[1]^2) - get_fm_total(f[1]^2)
+    # end
+
+    # sol = nlsolve(func!, [sqrt(0.5)])
+    # f_sol = sol.zero[1]^2
+    # a0_sol = f_sol * a0 
+    # return a0_sol
 end
 get_equilibrium_area(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_equilibrium_area)
 

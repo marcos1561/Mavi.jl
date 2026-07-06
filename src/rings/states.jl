@@ -3,7 +3,7 @@ module States
 export RingsState, ActiveState
 export FixRingsIds, VarRingsIds, get_rings_ids, get_num_active, get_particles_ids, get_num_total_particles, update_ids!
 export has_types_func, add_ring!, remove_ring!
-export num_max_particles, get_ring_id, get_particle_id, get_particle_ring_id, to_scalar_idx, get_inner_neigh_ids
+export num_max_particles, get_ring_id, get_particle_id, get_particle_ring_id, to_scalar_idx, get_inner_neigh_ids, get_ring_particles_indices
 export ring_num_particles
 
 using StaticArrays
@@ -127,6 +127,11 @@ end
 @inline get_rings_ids(state::RingsState) = get_rings_ids(state.rings_ids)
 @inline get_rings_ids(system) = get_rings_ids(system.state.rings_ids)
 
+ring_num_particles(num_particles::Vector, ring_type) = num_particles[ring_type]
+ring_num_particles(num_particles::Vector, types, rid) = num_particles[types[rid]]
+ring_num_particles(num_particles::Int, types=nothing, rid=nothing) = num_particles
+ring_num_particles(state::RingsState, ring_id) = ring_num_particles(state.num_particles, state.types, ring_id)
+
 @inline has_types_func(state::RingsState) = !(state.types === nothing)
 
 @inline is_variable_number(state::RingsState{U, Nothing}) where U = false
@@ -170,6 +175,12 @@ end
     return particle_id, ring_id
 end
 
+function get_ring_particles_indices(state::RingsState, ring_id)
+    first_id = to_scalar_idx(state, ring_id, 1)
+    last_id = first_id + ring_num_particles(state, ring_id) - 1
+    return first_id:last_id
+end
+
 function add_ring!(state, pos, pol)
     rings_ids = state.rings_ids
     for i in eachindex(rings_ids.mask)
@@ -191,11 +202,6 @@ function remove_ring!(state, ring_id)
     rings_ids.mask[ring_id] = false
     rings_ids.num_active -= 1
 end
-
-ring_num_particles(num_particles::Vector, ring_type) = num_particles[ring_type]
-ring_num_particles(num_particles::Vector, types, rid) = num_particles[types[rid]]
-ring_num_particles(num_particles::Int, types=nothing, rid=nothing) = num_particles
-ring_num_particles(state::RingsState, ring_id) = ring_num_particles(state.num_particles, state.types, ring_id)
 
 function calc_active_ids!(active, state) end 
 function calc_active_ids!(active::VarRingsIds, state::RingsState)
@@ -222,9 +228,7 @@ function calc_active_ids!(active::VarRingsIds, state::RingsState)
     active.num_active = pointer - 1
 end
 
-function mv_states.update_ids!(state::RingsState)
-    calc_active_ids!(state.rings_ids, state)
-end
+mv_states.update_ids!(state::RingsState) = calc_active_ids!(state.rings_ids, state)
 
 mv_states.get_particles_ids(state::RingsState) = mv_states.get_ids(state.rings_ids)
 mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state)

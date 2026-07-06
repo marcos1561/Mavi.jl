@@ -2,15 +2,21 @@ module Integration
 
 using StaticArrays
 
-import Mavi.Integration: calc_diff, calc_interaction, calc_forces!, walls!, get_step_function, calc_walls_forces!
+import Mavi.Integration:
+    calc_diff, 
+    calc_interaction, calc_forces!, calc_walls_forces!, 
+    get_step_function, system_initialization, 
+    walls!, update_time!
+
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
 
 using Mavi.Rings
 using Mavi.Rings.NeighborsMod
 using Mavi.Systems
-using Mavi.Rings.Configs
 using Mavi.Rings.States
 using Mavi.Rings.Sources
+using Mavi.Rings.RingsDebug
+using Mavi.Rings.Configs
 using Mavi.Configs: SpaceCfg, RectangleCfg, LinesCfg, PeriodicWalls, SlipperyWalls, ManyWalls
 
 export step!
@@ -41,7 +47,9 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     max_dist = 2 * Configs.particle_radius(interaction_cfg)
     neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
 
-    return calc_interaction_force(i, j, ri, rj, dr, dist, interaction_cfg, system)
+    f = calc_interaction_force(i, j, ri, rj, dr, dist, interaction_cfg, system)
+    debug_pairwise_force!(system.debug_info, f, ri, rj, i, j)
+    return f
 end
 
 function calc_interaction_force(i, j, ring_id1, ring_id2, dr, dist, interaction_cfg::HarmTruncCfg, system::System)
@@ -189,7 +197,9 @@ function area_forces!(system)
             a_deriv = SVector(dr.y, -dr.x) / 2
 
             idx_scalar = to_scalar_idx(system.state, ring_id, i)
-            forces[idx_scalar] -= fmod * a_deriv
+            f = -fmod * a_deriv
+            debug_area_force!(system.debug_info, f, ring_id, i)
+            forces[idx_scalar] += f
         end
     end
 end
@@ -216,7 +226,7 @@ function forces!(system)
             p2_id = to_scalar_idx(system.state, ring_id, second_id)
             
             f = springs_force(p1_id, p2_id, k, l, state, space_cfg) 
-
+            debug_spring_force!(system.debug_info, f, ring_id, first_id, second_id)
             forces[p1_id] += f
             forces[p2_id] -= f
         end
@@ -288,7 +298,8 @@ end
 function cleaning!(system)
     clean_forces!(system)
     neigh_clean!(system.info.p_neigh)
-    # neigh_clean!(system.info.r_neigh)
+    neigh_clean!(system.info.r_neigh)
+    RingsDebug.clean_debug!(system.debug_info)
 end
 
 function update_cms!(system)
@@ -447,7 +458,7 @@ function update_invasions!(system, inv_cfg::InvasionsCfg)
 end
 update_invasions!(system) = update_invasions!(system, system.int_cfg.extra.invasions_cfg)
 
-function step!(system)
+function system_initialization(::RingsSys, system)
     update_cms!(system)
     update_sources!(system, system.info.sources)
     
@@ -461,13 +472,14 @@ function step!(system)
     forces!(system)
     calc_walls_forces!(system)
     neigh_sum_buffers(system.info.p_neigh)
-    # neigh_sum_buffers(system.info.r_neigh)
-    
+    neigh_sum_buffers(system.info.r_neigh)
+end
+
+function step!(system)
     update!(system)
     walls!(system)
-
-    system.time_info.num_steps += 1
-    system.time_info.time += system.int_cfg.dt
+    update_time!(system)
+    system_initialization(system)
 end
 
 get_step_function(::RingsSys, system) = step!

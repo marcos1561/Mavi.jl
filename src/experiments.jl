@@ -1,7 +1,7 @@
 module Experiments
 
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
-export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time
+export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time, load_experiment_configs
 export DelayedCfg, ManyColsCfg
 export CartesianProdVals, VectorVals, CurveVals
 export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range, add_exp_values!
@@ -673,6 +673,11 @@ function check_checkpoint(cfg::CheckpointCfg, experiment; force_save=false)
     cp.last_used = cp_name
 
     serialize(joinpath(cp_dir, CHECKPOINT_INFO_NAME), cp)
+end
+
+function load_experiment_configs(path)
+    configs = convert(Dict{Symbol, Any}, JSON3.read(joinpath(path, EXP_COL_CONFIGS_NAME)))
+    load_dic_configs(configs)
 end
 
 function load_experiment(root, custom_step=nothing)

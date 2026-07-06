@@ -13,7 +13,7 @@ export get_potential_cfg
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
 export IntCfg, ChunksCfg, has_chunks, get_chunks_cfg_from_cell_size
 export DeviceMode, Sequencial, Threaded
-export particle_radius, potential_force
+export particle_radius, potential_force, maximum_interaction_distance
 
 using StaticArrays, StructTypes, Random
 using Mavi.States
@@ -259,7 +259,7 @@ function signed_pos(point, geometry_cfg::CircleCfg)
 
     dr = dr - dr_hat * geometry_cfg.radius
     sign_dist = dist - geometry_cfg.radius
-
+    
     return dr, abs(sign_dist), sign(sign_dist)
 end
 
@@ -417,8 +417,9 @@ get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cf
 # =
 
 abstract type DynamicCfg end
-abstract type PotentialCfg <: DynamicCfg end
+maximum_interaction_distance(potential::DynamicCfg) = @error "Not Implemented for $(typeof(potential))"
 
+abstract type PotentialCfg <: DynamicCfg end
 potential_force(dr, dist, potential::PotentialCfg, system, p_id) = potential_force(dr, dist, potential)
 
 function potential_force(dr, potential::PotentialCfg)
@@ -527,11 +528,14 @@ end
     tumble_rate::T
 end
 
-# particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.ro/2
+maximum_interaction_distance(p::HarmTruncCfg) = p.dist_max
+maximum_interaction_distance(p::LenJonesCfg) = Inf
+maximum_interaction_distance(p::SzaboCfg) = p.r_max
+
+particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.dist_eq / 2.0
 particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
 particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
-particle_radius(dynamic_cfg::HarmTruncCfg) = dynamic_cfg.dist_eq / 2.0
 
 # ==
 # Potential Finder

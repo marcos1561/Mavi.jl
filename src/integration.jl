@@ -13,6 +13,7 @@ using DataStructures
 using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
+using Mavi.Debug
 using Mavi.MovableObjects
 using Mavi.ChunksMod
 
@@ -480,9 +481,10 @@ function update_verlet!(system::System)
     term = dt*dt/2 # quadratic term on accelerated movement
     @. state.pos += state.vel * dt + forces * term
 
+    update_movable_objects!(system)
     walls!(system)
-    clean_forces!(system)
-    calc_forces!(system)
+    system_initialization(system)
+    update_time!(system)
 
     # Update velocities
     @. state.vel += dt/2 * (forces + old_forces)
@@ -529,8 +531,6 @@ function update_szabo!(system::System)
         state.pos[i] += vel * dt
         state.pol_angle[i] += d_theta
     end
-
-    update_movable_objects!(system)
 end
 
 function update_rtp!(system::System)
@@ -577,6 +577,7 @@ function system_initialization(sys_type, system) end
 
 function system_initialization(sys_type::StandardSys, system)
     update_chunks!(system.chunks)
+    clean_debug!(system.debug_info)
     clean_forces!(system)
     calc_forces!(system)
 end
@@ -587,12 +588,11 @@ newton_step!(system::System) = newton_step!(system, system.int_cfg)
 "Advance system one time step."
 function newton_step!(system::System, int_cfg::IntCfg)
     update_verlet!(system)
-    update_chunks!(system.chunks)
-    update_time!(system)
 end
 
 function szabo_step!(system::System)
     update_szabo!(system)
+    update_movable_objects!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
     system_initialization(system)
@@ -600,6 +600,7 @@ end
 
 function rtp_step!(system::System)
     update_rtp!(system)
+    update_movable_objects!(system)
     walls!(system, system.space_cfg)
     update_time!(system)
     system_initialization(system)
