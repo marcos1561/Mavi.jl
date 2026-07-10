@@ -1,7 +1,7 @@
 module Systems
 
 export System, StandardSys
-export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius, get_cm, reset_time
+export particles_radius, get_forces, clean_forces!, get_num_total_particles, is_valid_pair, get_particle_radius, get_entities_pos, reset_time
 
 using StaticArrays, Serialization, JSON3, StructTypes, Random
 
@@ -115,8 +115,18 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
 
     space_data = get_space_data(space_cfg)
 
-    System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, space_data, time_info, info, debug_info, sys_type, rng)
+    system = System(state, space_cfg, dynamic_cfg, int_cfg, chunks, forces, space_data, time_info, info, debug_info, sys_type, rng)
+    system_setup(system)
+    return system
 end
+
+system_setup(system) = system_setup(system.type, system)
+function system_setup(sys_type, system) 
+    system_base_setup(sys_type, system)
+    system_end_setup(sys_type, system)
+end
+function system_base_setup(sys_type, system) end
+function system_end_setup(sys_type, system) end
 
 reset_time(system) = reset(system.time_info)
 
@@ -139,6 +149,8 @@ clean_movable_objects_forces!(system::System) = clean_movable_objects_forces!(ge
     clean_movable_objects_forces!(system)
 end
 
+Configs.particle_radius(system::System) = particle_radius(system.dynamic_cfg)
+
 function particles_radius(dynamic_cfg, state)
     p_radius = particle_radius(dynamic_cfg)
     if p_radius isa Number
@@ -152,10 +164,16 @@ particles_radius(system::System) = particles_radius(system.dynamic_cfg, system.s
 get_particle_radius(dynamic_cfg, state, idx) = particle_radius(dynamic_cfg)
 get_particle_radius(system::System, idx) = get_particle_radius(system.dynamic_cfg, system.state, idx)
 
+get_entity_radius(dynamic_cfg, state, idx) = get_particle_radius(dynamic_cfg, state, idx)
+get_entity_radius(system::System, idx) = get_entity_radius(system.dynamic_cfg, system.state, idx)
+
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
-get_cm(system, state, entity_id) = state.pos[entity_id]
+States.get_entity_pos(state, system, id) = get_entity_pos(state, id)
+States.get_entities_pos(state, system) = get_entities_pos(state)
+States.get_entity_pos(system::System, id) = get_entity_pos(system.state, system, id)
+States.get_entities_pos(system::System) = get_entities_pos(system.state, system)
 
 States.get_num_total_particles(system::System) = get_num_total_particles(system.state)
 
@@ -163,6 +181,8 @@ States.get_particles_ids(system::System) = get_particles_ids(system.state)
 States.get_entities_ids(system::System) = get_entities_ids(system.state)
 
 States.update_ids!(system::System) = update_ids!(system.state)
+
+States.add_force_to_entity!(system, f, eid) = add_force_to_entity!(system.state, get_forces(system), f, eid) 
 
 function system_deepcopy(system, sys_type)
     System(

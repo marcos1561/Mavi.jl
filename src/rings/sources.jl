@@ -65,7 +65,8 @@ function ChunksChecker(pos, chunks, bbox_vec::Vector{G}) where G <: RectangleCfg
     bbox_ids = [CartesianIndex{2}[] for _ in 1:length(bbox_vec)]
 
     up = SVector(0, 1)
-    chunk_tl = chunks.geometry_cfg.bottom_left + up * chunks.geometry_cfg.height
+    geo = chunks.space_cfg.geometry_cfg
+    chunk_tl = geo.bottom_left + up * geo.height
 
     found_start = false
     start_x_id, end_x_id = 0, 0

@@ -571,15 +571,18 @@ function update_time!(system)
     system.time_info.num_steps += 1
 end
 
+function system_initialization(sys_type, system) end
 system_initialization(system) = system_initialization(system.type, system)
 
-function system_initialization(sys_type, system) end
+function system_end_initialization(sys_type, system) end
+system_end_initialization(system) = system_end_initialization(system.type, system)
 
 function system_initialization(sys_type::StandardSys, system)
     update_chunks!(system.chunks)
     clean_debug!(system.debug_info)
     clean_forces!(system)
     calc_forces!(system)
+    system_end_initialization(system)
 end
 
 "Advance system one time step."

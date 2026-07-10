@@ -43,13 +43,13 @@ function create_system(;num_cols, num_rows)
         dist_max = pair_dist_eq * 1.2,
     )
     
-    interaction_finder = InteractionMatrix([
+    potential_finder = PotentialMatrix([
         [interaction_cfg_1, interaction_cfg_pair];; 
         [interaction_cfg_pair, interaction_cfg_2]
     ])
 
-    interactions = list_interactions(interaction_finder)
-    self_interactions = list_self_interactions(interaction_finder)
+    potentials = Configs.list_potentials(potential_finder)
+    self_potentials = Configs.list_self_potentials(potential_finder)
 
     dynamic_cfg = RingsCfg(
         p0=[3.5, 3.5],
@@ -59,11 +59,9 @@ function create_system(;num_cols, num_rows)
         rot_diff=[0.5, 0.5],
         k_area=[1., 1.],
         k_spring=[20., 20.],
-        l_spring=[inter.dist_eq*0.8 for inter in self_interactions],
-        interaction_finder=interaction_finder,
+        l_spring=[inter.dist_eq*0.8 for inter in self_potentials],
+        interaction_finder=potential_finder,
     )
-
-    interactions = list_interactions(dynamic_cfg.interaction_finder)
 
     num_particles = [10, 5]
 
@@ -92,7 +90,7 @@ function create_system(;num_cols, num_rows)
     )
 
     bbox = get_bounding_box(space_cfg.geometry_cfg)
-    max_size = maximum([i.dist_max for i in interactions]) * 1.1
+    max_size = maximum([i.dist_max for i in potentials]) * 1.1
     num_x_chunks = floor(Int, bbox.length / max_size)
     num_y_chunks = floor(Int, bbox.height / max_size)
 
@@ -103,9 +101,9 @@ function create_system(;num_cols, num_rows)
         int_cfg=Configs.RingsIntCfg(
             dt=0.01,
             device=Configs.Sequencial(),
-            # p_chunks_cfg=Configs.ChunksCfg(
-            #     num_x_chunks, num_y_chunks,
-            # ),
+            p_chunks_cfg=Configs.ChunksCfg(
+                num_x_chunks, num_y_chunks,
+            ),
         ),
     )
 
@@ -147,6 +145,10 @@ function main(test=false)
     )
 
     if !test
+        # path = joinpath(@__DIR__, "sys_test")
+        # Rings.Mavi.run_system(system, tf=10)
+        # Rings.Mavi.save_system(system, joinpath(@__DIR__, "sys_test"))
+        # system = Rings.Mavi.load_system(path)
         animate(system, anim_cfg)
     else
         Rings.Mavi.run_system(system, tf=1)

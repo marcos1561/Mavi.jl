@@ -6,22 +6,21 @@ import Mavi.MaviSerder: MaviSerder, get_obj_save_data_json, load_dic_configs
 
 using Mavi.Rings
 using Mavi.Rings: RingsInfo, RingsSys
-using Mavi.Rings.Configs: InteractionCfg
 
 # ==
 # Matrix of InteractionCfg
 # ==
 
-StructTypes.StructType(::Type{Matrix{T}}) where T <: InteractionCfg = StructTypes.CustomStruct()
+# StructTypes.StructType(::Type{Matrix{T}}) where T <: InteractionCfg = StructTypes.CustomStruct()
 
-function StructTypes.lower(m::Matrix{T}) where T <: InteractionCfg
-    return (size=size(m), data=vec(m))
-end
+# function StructTypes.lower(m::Matrix{T}) where T <: InteractionCfg
+#     return (size=size(m), data=vec(m))
+# end
 
-function StructTypes.construct(::Type{Matrix{T}}, x) where T <: InteractionCfg
-    elems = [isa(el, T) ? el : JSON3.read(JSON3.write(el), T) for el in x["data"]]
-    reshape(elems, x["size"]...)
-end
+# function StructTypes.construct(::Type{Matrix{T}}, x) where T <: InteractionCfg
+#     elems = [isa(el, T) ? el : JSON3.read(JSON3.write(el), T) for el in x["data"]]
+#     reshape(elems, x["size"]...)
+# end
 
 # ==
 # RingsInfo

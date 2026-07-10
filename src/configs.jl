@@ -3,20 +3,22 @@ module Configs
 
 export GeometryCfg, DynamicCfg, AbstractIntCfg, GeometryCfg, WallType
 export SpaceCfg, RectangleCfg, CircleCfg, LinesCfg, ManyGeometries 
-export get_bounding_box, check_intersection, signed_pos, is_inside
+export get_bounding_box, check_intersection, signed_pos, is_inside, volume
 export RigidWalls, PeriodicWalls, SlipperyWalls, ManyWalls
 export ForceWalls, PotentialWalls, process_dist
 export get_main_wall, get_main_geometry
 export get_space_data, SpaceData
-export get_potential_cfg
 
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
+export PotentialMatrix, get_potential_cfg, list_potentials, list_self_potentials
 export IntCfg, ChunksCfg, has_chunks, get_chunks_cfg_from_cell_size
 export DeviceMode, Sequencial, Threaded
 export particle_radius, potential_force, maximum_interaction_distance
+export entity_radius
 
-using StaticArrays, StructTypes, Random
+using StaticArrays, StructTypes, Random, LinearAlgebra
 using Mavi.States
+using Mavi.Errors
 
 # =
 # Geometries 
@@ -28,35 +30,40 @@ get_space_data(space_cfg) = nothing
 abstract type GeometryCfg end
 
 function is_inside(point, geometry::GeometryCfg; pad) 
-    throw(NotImplementedError("is_inside not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
 end
 
 function num_dimensions(geometry::GeometryCfg) 
-    throw(NotImplementedError("num_dimensions not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
 end
 
 function check_intersection(geometry_1::GeometryCfg, geometry_2::GeometryCfg)
-    throw(NotImplementedError("check_intersection not implemented for $(typeof(geometry_1))-$(typeof(geometry_2))"))
+    g1, g2 = string(typeof(geometry_1)), string(typeof(geometry_2))
+    throw(NotImplementedError("$(g1), $(g2)"))
 end
 
 function get_bounding_box(geometry::GeometryCfg)
-    throw(NotImplementedError("get_bounding_box not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
 end
 
 function signed_pos(point, geometry::GeometryCfg)
-    throw(NotImplementedError("signed_pos not implemented for $(typeof(geometry_1))"))
+   throw(NotImplementedError(string(typeof(geometry))))
 end
 
 function random_point(geometry::GeometryCfg)
-    throw(NotImplementedError("random_point not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
 end
 
 function get_numerical_type(geometry::GeometryCfg) 
-    throw(NotImplementedError("get_numerical_type not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
 end 
 
 function get_num_dimensions(geometry::GeometryCfg) 
-    throw(NotImplementedError("get_num_dimensions not implemented for $(typeof(geometry))"))
+    throw(NotImplementedError(string(typeof(geometry))))
+end
+
+function volume(geometry::GeometryCfg) 
+    throw(NotImplementedError(string(typeof(geometry))))
 end
     
 function random_points(geometry::GeometryCfg, n)
@@ -68,10 +75,30 @@ function random_points(geometry::GeometryCfg, n)
     return points
 end
 
-function random_points_no_overlap(geometry::GeometryCfg, n; radius=0, max_attempts=10, offset=0)
+"""
+Creates `n` random points uniformly distributed inside `geometry`, such that, the distance
+between any two points is bigger than `min_dist`.
+
+# Arguments
+- `geometry`:  
+    The geometry where points will reside.
+
+- `n`:  
+    Number of points.
+
+- `min_dist`:  
+    The minimum distance between any two points.
+
+- `max_attempts`:  
+    Maximum number of attempts when trying to generate a point.
+
+- `offset`:  
+    Minimum distance between any point and the geometry boundary. 
+"""
+function random_points_no_overlap(geometry::GeometryCfg, n; min_dist=0, max_attempts=10, offset=0)
     T, D = get_numerical_type(geometry), get_num_dimensions(geometry)
     points = Vector{SVector{D, T}}(undef, n)
-    r2 = radius^2
+    r2 = min_dist^2
     for i in 1:n
         found_point = false
         num_attempts = 0
@@ -138,6 +165,7 @@ function RectangleCfg(points; offset=0)
     )
 end
 
+volume(geometry::RectangleCfg) = prod(geometry.size)
 get_numerical_type(geometry::RectangleCfg{N, T}) where {N, T} = T 
 get_num_dimensions(geometry::RectangleCfg{N, T}) where {N, T} = N 
 
@@ -251,6 +279,12 @@ function CircleCfg(;radius, center)
     radius, center... = promote(radius, center...)
     CircleCfg(radius, SVector(center...))
 end
+function CircleCfg{N}(radius) where N
+    CircleCfg(radius, zero(SVector{N, typeof(radius)}))
+end
+
+get_numerical_type(geometry::CircleCfg{N, T}) where {N, T} = T
+get_num_dimensions(geometry::CircleCfg{N, T}) where {N, T} = N
 
 function signed_pos(point, geometry_cfg::CircleCfg)
     dr = point - geometry_cfg.center
@@ -267,6 +301,16 @@ function is_inside(point, r::CircleCfg; pad=0)
     dist_sqr = sum((point - r.center).^2)    
     return dist_sqr <= (r.radius + pad)^2 
 end
+
+function random_point(geometry_cfg::CircleCfg{N, T}) where {N, T}
+    v = randn(SVector{N, T})
+    v = v / norm(v)
+    u = rand(T)^(1/N)
+    return v * u * geometry_cfg.radius
+end
+
+volume(geometry::CircleCfg{2, T}) where T = π * geometry.radius^2
+volume(geometry::CircleCfg{3, T}) where T = 4/3 * π * geometry.radius^3
 
 check_intersection(r1::RectangleCfg, r2::CircleCfg) = check_intersection(r2, r1)
 function check_intersection(r1::CircleCfg, r2::RectangleCfg)
@@ -537,6 +581,8 @@ particle_radius(dynamic_cfg::LenJonesCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 particle_radius(dynamic_cfg::SzaboCfg) = dynamic_cfg.r_eq/2
 particle_radius(dynamic_cfg::RunTumbleCfg) = dynamic_cfg.sigma * 2^(1/6) / 2
 
+entity_radius(dynamic_cfg) = particle_radius(dynamic_cfg)
+
 # ==
 # Potential Finder
 # ==
@@ -565,6 +611,7 @@ end
 end
 
 @inline get_potential_cfg(type_1, type_2, potential::PotentialCfg) = potential
+@inline get_potential_cfg(id1, id2, state, potential) = potential
 @inline get_potential_cfg(potential, state, pid) = potential
 
 

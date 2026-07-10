@@ -5,7 +5,7 @@ using StaticArrays
 import Mavi.Integration:
     calc_diff, 
     calc_interaction, calc_forces!, calc_walls_forces!, 
-    get_step_function, system_initialization, 
+    get_step_function, system_initialization, system_end_initialization,
     walls!, update_time!
 
 import Mavi.ChunksMod: Chunks, update_chunks!, update_particle_chunk!
@@ -40,7 +40,7 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     rj = get_ring_id(j, num_max_particles(system.state))
 
     pos = system.state.pos
-    interaction_cfg = get_interaction_cfg(ri, rj, system.state, dynamic_cfg.interaction_finder)
+    interaction_cfg = Configs.get_potential_cfg(ri, rj, system.state, dynamic_cfg.interaction_finder)
     dr = calc_diff(pos[i], pos[j], system.space_cfg)
     dist = sqrt(sum(dr.^2))
 
@@ -473,6 +473,8 @@ function system_initialization(::RingsSys, system)
     calc_walls_forces!(system)
     neigh_sum_buffers(system.info.p_neigh)
     neigh_sum_buffers(system.info.r_neigh)
+
+    system_end_initialization(system)
 end
 
 function step!(system)

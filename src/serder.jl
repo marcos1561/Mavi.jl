@@ -3,11 +3,27 @@ module MaviSerder
 export save_system, save_system_configs, save_component_serial, save_component_json, get_obj_save_data_json
 export load_system, load_dic_configs, load_component, load_component_serial, load_component_json, load_configs, load_system_configs, load_state
 
-using Serialization, JSON3, Random
+using Serialization, JSON3, Random, StructTypes
 using StaticArrays
 
 import Mavi
 using Mavi.Systems
+# using Mavi.Configs: PotentialCfg
+
+# ==
+# SerDer for Matrix
+# ==
+
+StructTypes.StructType(::Type{Matrix{T}}) where T = StructTypes.CustomStruct()
+
+function StructTypes.lower(m::Matrix{T}) where T
+    return (size=size(m), data=vec(m))
+end
+
+function StructTypes.construct(::Type{Matrix{T}}, x) where T
+    elems = [isa(el, T) ? el : JSON3.read(JSON3.write(el), T) for el in x["data"]]
+    reshape(elems, x["size"]...)
+end
 
 # ==
 # Serialization

@@ -9,7 +9,7 @@ export save_system, load_system
 using StaticArrays
 
 using Mavi
-import Mavi.Systems: System, SystemType, get_num_total_particles, get_chunks, system_deepcopy
+import Mavi.Systems: Systems, System, SystemType, get_num_total_particles, get_chunks, system_deepcopy
 import Mavi.Configs: SpaceCfg, PeriodicWalls, ManyWalls
 import Mavi.ChunksMod: Chunks, update_chunks!
 
@@ -49,14 +49,14 @@ end
 
 @inline function Mavi.Systems.get_particle_radius(dynamic_cfg::RingsCfg{U, T, I}, state::RingsState, idx) where {U<:AbstractArray, T, I}
     type = state.types[get_ring_id(idx, num_max_particles(state))]
-    inter = get_interaction_cfg(type, type, dynamic_cfg.interaction_finder)
+    inter = Configs.get_potential_cfg(type, type, dynamic_cfg.interaction_finder)
     return Configs.particle_radius(inter)
 end
 
 function Mavi.Systems.particles_radius(dynamic_cfg::RingsCfg, state)
     p_radius::Vector{Float64} = []
     for ring_id in get_rings_ids(state)
-        inter = get_interaction_cfg(ring_id, ring_id, state, dynamic_cfg.interaction_finder)
+        inter = Configs.get_potential_cfg(ring_id, ring_id, state, dynamic_cfg.interaction_finder)
         num_p = ring_num_particles(state, ring_id)
         radius_i = Mavi.Configs.particle_radius(inter)
         for _ in 1:num_p
@@ -275,16 +275,28 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         rng=rng,
     )
 
-    if !isnothing(system.int_cfg.extra.invasions_cfg)
-        info.invasions.last_check = system.time_info.num_steps
-    end
-
-    Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
-    Integration.system_initialization(system)
+    # if !isnothing(system.int_cfg.extra.invasions_cfg)
+    #     info.invasions.last_check = system.time_info.num_steps
+    # end
+    # Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
+    # Integration.system_initialization(system)
     return system
 end
 
-Mavi.Systems.get_cm(system, state::RingsState, entity_id) = system.info.cms[entity_id]
+function Systems.system_base_setup(::RingsSys, system)
+    Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
+     if !isnothing(system.int_cfg.extra.invasions_cfg)
+        info.invasions.last_check = system.time_info.num_steps
+    end
+    Integration.system_initialization(system)
+end
+
+Mavi.Systems.get_entity_pos(state::RingsState, system, id) = system.info.cms[id]
+Mavi.Systems.get_entities_pos(state::RingsState, system) = system.info.cms
+
+function Mavi.Configs.get_potential_cfg(ring_id1, ring_id2, state::RingsState, potential_finder::Mavi.Configs.PotentialMatrix)
+    potential_finder.matrix[state.types[ring_id1], state.types[ring_id2]]
+end
 
 function system_deepcopy(system::System, sys_type::RingsSys)
     sources = system.info.sources

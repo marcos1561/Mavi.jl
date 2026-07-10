@@ -66,7 +66,7 @@ function collect_cm_quantity(quantity::CmVelCfg, state::CmVelState, root_state, 
         data = state.cms2
         time_id = root_state.current_id
         for (idx, entity_id) in enumerate(state.entities_ids)
-            data[:, idx, time_id] = get_cm(system, system.state, entity_id)
+            data[:, idx, time_id] = get_entity_pos(system, entity_id)
         end
         state.num_frames += 1
     end
@@ -142,7 +142,7 @@ function Exp.collect(col::CmQuantitiesCol, system)
         current_time_id = col.state.current_id
 
         for entity_id in get_entities_ids(system)
-            cm_i = get_cm(system, system.state, entity_id)
+            cm_i = get_entity_pos(system, entity_id)
             if mask_func(cm_i)
                 continue
             end

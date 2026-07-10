@@ -4,6 +4,8 @@ module Utils
 include("utils.jl")
 end
 
+include("errors.jl")
+
 # Core Stuff
 include("states.jl")
 include("configs.jl")

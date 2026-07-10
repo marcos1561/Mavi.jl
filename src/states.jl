@@ -5,7 +5,11 @@ export StaticArrays
 using StaticArrays
 
 export SecondLawState, SelfPropelledState, State
-export ActiveState, get_particles_ids, get_num_total_particles, get_particle_type, update_ids!, get_particles_state, get_entities_ids
+export 
+    ActiveState, get_particles_ids, get_particle_type, get_entity_type, update_ids!, 
+    get_particles_state, get_entities_ids, get_entities_pos, get_particles_pos, get_entity_pos, get_particle_pos,
+    get_num_total_particles, get_num_total_entities,
+    add_force_to_entity!
 export get_movable_objects
 
 # = 
@@ -127,17 +131,32 @@ function SelfPropelledState(;pos, pol_angle, active_state=nothing, movable_objec
     )
 end
 
+get_ids_obj(state) = state.part_ids
+
 update_ids!(state) = update_part_ids!(state.part_ids)
 
-get_particles_ids(state) = get_ids(state.part_ids)
+get_particles_ids(state) = get_ids(get_ids_obj(state))
 get_entities_ids(state) = get_particles_ids(state)
-get_num_total_particles(state) = get_num(state.part_ids)
+
+get_num_total_particles(state) = get_num(get_ids_obj(state))
+get_num_total_entities(state) = get_num_total_entities(state)
+
+get_particle_pos(state, id) = state.pos[id]
+get_entity_pos(state, id) = get_particle_pos(state, id)
+
+get_particles_pos(state) = state.pos 
+get_entities_pos(state) = get_particles_pos(state)
 
 get_particles_state(state) = state
 
 get_movable_objects(state) = nothing
 get_movable_objects(state::SelfPropelledState) = state.movable_objects
 
+function get_entity_type(state, idx) end
 function get_particle_type(state, idx) end
+
+function add_force_to_entity!(state, forces, f, eid)
+    forces[eid] += f
+end
 
 end

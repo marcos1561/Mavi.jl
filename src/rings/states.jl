@@ -123,6 +123,8 @@ function RingsState(;rings_pos, pol, num_particles=nothing, types=nothing, activ
     return state
 end
 
+mv_states.get_ids_obj(state::RingsState) = state.rings_ids
+
 @inline get_num_active(state::RingsState) = get_rings_num(state.rings_ids)
 @inline get_rings_ids(state::RingsState) = get_rings_ids(state.rings_ids)
 @inline get_rings_ids(system) = get_rings_ids(system.state.rings_ids)
@@ -150,7 +152,11 @@ to_scalar_idx(state::RingsState, ring_id, particle_id) = to_scalar_idx(ring_id, 
 @inline get_particle_id(idx, num_max_particles) = idx - (get_ring_id(idx, num_max_particles) - 1) * num_max_particles
 @inline get_particle_id(idx, num_max_particles, ring_id) = idx - (ring_id - 1) * num_max_particles
 
-@inline mv_states.get_particle_type(state::RingsState, idx) = state.types[get_ring_id(state, idx)]
+get_type(types::Nothing, idx) = nothing
+get_type(types, idx) = types[idx]
+
+@inline mv_states.get_entity_type(state::RingsState, idx) = get_type(state.types, idx)
+@inline mv_states.get_particle_type(state::RingsState, idx) = get_type(state.types, get_ring_id(state, idx))
 
 function get_inner_neigh_ids(idx, num_max_particles)
     num_p = num_max_particles
@@ -230,8 +236,25 @@ end
 
 mv_states.update_ids!(state::RingsState) = calc_active_ids!(state.rings_ids, state)
 
-mv_states.get_particles_ids(state::RingsState) = mv_states.get_ids(state.rings_ids)
-mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state)
-mv_states.get_num_total_particles(state::RingsState) = mv_states.get_num(state.rings_ids)
+mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state.rings_ids)
+# mv_states.get_particles_ids(state::RingsState) = mv_states.get_ids(state.rings_ids)
+# mv_states.get_particles_pos(state) = get_entities_pos(state, state.part_ids)
+# mv_states.get_num_total_particles(state::RingsState) = mv_states.get_num(state.rings_ids)
+
+mv_states.get_num_total_entities(state::RingsState) = get_rings_num(state)
+
+function mv_states.get_entities_pos(state::RingsState, ids_obj::RingsIds) 
+    @error "To get rings center positions use the method `get_entities_pos(state, system)`." 
+end
+
+function mv_states.add_force_to_entity!(state::RingsState, forces, f, eid)
+    # @show "Aqui"
+    pids = get_ring_particles_indices(state, eid)
+    n = length(pids)
+    fi = f / n
+    for i in pids
+        forces[i] += fi
+    end
+end
 
 end

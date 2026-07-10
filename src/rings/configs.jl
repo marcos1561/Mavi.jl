@@ -3,14 +3,12 @@ module Configs
 export RingsIntCfg, RingsCfg, has_types_cfg, get_spring_pars
 export get_area0, get_equilibrium_p0, get_particle_radius
 export get_equilibrium_area, get_particles_area_contribution, get_ring_radius
-export HarmTruncCfg
-export InteractionMatrix, get_interaction_cfg, list_interactions, list_self_interactions
+export HarmTruncCfg, PotentialMatrix
 export IntCfg, InvasionsCfg
 
 using NLsolve, StructTypes, JSON3
 
 import Mavi.Configs as MaviCfg
-# import Mavi.Configs: DynamicCfg, AbstractIntCfg, ChunksCfg, has_chunks, particle_radius
 
 import Mavi.Rings.States: ring_num_particles
 
@@ -18,96 +16,10 @@ using Reexport
 @reexport using Mavi.Configs
 
 # =
-# Pairwise interactions
-# = 
-
-abstract type InteractionCfg end
-
-"""
-Harmonic truncated potential. This radial potencial will generate
-a force of the following form
-```
-if dist < dist_eq
-    force_magnitude = -k_rep * (dist/dist_eq - 1)
-elseif dist < dist_max
-    force_magnitude = k_atr * (dist/dist_eq - 1)
-else
-    force_magnitude = 0
-end
-```
-where `dist` is the distance between particles.
-"""
-struct HarmTruncCfg{T<:Number} <: InteractionCfg
-    k_rep::T
-    k_atr::T
-    dist_eq::T
-    dist_max::T
-end
-
-function HarmTruncCfg(;k_rep, k_atr, dist_eq, dist_max)
-    HarmTruncCfg(promote(k_rep, k_atr, dist_eq, dist_max)...)
-end
-function HarmTruncCfg{T}(; k_rep, k_atr, dist_eq, dist_max) where {T<:Number}
-    HarmTruncCfg{T}(T(k_rep), T(k_atr), T(dist_eq), T(dist_max))
-end
-
-function MaviCfg.potential_force(dr, dist, potential::HarmTruncCfg)
-    if dist > potential.dist_max
-        return zero(dr)
-    end
-
-    dist_eq = potential.dist_eq
-
-    if dist < dist_eq
-        fmod = -potential.k_rep * (dist/dist_eq - 1)
-    else
-        fmod = -potential.k_atr * (dist/dist_eq - 1)
-    end
-
-    return fmod / dist * dr
-end
-
-function MaviCfg.particle_radius(interaction_cfg::HarmTruncCfg) 
-    return interaction_cfg.dist_eq / 2.0
-end
-
-abstract type InteractionFinder{T} end
-
-struct InteractionMatrix{T} <: InteractionFinder{T} 
-    matrix::Matrix{T}
-end
-
-list_interactions(interactions::InteractionCfg) = [interactions]
-
-function list_interactions(interactions::InteractionMatrix)
-    mat = interactions.matrix
-    return [mat[i, j] for i in 1:size(mat, 1) for j in i:size(mat, 2)]
-end
-
-list_self_interactions(interactions::InteractionCfg) = [interactions]
-
-function list_self_interactions(interactions::InteractionMatrix)
-    mat = interactions.matrix
-    return [mat[i, i] for i in axes(mat, 1)]
-end
-
-@inline function get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionMatrix)
-    interaction.matrix[state.types[ring_id1], state.types[ring_id2]]
-end
-
-@inline function get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionMatrix)
-    interaction.matrix[ring_type_1, ring_type_2]
-end
-
-@inline get_interaction_cfg(ring_id1, ring_id2, state, interaction::InteractionCfg) = interaction
-
-@inline get_interaction_cfg(ring_type_1, ring_type_2, interaction::InteractionCfg) = interaction
-
-# =
 # Rings Configs
 # = 
 
-struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFinderT<:Union{InteractionFinder{T}, T}} <: DynamicCfg
+struct RingsCfg{U<:Union{AbstractVector, Number}, T<:MaviCfg.PotentialCfg, PF<:Union{MaviCfg.PotentialFinder{T}, T}} <: DynamicCfg
     p0::U
     relax_time::U
     vo::U
@@ -118,7 +30,7 @@ struct RingsCfg{U<:Union{AbstractVector, Number}, T<:InteractionCfg, InteracFind
     l_spring::U
     num_particles::Union{Int, Vector{Int}}
     num_types::Int
-    interaction_finder::InteracFinderT
+    interaction_finder::PF
 end
 
 """
@@ -247,6 +159,13 @@ function RingsCfg(cfg::RingsCfg, num_particles)
     )
 end
 
+function MaviCfg.maximum_interaction_distance(dynamic_cfg::RingsCfg)
+    return maximum(
+        p -> maximum_interaction_distance(p),
+        list_potentials(dynamic_cfg.interaction_finder)
+    )
+end
+
 @inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:Number, T, F} = false
 @inline has_types_cfg(dynamic_cfg::RingsCfg{U, T, F}) where {U<:AbstractVector, T, F} = true
 
@@ -255,6 +174,13 @@ end
 end
 @inline function get_ring_prop_by_name(dynamic_cfg::RingsCfg{U, T, I}, name, type) where {U<:AbstractVector, T, I}
     return getfield(dynamic_cfg, name)[type]
+end
+
+function get_rings_property(dynamic_cfg::RingsCfg{U, T, I}, prop_func; dtype=nothing) where {U<:Number, T, I}
+    if isnothing(dtype)
+        dtype = U
+    end
+    dtype(prop_func(dynamic_cfg, nothing))
 end
 
 function get_rings_property(dynamic_cfg::RingsCfg{U, T, I}, prop_func; dtype=nothing) where {U, T, I}
@@ -289,11 +215,13 @@ end
 
 
 @inline function get_particle_radius(dynamic_cfg::RingsCfg, type=nothing)
-    inter = get_interaction_cfg(type, type, dynamic_cfg.interaction_finder)
+    inter = get_potential_cfg(type, type, dynamic_cfg.interaction_finder)
     return particle_radius(inter)
 end
 
 MaviCfg.particle_radius(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, get_particle_radius)
+MaviCfg.entity_radius(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, get_ring_radius)
+
 
 ring_num_particles(dynamic_cfg::RingsCfg, type) = ring_num_particles(dynamic_cfg.num_particles, type)
 ring_num_particles(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, ring_num_particles, dtype=Int)
@@ -302,11 +230,13 @@ ring_num_particles(dynamic_cfg::RingsCfg) = get_rings_property(dynamic_cfg, ring
 Returns the equilibrium area of the area force for
 the given number of particles, taking into account `p0`.
 """
+get_area0(num_particles, l_spring, p0) = (num_particles * l_spring / p0)^2
+
 function get_area0(dynamic_cfg::RingsCfg{U, T, I}, type=nothing) where {U, T, I}
     num_particles = ring_num_particles(dynamic_cfg, type)
     l_spring = get_ring_prop_by_name(dynamic_cfg, :l_spring, type)
     p0 = get_ring_prop_by_name(dynamic_cfg, :p0, type)
-    return (num_particles * l_spring / p0)^2
+    get_area0(num_particles, l_spring, p0)
 end
 get_area0(dynamic_cfg::RingsCfg{U, T, I}) where {U<:AbstractVector, T, I} = get_rings_property(dynamic_cfg, get_area0)
 
@@ -442,6 +372,16 @@ function RingsIntCfg(; dt, p_chunks_cfg=nothing, r_chunks_cfg=nothing,
     end
 
     MaviCfg.IntCfg(dt, p_chunks_cfg, device, IntCfgExtra(r_chunks_cfg, invasions_cfg))
+end
+function RingsIntCfg(int_cfg::MaviCfg.IntCfg; r_chunks_cfg=nothing, 
+    invasions_cfg=nothing) 
+    RingsIntCfg(
+        dt=int_cfg.dt,
+        p_chunks_cfg=int_cfg.chunks_cfg,
+        device=int_cfg.device,
+        r_chunks_cfg=r_chunks_cfg,
+        invasions_cfg=invasions_cfg,
+    )
 end
 
 end
