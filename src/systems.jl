@@ -170,6 +170,8 @@ get_entity_radius(system::System, idx) = get_entity_radius(system.dynamic_cfg, s
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
+States.get_particles_pos(system::System) = get_particles_pos(system.state)
+
 States.get_entity_pos(state, system, id) = get_entity_pos(state, id)
 States.get_entities_pos(state, system) = get_entities_pos(state)
 States.get_entity_pos(system::System, id) = get_entity_pos(system.state, system, id)

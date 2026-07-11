@@ -46,6 +46,7 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
 
     max_dist = 2 * Configs.particle_radius(interaction_cfg)
     neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
+    neigh_update!(system.info.r_neigh, i, j, dist, max_dist)
 
     f = calc_interaction_force(i, j, ri, rj, dr, dist, interaction_cfg, system)
     debug_pairwise_force!(system.debug_info, f, ri, rj, i, j)

@@ -1,6 +1,6 @@
 module RingsGraphs
 
-export InvasionsGraphCfg, RingsNumsGraphCfg, RingForceGraphCfg
+export InvasionsGraphCfg, RingsNumsGraphCfg, RingForceGraphCfg, NeighborsGraphCfg
 
 using GLMakie
 
@@ -8,7 +8,13 @@ using Mavi.Rings
 using Mavi.Rings.States
 using Mavi.Rings.Configs
 using Mavi.Rings.RingsDebug
-import Mavi.Visualization.SystemGraphs: Graph, GraphCfg, MainGraph, MainGraphCfg, GraphComp, GraphCompCfg, get_graph_data, update_graph_data, get_graph, update_graph, get_default_num_types
+using Mavi.Rings.NeighborsMod
+import Mavi.Visualization.SystemGraphs: 
+    Graph, GraphCfg, MainGraph, MainGraphCfg, 
+    GraphComp, GraphCompCfg, 
+    get_graph_data, update_graph_data, 
+    get_graph, update_graph, 
+    get_default_num_types
 
 function update_types_to_ring_id!(types, system)
     for ring_id in axes(system.rings_pos, 2)
@@ -236,6 +242,47 @@ function update_graph(graph::RingForceGraph, system)
         end
         Makie.update!(graph.arrows[name], x, y, u, v)
     end
+end
+
+# ==
+# Neighbors
+# ==
+@kwdef struct NeighborsGraphCfg{N} <: GraphCfg 
+    neighbors::N
+    offset=nothing
+end
+
+struct NeighborsGraph{N, P} <: Graph 
+    cfg::NeighborsGraphCfg{N}
+    plot::P
+end
+
+function get_graph(ax, system, cfg::NeighborsGraphCfg)
+    plot = text!(ax, [zero(eltype(system.state.pos))])
+    graph = NeighborsGraph(cfg, plot)
+    update_graph(graph, system)
+    graph
+end
+
+function update_graph(graph::NeighborsGraph, system) 
+    neigh = get_neigh(graph.cfg.neighbors)
+
+    pos = system.state.pos
+    points = Point2f[]
+    text = String[]
+    count = get_neigh_count(neigh)
+    
+    offset = graph.cfg.offset
+    if offset === nothing
+        offset = zero(eltype(pos))
+    end
+        
+    for (pid, c) in enumerate(count)
+        push!(points, pos[pid] + offset)
+        push!(text, "$c")
+    end
+
+    Makie.update!(graph.plot, points; text=text)
 end
 
 end # RingsGraphs

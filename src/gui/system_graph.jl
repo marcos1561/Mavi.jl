@@ -1,7 +1,11 @@
 module SystemGraphs
 
-export MainGraph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
-export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg
+export Graph, GraphCfg, GraphComp, GraphCompCfg, GraphCompDebug
+export update_graph, get_graph
+export MainGraph
+export 
+    ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, 
+    NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg, ChunksGraphCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
 using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
@@ -9,6 +13,8 @@ using Mavi.Systems
 using Mavi.States
 using Mavi.Configs
 using Mavi.MovableObjects
+using Mavi.ChunksMod
+using Mavi.Errors
 
 "Drawn the borders of `geometry_cfg`."
 function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
@@ -176,7 +182,8 @@ abstract type Graph end
 
 "Construct a Graph for `ax` given its configurations `cfg`."
 function get_graph(ax, system, cfg::GraphCfg) 
-    @error "No graph constructor for $(typeof(cfg))"
+    throw(NotImplementedError(cfg))
+    # @error "No graph constructor for $(typeof(cfg))"
 end
 
 "Updates the graph to the next frame."
@@ -498,6 +505,7 @@ function update_graph(comp::CircleGraph, system)
 end
 
 @kwdef struct NumsGraphCfg <: GraphCompCfg 
+    offset=nothing
     kwargs = Dict()
 end
 
@@ -525,7 +533,12 @@ function update_graph(comp::NumsGrah, system)
     pos = comp.pos_obs[]
     particles_ids = get_particles_ids(system)
     
-    points = [Point2f(p) for p in pos]
+    offset = comp.cfg.offset
+    if offset === nothing
+        offset = zero(eltype(pos))
+    end
+
+    points = [Point2f(p + offset) for p in pos]
     text = [string(i) for i in particles_ids]
 
     Makie.update!(comp.plot, points; text=text)
@@ -708,6 +721,69 @@ function SystemGraphs.update_graph(graph::TotalForceGraph, system)
     end
 
     Makie.update!(graph.arrows, x, y, u, v)
+end
+
+# ==
+# Chunks
+# ==
+
+@kwdef struct ChunksGraphCfg{C} <: GraphCfg 
+    color::C="gray"
+    see_particle_chunk=true
+end
+
+struct ChunksGraph{P} <: Graph 
+    cfg::ChunksGraphCfg
+    p_chunk_plot::P
+end
+
+function get_graph(ax, system, cfg::ChunksGraphCfg)
+    chunks = system.chunks
+    if chunks === nothing
+        return nothing
+    end
+
+    bbox = chunks.space_cfg.geometry_cfg
+    bl = bbox.bottom_left
+    l, h = chunks.chunk_length, chunks.chunk_height
+    for i in 1:(chunks.num_cols + 1)
+        x = bl.x + l * (i - 1)
+        lines!(ax, [x, x], [bl.y, bl.y + bbox.height], color=cfg.color)
+    end
+    for i in 1:(chunks.num_rows + 1)
+        y = bl.y + h * (i - 1)
+        lines!(ax, [bl.x, bl.x + bbox.length], [y, y], color=cfg.color)
+    end
+
+    p_chunk_plot = nothing
+    if cfg.see_particle_chunk
+        p_chunk_plot = text!(ax, [zero(eltype(system.state.pos))])
+    end
+    graph = ChunksGraph(cfg, p_chunk_plot)
+    update_graph(graph, system)
+    graph
+end
+
+function update_graph(graph::ChunksGraph, system) 
+    if graph.p_chunk_plot === nothing
+        return
+    end
+
+    pos = system.state.pos
+    chunks = system.chunks
+    nc = chunks.num_cols
+    nr = chunks.num_rows
+
+    points = Point2f[]
+    text = String[]
+    for i in 1:nr, j in 1:nc
+        for pid in get_chunk_particles(chunks, i, j)
+            push!(points, pos[pid])
+            push!(text, "($i, $j)")
+        end
+    end
+
+    Makie.update!(graph.p_chunk_plot, points; text=text)
 end
 
 include("../rings/view.jl")
