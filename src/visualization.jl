@@ -135,8 +135,8 @@ function VideoCfg(;path, duration, anim_cfg=nothing, save_configs=false)
     VideoCfg(path, duration, anim_cfg, save_configs)
 end
 
-struct ImageCfg{GraphT, T<:Number}
-    path::String
+struct ImageCfg{GraphT, T<:Union{Number, Nothing}}
+    path::Union{String, Nothing}
     tf::T
     graph_cfg::GraphT
     fig_kwargs::Union{Dict, Nothing}
@@ -144,7 +144,7 @@ struct ImageCfg{GraphT, T<:Number}
 end
 function ImageCfg(;
     path,
-    tf=0,
+    tf=nothing,
     graph_cfg=MainGraphCfg(),
     fig_kwargs=nothing,
     ax_kwargs=nothing,
@@ -493,14 +493,20 @@ function animate(system::System, cfg::ImageCfg; step_func=nothing)
 
     graph = SystemGraphs.get_graph(ax, system, get_graph_cfg(cfg.graph_cfg))
 
-    ti = system.time_info.time
-    while system.time_info.time - ti < cfg.tf
-        step_func(system)
+    if cfg.tf !== nothing
+        ti = system.time_info.time
+        while system.time_info.time - ti < cfg.tf
+            step_func(system)
+        end
     end
 
     SystemGraphs.update_graph(graph, system)
 
-    save(cfg.path, fig)
+    if cfg.path === nothing
+        return fig, ax, graph
+    else
+        save(cfg.path, fig)
+    end
 end
 
 function animate(system::System, cfg::Vector{I}; step_func=nothing) where I <: ImageCfg

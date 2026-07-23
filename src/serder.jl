@@ -72,7 +72,10 @@ function save_system_configs(system::System, root, name="configs")
 end
 
 "Save a system in the path `root`."
-function save_system(system::System, root)
+function save_system(system::System, root; metadata=nothing)
+    if metadata !== nothing
+        save_component_json(metadata, root, "metadata")
+    end
     save_system_configs(system, root)
     save_component_serial(system.state, root, "state")
     serialize(joinpath(root, "state/rng.bin"), system.rng)

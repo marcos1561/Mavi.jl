@@ -22,6 +22,7 @@ module Progress
     struct NormalFormatter{L} <: ProgFormatter
         label::L
     end
+    NormalFormatter() = NormalFormatter(nothing)
 
     function progress_text(formatter::NormalFormatter{Nothing}, progress, remaining)
         println("Progress: $(progress) % | $(remaining)")

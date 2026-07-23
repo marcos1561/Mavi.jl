@@ -279,8 +279,8 @@ function CircleCfg(;radius, center)
     radius, center... = promote(radius, center...)
     CircleCfg(radius, SVector(center...))
 end
-function CircleCfg{N}(radius) where N
-    CircleCfg(radius, zero(SVector{N, typeof(radius)}))
+function CircleCfg{N}(radius::T) where {N, T<:Number}
+    CircleCfg{N, T}(radius, zero(SVector{N, T}))
 end
 
 get_numerical_type(geometry::CircleCfg{N, T}) where {N, T} = T

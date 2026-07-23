@@ -12,6 +12,7 @@ using Base.Threads
 
 using Mavi.Systems
 using Mavi.MaviSerder
+using Mavi.Errors
 using Mavi.Integration: get_step_function, system_initialization
 
 using Mavi.Utils.Progress
@@ -28,7 +29,7 @@ abstract type ColState end
 abstract type Collector end
 
 function get_collector(col_cfg::ColCfg, exp_cfg, system, state=nothing) end
-function collect(col::Collector, system) end
+collect(col::Collector, system, args...; kwarg...)  = throw(NotImplementedError(col))
 function final_collect(col::Collector, system) end
 function save_data(col::Collector, path) end
 function load_data(::Type{ColCfg}, path) end
@@ -672,7 +673,11 @@ function check_checkpoint(cfg::CheckpointCfg, experiment; force_save=false)
     cp.is_valid[cp_name] = true
     cp.last_used = cp_name
 
-    serialize(joinpath(cp_dir, CHECKPOINT_INFO_NAME), cp)
+    cp_path = joinpath(cp_dir, CHECKPOINT_INFO_NAME)
+    cp_path_temp = cp_path * ".tmp"
+    # serialize(joinpath(cp_dir, CHECKPOINT_INFO_NAME), cp)
+    serialize(cp_path_temp, cp)
+    mv(cp_path_temp, cp_path, force=true)
 end
 
 function load_experiment_configs(path)
