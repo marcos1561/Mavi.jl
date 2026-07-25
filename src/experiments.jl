@@ -3,8 +3,8 @@ module Experiments
 export Experiment, ExperimentCfg, CheckpointCfg, run_experiment, load_experiment
 export ExperimentBatch, run_experiment_batch, add_experiments, load_experiment_batch, load_experiment_batch_values, set_final_time, load_experiment_configs
 export DelayedCfg, ManyColsCfg
-export CartesianProdVals, VectorVals, CurveVals
-export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range, add_exp_values!
+export CartesianProdVals, VectorVals, CurveVals, EnsembleValues
+export get_all_exp_value, get_exp_value, indices_with_fixed, get_exp_range, add_exp_values!, ensemble_get_system_func
 export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
@@ -165,6 +165,9 @@ Base.length(exp_values::ExpValues) = length(exp_values.values)
 Base.eachindex(exp_values::ExpValues) = eachindex(exp_values.values)
 get_exp_value(exp_values::ExpValues, idx) = exp_values.values[idx] 
 get_all_exp_value(exp_values::ExpValues) = exp_values.values 
+get_system_outer(exp_values::ExpValues, init_system, idx, get_system) = get_system(
+    init_system, get_exp_value(exp_values, idx), idx
+)
 
 function add_exp_values!(exp_values::ExpValues, new_vals)
     for v in new_vals
@@ -305,6 +308,32 @@ end
 
 function curve_values(exp_values::CurveVals, parameter_idx)
     exp_values.curve_values[parameter_idx]
+end
+
+function EnsembleValues(;ensemble_path::Union{String, Vector{String}}, parameter_range, parameter_name=nothing)
+    if ensemble_path isa String
+        path_list = filter(isdir, readdir(ensemble_path, join=true))
+        curve_values = [copy(path_list) for _ in 1:length(parameter_range)]
+    else
+        n_par = length(parameter_range)
+        n_ens = length(ensemble_path)
+        if n_ens != n_par
+            error("If `ensemble_path` is a `Vector`, then its length must me `length(parameter_range)=$n_par`, but it is $n_ens.")
+        end
+        curve_values = [filter(isdir, readdir(p, join=true)) for p in ensemble_path]
+    end
+    CurveVals(
+        parameter_range=parameter_range,
+        curve_values=curve_values,
+        parameter_name=parameter_name
+    )
+end
+
+function ensemble_get_system_func(get_system)
+    function func(_, exp_value, idx)
+        init_system = load_system(exp_value[2])
+        return get_system(init_system, exp_value[1], idx)
+    end
 end
 
 struct ExperimentBatch{C<:ColCfg, S<:System, V, F}
@@ -490,8 +519,6 @@ function process_experiment(idx, experiment_batch, get_system, stop_func, result
     step_func = experiment_batch.custom_step
     
     try
-        exp_value = get_exp_value(values, idx)
-
         exp_root = joinpath(exp_cfg.root, "data", string(idx))
         done_path = joinpath(exp_root, ".done")
         
@@ -513,7 +540,7 @@ function process_experiment(idx, experiment_batch, get_system, stop_func, result
                 checkpoint_cfg=exp_cfg.checkpoint_cfg,
             )
 
-            system = get_system(init_system, exp_value, idx)
+            system = get_system_outer(values, init_system, idx, get_system)
             experiment = Experiment(
                 exp_cfg_i, col_cfg, system, 
                 step_func,
