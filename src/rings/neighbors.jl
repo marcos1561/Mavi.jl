@@ -1,6 +1,6 @@
 module NeighborsMod
 
-export NeighborsCfg, Neighbors, ParticleNeighbors 
+export NeighborsCfg, HystericNeighborsCfg, Neighbors, ParticleNeighbors 
 export get_neigh, get_neigh_list, get_neigh_count, neigh_sum_buffers, neigh_clean!, neigh_update!
 
 import Mavi
@@ -53,9 +53,21 @@ get_slide_idx(::Mavi.Configs.Threaded) = Mavi.Integration.get_thread_index()
     type::Symbol = :rings
 end
 
+@kwdef struct HystericNeighborsCfg
+    neigh_cfg::NeighborsCfg
+    offset_k::Float64
+end
+
+struct HystericNeighbors{N} <: AbstractNeighbors
+    cfg::HystericNeighborsCfg
+    neighbors::N
+    is_neigh_buffer::BitMatrix
+end
+HystericNeighbors(cfg, neighbors, num_entities) = HystericNeighbors(cfg, neighbors, falses(num_entities, num_entities))
+
 function get_neigh(neigh) end
 get_neigh(neigh::Neighbors) = neigh
-get_neigh(neigh::ParticleNeighbors) = neigh.neighbors
+get_neigh(neigh::Union{ParticleNeighbors, HystericNeighbors}) = neigh.neighbors
 
 function get_neigh_list(neighbors, id) 
     neigh = get_neigh(neighbors)
@@ -66,7 +78,7 @@ get_neigh_count(neighbors) = @view get_neigh(neighbors).count[:, 1]
 function neigh_clean!(neighbors) end
 
 function neigh_clean!(neighbors::AbstractNeighbors)
-   get_neigh(neighbors).count .= 0 
+    get_neigh(neighbors).count .= 0 
 end
 
 function neigh_sum_buffers(neighbors) end
@@ -94,7 +106,7 @@ function neigh_sum_buffers(neighbors::Neighbors{L, D}) where {L<:AbstractArray, 
     end
 end
 
-neigh_sum_buffers(neighbors::ParticleNeighbors) = neigh_sum_buffers(get_neigh(neighbors))
+neigh_sum_buffers(neighbors::AbstractNeighbors) = neigh_sum_buffers(get_neigh(neighbors))
 
 function neigh_update_data!(neighbors::Neighbors{Nothing, D}, i, j) where D
     count = neighbors.count
@@ -120,6 +132,27 @@ function neigh_update!(neighbors::Nothing, i, j, dist, max_dist) end
 function neigh_update!(neighbors::Neighbors, i, j, dist, max_dist)
     if dist < max_dist * neighbors.cfg.tol
         neigh_update_data!(neighbors, i, j)    
+    end
+end
+
+function neigh_update!(neighbors::HystericNeighbors, i, j, dist, max_dist)
+    inner_neigh = neighbors.neighbors
+    is_neigh_buffer = neighbors.is_neigh_buffer
+    offset_k = neighbors.cfg.offset_k
+    max_dist = inner_neigh.cfg.tol * max_dist
+    if is_neigh_buffer[i, j]
+        if dist < max_dist * (1 + offset_k)
+            neigh_update_data!(inner_neigh, i, j)
+        else
+            is_neigh_buffer[i, j] = false
+            is_neigh_buffer[j, i] = false
+        end
+    else
+        if dist < max_dist
+            is_neigh_buffer[i, j] = true
+            is_neigh_buffer[j, i] = true
+            neigh_update_data!(inner_neigh, i, j)
+        end
     end
 end
 

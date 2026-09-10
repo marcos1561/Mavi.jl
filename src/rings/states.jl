@@ -243,7 +243,7 @@ mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state.rings_ids)
 
 mv_states.get_num_total_entities(state::RingsState) = get_rings_num(state)
 
-function mv_states.get_entities_pos(state::RingsState, ids_obj::RingsIds) 
+function mv_states.get_entities_pos(state::RingsState) 
     @error "To get rings center positions use the method `get_entities_pos(state, system)`." 
 end
 

@@ -28,6 +28,10 @@ abstract type ColCfg end
 abstract type ColState end
 abstract type Collector end
 
+# TODO: Em alguns `get_collector` a coleta é feita de forma forçada, no entanto, isso não
+# deve ser feito quando um checkpoint é carregado, ou seja, a coleta forçada apenas deve
+# ocorrer quando o coletor é criada pela primeira vez, fora de `get_collector`.
+
 function get_collector(col_cfg::ColCfg, exp_cfg, system, state=nothing) end
 collect(col::Collector, system, args...; kwarg...)  = throw(NotImplementedError(col))
 function final_collect(col::Collector, system) end
@@ -310,18 +314,33 @@ function curve_values(exp_values::CurveVals, parameter_idx)
     exp_values.curve_values[parameter_idx]
 end
 
-function EnsembleValues(;ensemble_path::Union{String, Vector{String}}, parameter_range, parameter_name=nothing)
+"Merge v2 into v1"
+function merge!(v1::CurveVals, v2::CurveVals)
+    for (v, cv) in zip(v2.parameter_range, v2.curve_values)
+        add_new_curve!(v1, parameter_value=v, curve_values=cv)
+    end
+end
+
+function EnsembleValues(;ensemble_path::Union{String, Vector{String}, Vector{Vector{String}}}, parameter_range, parameter_name=nothing)
     if ensemble_path isa String
         path_list = filter(isdir, readdir(ensemble_path, join=true))
         curve_values = [copy(path_list) for _ in 1:length(parameter_range)]
-    else
+    elseif ensemble_path isa Vector{String}
         n_par = length(parameter_range)
         n_ens = length(ensemble_path)
         if n_ens != n_par
             error("If `ensemble_path` is a `Vector`, then its length must me `length(parameter_range)=$n_par`, but it is $n_ens.")
         end
         curve_values = [filter(isdir, readdir(p, join=true)) for p in ensemble_path]
+    else
+        n_par = length(parameter_range)
+        n_ens = length(ensemble_path)
+        if n_ens != n_par
+            error("If `ensemble_path` is a `Vector`, then its length must me `length(parameter_range)=$n_par`, but it is $n_ens.")
+        end
+        curve_values = ensemble_path
     end
+
     CurveVals(
         parameter_range=parameter_range,
         curve_values=curve_values,
@@ -620,6 +639,16 @@ function save_data(col::ManyCols, path)
     end
 end
 
+# function Exp.load_data(::Type{ManyCols}, path)
+#     datas = Dict{String, Any}()
+#     for path_i in readdir(path, join=true)
+#         datas[basename(path_i)] = load_data( path_i)
+#     end
+
+#     deserialize(joinpath(path, "data.bin"))
+# end
+
+
 # =
 # Delayed Collector
 # = 
@@ -712,13 +741,16 @@ function load_experiment_configs(path)
     load_dic_configs(configs)
 end
 
-function load_experiment(root, custom_step=nothing)
+function get_checkpoint_info(root)
     cp_path = joinpath(root, CHECKPOINT_DIRNAME, CHECKPOINT_INFO_NAME)
     if !isfile(cp_path)
         error("Checkpoint info file does not exist at $cp_path")
     end
-    cp_info::Checkpoint = deserialize(cp_path)
+    return deserialize(cp_path)
+end
 
+get_checkpoint_path(root) = get_checkpoint_path(root, get_checkpoint_info(root))
+function get_checkpoint_path(root, cp_info)
     cp_name = cp_info.last_used
     if !cp_info.is_valid[cp_name]
         cp_name = cp_name == "1" ? "2" : "1"
@@ -727,8 +759,28 @@ function load_experiment(root, custom_step=nothing)
         end
     end
         
-    path = joinpath(root, CHECKPOINT_DIRNAME, cp_name)
-    
+    return joinpath(root, CHECKPOINT_DIRNAME, cp_name)
+end
+
+function load_experiment(root, custom_step=nothing)
+    # cp_path = joinpath(root, CHECKPOINT_DIRNAME, CHECKPOINT_INFO_NAME)
+    # if !isfile(cp_path)
+    #     error("Checkpoint info file does not exist at $cp_path")
+    # end
+    # cp_info::Checkpoint = deserialize(cp_path)
+
+    # cp_name = cp_info.last_used
+    # if !cp_info.is_valid[cp_name]
+    #     cp_name = cp_name == "1" ? "2" : "1"
+    #     if !cp_info.is_valid[cp_name]
+    #         error("Every checkpoint is corrupted!")
+    #     end
+    # end
+        
+    # path = joinpath(root, CHECKPOINT_DIRNAME, cp_name)
+    cp_info = get_checkpoint_info(root)
+    path = get_checkpoint_path(root, cp_info)
+
     configs = convert(Dict{Symbol, Any}, JSON3.read(joinpath(root, EXP_COL_CONFIGS_NAME)))
     configs = load_dic_configs(configs)
     exp_cfg = configs[:experiment] 

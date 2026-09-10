@@ -43,6 +43,7 @@ end
 
 "Returns data to be saved inside `obj`."
 get_obj_save_data(obj) = obj
+# get_obj_save_data(obj::Dict) = Dict(k => get_obj_save_data_json(v) for (k, v) in obj)
 
 "Returns data to be saved inside `obj` in the `json` format."
 get_obj_save_data_json(obj) = (type=string(typeof(obj)), data=get_obj_save_data(obj))
@@ -51,6 +52,14 @@ get_obj_save_data_json(obj::Tuple) = [get_obj_save_data_json(x) for x in obj]
 function save_component_json(obj, root, name)
     open(joinpath(root, "$name.json"), "w") do io
         JSON3.pretty(io, get_obj_save_data_json(obj))
+    end
+end
+
+function save_configs(configs, save_path)
+    configs_data = get_obj_save_data(configs)
+    mkpath(dirname(save_path))
+    open(save_path, "w") do io
+        JSON3.pretty(io, configs_data)
     end
 end
 
@@ -73,6 +82,7 @@ end
 
 "Save a system in the path `root`."
 function save_system(system::System, root; metadata=nothing)
+    mkpath(root)
     if metadata !== nothing
         save_component_json(metadata, root, "metadata")
     end
@@ -129,6 +139,7 @@ function load_dic_configs(configs)
         if name == :sys_type
             continue
         end
+        # println("Name: $name")
         # println("Type: ", get_saved_type(load_info))
         # println("Data: ", JSON3.write(get_saved_data(load_info)))
         # println("================")
@@ -143,12 +154,17 @@ function load_configs(path)
     load_dic_configs(configs)
 end
 
-function load_system_configs(path) 
+function load_system_configs(path; ignore_info=false) 
     configs = JSON3.read(path)
     configs = convert(Dict{Symbol, Any}, configs)
+    if ignore_info
+        delete!(configs, :info)
+    end
     sys_type = eval(Meta.parse(configs[:sys_type]))
     configs = load_dic_configs(configs)
     configs[:sys_type] = sys_type
+
+
     return configs
 end
 

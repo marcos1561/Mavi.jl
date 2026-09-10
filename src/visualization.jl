@@ -187,12 +187,16 @@ get_anim_cfg(cfg::VideoCfg) = cfg.anim_cfg
 # get_graph_cfg(image_cfg::ImageCfg{G, T}) where {G<:SystemGraphs.GraphCompCfg, T} = MainGraphCfg(image_cfg.graph_cfg)
 
 "Render, in real time, the system using the given step function."
-function animate(system::System, cfg=nothing; step_func=nothing, create_widget=nothing, is_3D=false, return_graph=false)
+function animate(system::System, cfg=nothing; step_func=nothing, 
+    create_widget=nothing, is_3D=false, return_graph=false, mouse_click_callback=nothing, skip_initialization=false
+    )
     if isnothing(step_func)
         step_func = get_step_function(system)
     end
 
-    system_initialization(system)
+    if !skip_initialization
+        system_initialization(system)
+    end
 
     GLMakie.activate!(; title="Mavi")
 
@@ -355,6 +359,9 @@ function animate(system::System, cfg=nothing; step_func=nothing, create_widget=n
             if event.button == Mouse.left && event.action == Mouse.press
                 pos = mouseposition(system_ax.scene)
                 println("Data coordinates: ", pos)
+                if mouse_click_callback !== nothing
+                    mouse_click_callback(pos, system)
+                end
             end
         end
 
