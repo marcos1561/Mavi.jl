@@ -100,7 +100,7 @@ function save_experiment_configs(col_cfg, exp_cfg)
     end
 end
 
-function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=nothing)
+function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=nothing, save_system_on_error=true)
     if isnothing(prog_kwargs)
         prog_kwargs = ()
     end
@@ -130,25 +130,34 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
 
     prog = ProgContinuos(init=system.time_info.time, final=cfg.tf; prog_kwargs...)
 
-    system_initialization(system)
-    while system.time_info.time < cfg.tf
-        experiment_step!(system)
-        collect(col, system)
-        check_checkpoint(cfg.checkpoint_cfg, experiment)
-        show_progress(prog, system.time_info.time)
+    try
+        system_initialization(system)
+        while system.time_info.time < cfg.tf
+            experiment_step!(system)
+            collect(col, system)
+            check_checkpoint(cfg.checkpoint_cfg, experiment)
+            show_progress(prog, system.time_info.time)
 
-        if stop_col_func(col)
-            break
-        end
+            if stop_col_func(col)
+                break
+            end
 
-        if stop_func(system)
-            break
+            if stop_func(system)
+                break
+            end
         end
+        final_collect(col, system)
+        save_data(col, col_path)
+        check_checkpoint(cfg.checkpoint_cfg, experiment, force_save=true)
+    catch err
+        if save_system_on_error
+            exp_root = experiment.cfg.root
+            save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
+            save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
+        end
+        rethrow()
     end
-    final_collect(col, system)
-    save_data(col, col_path)
-    check_checkpoint(cfg.checkpoint_cfg, experiment, force_save=true)
-    
+
     if cfg.save_final_state
         save_system(system, joinpath(cfg.root, FINAL_STATE_NAME))
         # save_component_serial(system.state, cfg.root, FINAL_STATE_NAME)
@@ -573,8 +582,8 @@ function process_experiment(idx, experiment_batch, get_system, stop_func, result
             experiment_log(exp_logger, idx, "Error during experiment", before="\n")
             experiment_log_error(exp_logger, idx, e, catch_backtrace())
             
-            save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
-            save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
+            # save_system(experiment.system, mkpath(joinpath(exp_root, "error_system")))
+            # save_data(experiment.col, mkpath(joinpath(exp_root, "error_col")))
         end
 
         results[idx] = nothing

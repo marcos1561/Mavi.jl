@@ -508,6 +508,8 @@ function update_szabo!(system::System)
     vo, relax_time = dynamic_cfg.vo, dynamic_cfg.relax_time
     mu, dr = dynamic_cfg.mobility, dynamic_cfg.rot_diff 
 
+    noise_coeff = sqrt(2 * dr * dt)
+
     for i in 1:get_num_total_particles(system)
         theta = state.pol_angle[i]
         pol = SVector(cos(theta), sin(theta) )
@@ -526,7 +528,8 @@ function update_szabo!(system::System)
             cross_prod = sign(cross_prod)
         end
 
-        d_theta = 1/relax_time * asin(cross_prod) * dt + sqrt(2 * dr * dt) * randn(system.rng)
+        # d_theta = 1/relax_time * asin(cross_prod) * dt + noise_coeff * randn(system.rng)
+        d_theta = 1/relax_time * cross_prod * dt + noise_coeff * randn(system.rng)
         
         state.pos[i] += vel * dt
         state.pol_angle[i] += d_theta
