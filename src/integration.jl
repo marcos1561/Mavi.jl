@@ -117,6 +117,9 @@ end
 function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
     forces = get_forces(system)
 
+    # println("==== Calculation Forces ==========")
+    # println("Start force: $(forces[173])")
+
     # Iteration over all chunks
     for col in 1:chunks.num_cols
         for row in 1:chunks.num_rows
@@ -133,6 +136,12 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
                     p2_id = chunk[j]
                     f1 = calc_interaction(p1_id, p2_id, system.dynamic_cfg, system)
                     
+                    # if p1_id == 173
+                    #     println("Adding Force caused by $p2_id: $f1")
+                    # elseif p2_id == 173
+                    #     println("Adding Force caused by $p1_id: $(-f1)")
+                    # end
+
                     forces[p1_id] += f1
                     forces[p2_id] -= f1
                 end
@@ -152,6 +161,12 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
                         f1 = calc_interaction(p1_id, p2_id, 
                             system.dynamic_cfg, system)
                         
+                        # if p1_id == 173
+                        #     println("Adding Force caused by $p2_id: $f1")
+                        # elseif p2_id == 173
+                        #     println("Adding Force caused by $p1_id: $(-f1)")
+                        # end
+
                         forces[p1_id] +=  f1
                         forces[p2_id] -=  f1
                     end
@@ -159,6 +174,8 @@ function calc_forces!(system::System, chunks::Chunks, device::Sequencial)
             end
         end
     end
+
+    # println("==== End Forces ==========")
 end
 
 function calc_forces!(system::System, chunks::Chunks, device::Threaded)

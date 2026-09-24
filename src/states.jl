@@ -45,6 +45,15 @@ end
 get_num(part_ids) = length(part_ids)
 get_num(part_ids::ParticleIds) = part_ids.num
 
+# TODO: Add some type of unique ids in `ParticleIds` and the method `get_unique_ids`. 
+# 
+# Standard method used by systems with a fix amount of entities
+# get_unique_ids(part_ids) = get_ids(part_ids)
+#
+# get_unique_ids(part_ids::ParticleIds) = @view part_ids.unique_ids[1:part_ids.num]
+#
+# Remember to update `part_ids.unique_ids` in the `update_part_ids!` function.
+
 function update_part_ids!(part_ids) end 
 function update_part_ids!(part_ids::ParticleIds) 
     idx = 1
@@ -131,6 +140,8 @@ function SelfPropelledState(;pos, pol_angle, active_state=nothing, movable_objec
     )
 end
 
+get_particle_pol(state::SelfPropelledState, id) = state.pol_angle[id]
+
 get_ids_obj(state) = state.part_ids
 
 update_ids!(state) = update_part_ids!(state.part_ids)
@@ -142,7 +153,10 @@ get_num_total_particles(state) = get_num(get_ids_obj(state))
 get_num_total_entities(state) = get_num_total_entities(state)
 
 get_particle_pos(state, id) = state.pos[id]
+get_particle_pol(state, id) = throw(ArgumentError("not implemented for : $(typeof(state))"))
+
 get_entity_pos(state, id) = get_particle_pos(state, id)
+get_entity_pol(state, id) = get_particle_pol(state, id)
 
 get_particles_pos(state) = state.pos 
 get_entities_pos(state) = get_particles_pos(state)

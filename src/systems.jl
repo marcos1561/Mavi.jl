@@ -170,6 +170,19 @@ get_entity_radius(system::System, idx) = get_entity_radius(system.dynamic_cfg, s
 @inline is_valid_pair(state::State, dynamic_cfg, i, j) = true
 @inline is_valid_pair(system, i, j) = is_valid_pair(system.state, system.dynamic_cfg, i, j)
 
+get_particle_vel(system, id) = get_particle_vel(system.dynamic_cfg, system.state, system, id)
+get_particle_vel(dynamic_cfg, state::SecondLawState, system, id) = state.vel[id]
+function get_particle_vel(dynamic_cfg::SzaboCfg, state::SelfPropelledState, system, id)
+    pol_angle = States.get_particle_pol(state, id)
+    pol = SVector(cos(pol_angle), sin(pol_angle))
+    force = get_forces(system)[id]
+    return dynamic_cfg.vo * pol + dynamic_cfg.mobility * force
+end
+
+get_entity_vel(dynamic_cfg, state, system, id) = get_particle_vel(dynamic_cfg, state, system, id)
+get_entity_vel(system, id) = get_entity_vel(system.dynamic_cfg, system.state, system, id)
+
+
 States.get_particles_pos(system::System) = get_particles_pos(system.state)
 
 States.get_entity_pos(state, system, id) = get_entity_pos(state, id)

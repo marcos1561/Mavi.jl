@@ -10,6 +10,7 @@ export load_data
 using Serialization, JSON3, Setfield, DataStructures, Dates
 using Base.Threads
 
+import Mavi
 using Mavi.Systems
 using Mavi.MaviSerder
 using Mavi.Errors
@@ -23,6 +24,10 @@ FINAL_STATE_NAME = "final_state"
 CHECKPOINT_DIRNAME = "checkpoint"
 CHECKPOINT_INFO_NAME = "checkpoint_info.bin"
 EXP_COL_CONFIGS_NAME = "experiment_configs.json"
+COL_CFG_TYPE_FILENAME = "cfg_type.bin"
+COL_FILENAME = "col.bin"
+
+include("./collectors/samplers.jl")
 
 abstract type ColCfg end
 abstract type ColState end
@@ -35,9 +40,26 @@ abstract type Collector end
 function get_collector(col_cfg::ColCfg, exp_cfg, system, state=nothing) end
 collect(col::Collector, system, args...; kwarg...)  = throw(NotImplementedError(col))
 function final_collect(col::Collector, system) end
-function save_data(col::Collector, path) end
-function load_data(::Type{ColCfg}, path) end
+
+save_data(col::Collector, path) = serialize(joinpath(path, COL_FILENAME), col)
+
+function load_data(path)
+    T_string = string(deserialize(joinpath(path, COL_CFG_TYPE_FILENAME)))
+    T = eval(Meta.parse(T_string))
+    @show T
+    load_data(T, path)
+end
+load_data(::Type{C}, path) where C <: ColCfg = deserialize(joinpath(path, COL_FILENAME))
+
 stop_col_func(col::Collector) = false
+
+create_data_path(::Collector, path) = mkpath(path)
+
+function save_col_cfg_type(col::Collector, path)
+    col_cfg = col.cfg
+    COL_CFG_T_string = string(typeof(col_cfg))
+    serialize(joinpath(path, COL_CFG_TYPE_FILENAME), COL_CFG_T_string)
+end
 
 # = 
 # Experiment
@@ -112,11 +134,13 @@ function run_experiment(experiment::Experiment, stop_func=nothing; prog_kwargs=n
     if isnothing(stop_func)
         stop_func = (system) -> false
     end
-
+    
     save_system_configs(system, cfg.root)
     save_experiment_configs(experiment)
-
-    col_path = mkpath(joinpath(cfg.root, COL_DIRNAME))
+    
+    col_path = joinpath(cfg.root, COL_DIRNAME)
+    create_data_path(col, col_path)
+    save_col_cfg_type(col, col_path)
 
     if !isnothing(experiment.checkpoint)
         mkpath(joinpath(cfg.root, CHECKPOINT_DIRNAME, "1"))
@@ -641,6 +665,18 @@ function final_collect(col::ManyCols, system)
     end
 end
 
+function create_data_path(col::ManyCols, path)
+    for col_name in keys(col.cols)
+        mkpath(joinpath(path, string(col_name)))
+    end
+end
+
+function save_col_cfg_type(col::ManyCols, path)
+    for (col_name, col) in pairs(col.cols)
+        save_col_cfg_type(col, joinpath(path, string(col_name)))
+    end
+end
+
 function save_data(col::ManyCols, path)
     for (col_name, col) in pairs(col.cols)
         col_path = mkpath(joinpath(path, string(col_name)))
@@ -837,6 +873,6 @@ function load_experiment_batch_values(root)
     return deserialize(joinpath(root, "values.bin"))
 end
 
-include("collectors/cm_quantities.jl")
+include("collectors/field_quantities.jl")
 
 end # Collectors

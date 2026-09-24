@@ -163,4 +163,4 @@ function update_object!(object::MovableObject, int_cfg)
     update_object!(object.state, object.dynamic_cfg, object.restriction, object.force, int_cfg)
 end
 
-end #MovableObjects
+end # MovableObjects

@@ -5,7 +5,8 @@ export update_graph, get_graph
 export MainGraph
 export 
     ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, 
-    NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg, ChunksGraphCfg
+    NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg, ChunksGraphCfg, VelocityGraphCfg,
+    PolarizationGraphCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
 using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
@@ -785,6 +786,102 @@ function update_graph(graph::ChunksGraph, system)
 
     Makie.update!(graph.p_chunk_plot, points; text=text)
 end
+
+
+struct VelocityGraphCfg{C} <: GraphCfg
+    color::C
+    lengthscale::Float64
+    kwargs::Dict
+end
+function VelocityGraphCfg(;
+    color="black",
+    lengthscale=1.0,
+    kwargs=(),
+)
+    kwargs = merge(Dict(kwargs), Dict(:color=>color, :lengthscale=>lengthscale))
+    VelocityGraphCfg(color, lengthscale, kwargs)
+end
+
+struct VelocityGraph{P, C} <: Graph
+    arrows::P
+    cfg::C
+end
+
+function SystemGraphs.get_graph(ax, system, cfg::VelocityGraphCfg)
+    plot = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0]; cfg.kwargs...)
+    graph = VelocityGraph(plot, cfg)
+    SystemGraphs.update_graph(graph, system)
+    return graph
+end
+
+function SystemGraphs.update_graph(graph::VelocityGraph, system)
+    points = States.get_particles_pos(system.state)
+    ids = States.get_particles_ids(system.state)
+    n = length(ids)
+
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    u = Vector{Float64}(undef, n)
+    v = Vector{Float64}(undef, n)
+
+    for (i, p_i) in enumerate(ids)
+        vel_i = Systems.get_particle_vel(system, p_i)
+        point_i = points[p_i]
+        x[i] = point_i.x
+        y[i] = point_i.y
+        u[i] = vel_i.x
+        v[i] = vel_i.y
+    end
+    Makie.update!(graph.arrows, x, y, u, v)
+end
+
+
+struct PolarizationGraphCfg{C} <: GraphCfg
+    color::C
+    lengthscale::Float64
+    kwargs::Dict
+end
+function PolarizationGraphCfg(;
+    color="green",
+    lengthscale=1.0,
+    kwargs=(),
+)
+    kwargs = merge(Dict(kwargs), Dict(:color=>color, :lengthscale=>lengthscale))
+    PolarizationGraphCfg(color, lengthscale, kwargs)
+end
+
+struct PolarizationGraph{P, C} <: Graph
+    arrows::P
+    cfg::C
+end
+
+function SystemGraphs.get_graph(ax, system, cfg::PolarizationGraphCfg)
+    plot = arrows2d!(ax, [0.0], [0.0], [0.0], [0.0]; cfg.kwargs...)
+    graph = PolarizationGraph(plot, cfg)
+    SystemGraphs.update_graph(graph, system)
+    return graph
+end
+
+function SystemGraphs.update_graph(graph::PolarizationGraph, system)
+    points = States.get_particles_pos(system.state)
+    ids = States.get_particles_ids(system.state)
+    n = length(ids)
+
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    u = Vector{Float64}(undef, n)
+    v = Vector{Float64}(undef, n)
+
+    for (i, p_i) in enumerate(ids)
+        pol_angle = States.get_particle_pol(system.state, p_i)
+        x[i] = points[p_i][1]
+        y[i] = points[p_i][2]
+        u[i] = cos(pol_angle)
+        v[i] = sin(pol_angle)
+    end
+    Makie.update!(graph.arrows, x, y, u, v)
+end
+
 
 include("../rings/view.jl")
 

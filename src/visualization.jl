@@ -4,7 +4,10 @@ module Visualization
 export animate, random_colors
 export AnimationCfg, VideoCfg, ImageCfg, UiSettings
 export DefaultInfoUICfg
-export ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg
+export 
+    ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, 
+    NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg, VelocityGraphCfg,
+    PolarizationGraphCfg
 export drawn_borders, colors_from_cmap
 
 using GLMakie
