@@ -36,27 +36,29 @@ Save `obj` in the folder `root/name` using `Serialization`. Two things are saved
 """
 function save_component_serial(obj, root, name) 
     root_path = mkpath(joinpath(root, name))
-    data = get_obj_save_data_json(obj)
+    data = get_obj_save_data_json(obj, root_path)
     serialize(joinpath(root_path, "type.bin"), data[:type])
     serialize(joinpath(root_path, "data.bin"), data[:data])
 end
 
 "Returns data to be saved inside `obj`."
+get_obj_save_data(obj, path) = get_obj_save_data(obj)
 get_obj_save_data(obj) = obj
 # get_obj_save_data(obj::Dict) = Dict(k => get_obj_save_data_json(v) for (k, v) in obj)
 
 "Returns data to be saved inside `obj` in the `json` format."
-get_obj_save_data_json(obj) = (type=string(typeof(obj)), data=get_obj_save_data(obj))
-get_obj_save_data_json(obj::Tuple) = [get_obj_save_data_json(x) for x in obj]
+get_obj_save_data_json(obj, path=nothing) = (type=string(typeof(obj)), data=get_obj_save_data(obj, path))
+get_obj_save_data_json(obj::Tuple, path=nothing) = [get_obj_save_data_json(x, path) for x in obj]
 
 function save_component_json(obj, root, name)
-    open(joinpath(root, "$name.json"), "w") do io
-        JSON3.pretty(io, get_obj_save_data_json(obj))
+    path = joinpath(root, "$name.json")
+    open(path, "w") do io
+        JSON3.pretty(io, get_obj_save_data_json(obj, path))
     end
 end
 
 function save_configs(configs, save_path)
-    configs_data = get_obj_save_data(configs)
+    configs_data = get_obj_save_data(configs, dirname(save_path))
     mkpath(dirname(save_path))
     open(save_path, "w") do io
         JSON3.pretty(io, configs_data)
@@ -65,17 +67,18 @@ end
 
 function save_system_configs(system::System, root, name="configs")
     mkpath(root)
+    path = joinpath(root, "$name.json")
     configs_data = Dict(
         "sys_type" => system.type,
-        "space_cfg" => get_obj_save_data_json(system.space_cfg),
-        "dynamic_cfg" => get_obj_save_data_json(system.dynamic_cfg),
-        "int_cfg" => get_obj_save_data_json(system.int_cfg),
-        "info" => get_obj_save_data_json(system.info),
-        "debug_info" => get_obj_save_data_json(system.debug_info),
-        "time_info" => get_obj_save_data_json(system.time_info),
+        "space_cfg" => get_obj_save_data_json(system.space_cfg, path),
+        "dynamic_cfg" => get_obj_save_data_json(system.dynamic_cfg, path),
+        "int_cfg" => get_obj_save_data_json(system.int_cfg, path),
+        "info" => get_obj_save_data_json(system.info, path),
+        "debug_info" => get_obj_save_data_json(system.debug_info, path),
+        "time_info" => get_obj_save_data_json(system.time_info, path),
     )
 
-    open(joinpath(root, "$name.json"), "w") do io
+    open(path, "w") do io
         JSON3.pretty(io, configs_data)
     end
 end
@@ -105,6 +108,8 @@ get_saved_data(load_info::JSON3.Array) = load_info
 "Information to load an object saved using `Serialization`."
 get_load_info_serial(root) = (type=deserialize(joinpath(root, "type.bin")), data=root)
 
+load_component(T, data, path) = load_component(T, data)
+
 "Load object of type `T` with data saved in `path`."
 load_component(T::Type, path::String) = deserialize(joinpath(path, "data.bin"))
 
@@ -114,26 +119,26 @@ load_component(T::Type, data::JSON3.Object) = JSON3.read(JSON3.write(data), T)
 load_component(T::Type{Nothing}, _) = nothing
 
 "Load array of objects with load information in `data`"
-function load_component(T::Type{Nothing}, data::JSON3.Array)
+function load_component(T::Type{Nothing}, data::JSON3.Array, path)
     data_loaded = []
     for load_info in data
-        push!(data_loaded, load_component(get_saved_type(load_info), get_saved_data(load_info)))
+        push!(data_loaded, load_component(get_saved_type(load_info), get_saved_data(load_info)), path)
     end
     return Tuple(data_loaded)
 end
 
 function load_component_serial(path)
    load_info = get_load_info_serial(path)
-   load_component(get_saved_type(load_info), get_saved_data(load_info)) 
+   load_component(get_saved_type(load_info), get_saved_data(load_info), path) 
 end
 
 function load_component_json(path)
    load_info = JSON3.read(path)
-   load_component(get_saved_type(load_info), get_saved_data(load_info)) 
+   load_component(get_saved_type(load_info), get_saved_data(load_info), path) 
 end
 
 "Load dictionary of object with load information in `configs`."
-function load_dic_configs(configs)
+function load_dic_configs(configs, path)
     configs_loaded = Dict()
     for (name, load_info) in configs
         if name == :sys_type
@@ -141,9 +146,11 @@ function load_dic_configs(configs)
         end
         # println("Name: $name")
         # println("Type: ", get_saved_type(load_info))
+        # println("Data Type: ", typeof(get_saved_data(load_info)))
+        # println("Data Value: ", get_saved_data(load_info))
         # println("Data: ", JSON3.write(get_saved_data(load_info)))
         # println("================")
-        configs_loaded[name] = load_component(get_saved_type(load_info), get_saved_data(load_info))
+        configs_loaded[name] = load_component(get_saved_type(load_info), get_saved_data(load_info), path)
     end
     return configs_loaded
 end
@@ -151,7 +158,7 @@ end
 function load_configs(path) 
     configs = JSON3.read(path)
     configs = convert(Dict{Symbol, Any}, configs)
-    load_dic_configs(configs)
+    load_dic_configs(configs, path)
 end
 
 function load_system_configs(path; ignore_info=false) 
@@ -161,7 +168,7 @@ function load_system_configs(path; ignore_info=false)
         delete!(configs, :info)
     end
     sys_type = eval(Meta.parse(configs[:sys_type]))
-    configs = load_dic_configs(configs)
+    configs = load_dic_configs(configs, path)
     configs[:sys_type] = sys_type
 
 
@@ -170,7 +177,7 @@ end
 
 function load_state(path)
     load_info = get_load_info_serial(path)
-    load_component(get_saved_type(load_info), get_saved_data(load_info))
+    load_component(get_saved_type(load_info), get_saved_data(load_info), path)
 end
 
 function load_system(configs_loaded, rng, sys_type)
@@ -206,7 +213,7 @@ function load_system(configs_path::String, state_path::String, time_info_path=no
     end
     # rng = deserialize(joinpath(state_path, "rng.bin"))
 
-    configs = load_dic_configs(configs)
+    configs = load_dic_configs(configs, configs_path)
     load_system(configs, rng, sys_type)
 end
 

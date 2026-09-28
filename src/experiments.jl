@@ -46,7 +46,6 @@ save_data(col::Collector, path) = serialize(joinpath(path, COL_FILENAME), col)
 function load_data(path)
     T_string = string(deserialize(joinpath(path, COL_CFG_TYPE_FILENAME)))
     T = eval(Meta.parse(T_string))
-    @show T
     load_data(T, path)
 end
 load_data(::Type{C}, path) where C <: ColCfg = deserialize(joinpath(path, COL_FILENAME))

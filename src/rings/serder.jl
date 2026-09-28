@@ -55,8 +55,8 @@ function MaviSerder.get_obj_save_data(info::RingsInfo)
     )
 end
 
-function MaviSerder.load_component(T::Type{RI}, data::JSON3.Object) where RI <: RingsInfo 
-    return load_dic_configs(data)
+function MaviSerder.load_component(T::Type{RI}, data::JSON3.Object, path) where RI <: RingsInfo 
+    return load_dic_configs(data, path)
 end
 
 # ==
