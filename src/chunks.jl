@@ -204,7 +204,7 @@ function update_chunks!(chunks::Nothing) end
 """
 Iterate over all pairs of entities once and execute the function `func(i, j, chunk_id)`, where `i` and `j` are the entities ids. The pair (i, j) will be in the iteration if i and j are in the same chunk or in neighboring chunks, this pair will only be in the iteration once, not twice.
 """
-function iterate_over_pais(chunks::Chunks, func)
+function iterate_over_pais(chunks::Chunks, func; kwargs...)
     for col in 1:chunks.num_cols
         for row in 1:chunks.num_rows
             chunk_id = (col, row)
@@ -219,7 +219,7 @@ function iterate_over_pais(chunks::Chunks, func)
                 # Interaction between particles in the same chunk
                 for j in (i+1):np
                     p2_id = chunk[j]
-                    func(p1_id, p2_id, chunk_id)
+                    func(p1_id, p2_id, chunk_id; kwargs...)
                 end
                 
                 # Interaction of particles in neighboring chunks
@@ -229,7 +229,7 @@ function iterate_over_pais(chunks::Chunks, func)
                     
                     for j in 1:nei_np
                         p2_id = nei_chunk[j]
-                        func(p1_id, p2_id, chunk_id)
+                        func(p1_id, p2_id, chunk_id; kwargs...)
                     end
                 end
             end

@@ -6,7 +6,7 @@ using StaticArrays
 
 export SecondLawState, SelfPropelledState, State
 export 
-    ActiveState, get_particles_ids, get_particle_type, get_entity_type, update_ids!, 
+    ActiveState, get_particles_ids, get_particle_type, get_entity_type, update_ids!, is_variable_number,
     get_particles_state, get_entities_ids, get_entities_pos, get_particles_pos, get_entity_pos, get_particle_pos,
     get_num_total_particles, get_num_total_entities,
     add_force_to_entity!
@@ -44,6 +44,9 @@ end
 
 get_num(part_ids) = length(part_ids)
 get_num(part_ids::ParticleIds) = part_ids.num
+
+is_variable_number(part_ids::Base.OneTo) = false
+is_variable_number(part_ids::ParticleIds) = true
 
 # TODO: Add some type of unique ids in `ParticleIds` and the method `get_unique_ids`. 
 # 
@@ -143,6 +146,8 @@ end
 get_particle_pol(state::SelfPropelledState, id) = state.pol_angle[id]
 
 get_ids_obj(state) = state.part_ids
+
+is_variable_number(state) = is_variable_number(get_ids_obj(state))
 
 update_ids!(state) = update_part_ids!(state.part_ids)
 

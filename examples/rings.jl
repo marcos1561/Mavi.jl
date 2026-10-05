@@ -75,10 +75,7 @@ function main(test=false)
         num_rows=13,
     )
 
-    anim_cfg = AnimationCfg(
-        num_steps_per_frame=15,
-        graph_cfg=CircleGraphCfg(),
-    )
+    anim_cfg = AnimationCfg(num_steps_per_frame=15)
     
     if !test
         animate(system, anim_cfg)

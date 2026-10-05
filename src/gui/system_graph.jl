@@ -9,6 +9,8 @@ export
     PolarizationGraphCfg
 export drawn_borders, colors_from_cmap, get_graph_cfg
 
+export PalettePainterCfg, EntityTypes, DynamicTypes, FakeContinuosTypes, ManyTypes, CmapPalette
+
 using GLMakie, ColorSchemes, DataStructures, Random, StaticArrays
 using Mavi.Systems
 using Mavi.States
@@ -16,6 +18,8 @@ using Mavi.Configs
 using Mavi.MovableObjects
 using Mavi.ChunksMod
 using Mavi.Errors
+
+include("./painters.jl")
 
 "Drawn the borders of `geometry_cfg`."
 function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
@@ -379,13 +383,14 @@ end
     width::Float64 = 0.5
 end
 
-struct CircleGraphCfg{C, S<:Union{StrokeCfg, Nothing}, F} <: GraphCompCfg
+struct CircleGraphCfg{S<:Union{StrokeCfg, Nothing}, P<:PainterCfg} <: GraphCompCfg
     circle_radius::Float64
     stroke_cfg::S
     circle_rel::Int
-    colors_map::C
-    update_data::F
-    rng::AbstractRNG
+    painter_cfg::P
+    # colors_map::C
+    # update_data::F
+    # rng::AbstractRNG
 end
 
 """
@@ -413,37 +418,23 @@ Drawn particles as circles.
 - `rng`:  
     RNG object. Default to the global RNG.
 """
-function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, colors_map=:random, 
-    update_data=nothing, rng=nothing)
-    
-    # if colors_map === nothing
-    #     colors_map = RGBf(GLMakie.to_color(:black))
-    # end
-
-    if colors_map isa Vector{Symbol}
-        colors_map = RGBf.(GLMakie.to_color.(colors_map))
-    end
-
-    if update_data === nothing
-        update_data = update_graph_data
-    end
-
-    if isnothing(rng)
-        rng = Random.GLOBAL_RNG
-    end
-
-    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, colors_map, update_data, rng)
+function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, 
+    painter_cfg=nothing, rng=nothing
+    )
+    painter_cfg = PalettePainterCfg(painter_cfg, rng=rng)
+    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, painter_cfg)
 end
 
-struct CircleGraph{C, P, O, PosObs} <: GraphComp
-    types::Vector{Int}
-    colors::Vector{C}
-    radius::Vector{Float64}
-    cmap::Vector{C}
-    plot::P
-    obs_list::O
-    pos_obs::PosObs
+struct CircleGraph{PosObs, PainterT, PlotP} <: GraphComp
+    # types::Vector{Int}
+    # colors::Vector{C}
+    # cmap::Vector{C}
+    # obs_list::O
     cfg::CircleGraphCfg
+    pos_obs::PosObs
+    painter::PainterT
+    plot::PlotP
+    radius::Vector{Float64}
 end
 
 function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
@@ -465,11 +456,12 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
         end
     end
 
-    num_types = get_comp_num_types(cfg, system)
-
-    types = get_graph_data(cfg, system)
-    cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
-    colors = Vector{eltype(cmap)}(undef, num_total_particles)
+    
+    # num_types = get_comp_num_types(cfg, system)
+    # types = get_graph_data(cfg, system)
+    # cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
+    # colors = Vector{eltype(cmap)}(undef, num_total_particles)
+    painter = get_painter(cfg.painter_cfg, system)
 
     if isnothing(cfg.stroke_cfg)
         circles_plot = poly!(ax, [Circle(Point2f(0, 0), 1)])
@@ -481,17 +473,21 @@ function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
         )
     end
 
-    comp = CircleGraph(types, colors, radius, cmap, circles_plot, (), pos_obs, cfg)
+    # comp = CircleGraph(types, colors, radius, cmap, circles_plot, (), pos_obs, cfg)
+    comp = CircleGraph(cfg, pos_obs, painter, circles_plot, radius)
     update_graph(comp, system)
     return comp
 end
 
 function update_graph(comp::CircleGraph, system)
-    update_list = get_comp_update_data(comp)(comp, system)
-    notify_comp_observables(comp, update_list)
+    # update_list = get_comp_update_data(comp)(comp, system)
+    # notify_comp_observables(comp, update_list)
+    # colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
 
     particles_ids = get_particles_ids(system)
-    colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
+    
+    update_painter!(comp.painter, system)
+    colors = @view comp.painter.colors[1:length(particles_ids)]
     
     if comp.cfg.circle_radius == -1
         radius = get_radius!(comp.radius, system.dynamic_cfg, get_particles_state(system.state), particles_ids)

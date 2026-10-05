@@ -63,7 +63,7 @@ function main(test=false)
     anim_cfg = Visualization.AnimationCfg(
         num_steps_per_frame=200,
         exec_times_size=100,
-        graph_cfg=CircleGraphCfg(colors_map=:magma),
+        graph_cfg=CircleGraphCfg(painter_cfg=:magma),
     )
 
     if !test

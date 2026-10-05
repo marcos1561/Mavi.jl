@@ -8,6 +8,7 @@ export
     ManyGraphsCfg, MainGraphCfg, CircleGraphCfg, ScatterGraphCfg, 
     NumsGraphCfg, MovableObjectsCfg, TotalForceGraphCfg, VelocityGraphCfg,
     PolarizationGraphCfg
+export PalettePainterCfg
 export drawn_borders, colors_from_cmap
 
 using GLMakie

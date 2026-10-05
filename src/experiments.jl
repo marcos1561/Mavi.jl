@@ -825,8 +825,9 @@ function load_experiment(root, custom_step=nothing)
     cp_info = get_checkpoint_info(root)
     path = get_checkpoint_path(root, cp_info)
 
-    configs = convert(Dict{Symbol, Any}, JSON3.read(joinpath(root, EXP_COL_CONFIGS_NAME)))
-    configs = load_dic_configs(configs)
+    configs_path = joinpath(root, EXP_COL_CONFIGS_NAME)
+    configs = convert(Dict{Symbol, Any}, JSON3.read(configs_path))
+    configs = load_dic_configs(configs, configs_path)
     exp_cfg = configs[:experiment] 
     col_cfg = configs[:collector] 
     

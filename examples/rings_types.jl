@@ -119,17 +119,16 @@ function main(test=false)
     # Red and bue colors
     # 
     # colors_map = [:red, :blue]
-    # colors::Vector{Symbol} = []
+    # palette::Vector{Symbol} = []
     # for ring_id in 1:size(system.state.rings_pos, 3)
     #     t = system.state.types[ring_id]
-    #     push!(colors, colors_map[t])
+    #     push!(palette, colors_map[t])
     # end
     
     # Colors from the ends of a color map
-    # 
-    colors_map = ColorSchemes.bam
-    # colors_map = ColorSchemes.vik
-    colors::Vector{RGBf} = []
+    cmap = ColorSchemes.bam
+    # cmap = ColorSchemes.vik
+    palette::Vector{RGBf} = []
     for ring_id in 1:size(system.state.rings_pos, 2)
         t = system.state.types[ring_id]
         if t == 1
@@ -137,11 +136,11 @@ function main(test=false)
         else    
             c = rand(Float64)/4
         end
-        push!(colors, colors_map[c])
+        push!(palette, cmap[c])
     end
     
     anim_cfg = AnimationCfg(
-        graph_cfg=CircleGraphCfg(colors_map=colors),
+        graph_cfg=CircleGraphCfg(painter_cfg=palette)
     )
 
     if !test

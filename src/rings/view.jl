@@ -14,15 +14,26 @@ import Mavi.Visualization.SystemGraphs:
     GraphComp, GraphCompCfg, 
     get_graph_data, update_graph_data, 
     get_graph, update_graph, 
-    get_default_num_types
+    get_default_num_types,
+    get_types, EntityTypes, PaletteTypes
 
-function update_types_to_ring_id!(types, system)
-    for ring_id in axes(system.rings_pos, 2)
-        for p_id in 1:get_num_particles(system, ring_id)
-            idx = to_scalar_idx(system.state, ring_id, p_id)
-            types[idx] = ring_id
+
+function update_types_to_ring_id!(types, state)
+    num_max_p = num_max_particles(state)
+    for ring_id in axes(state.rings_pos, 2)
+        for particle_id in 1:num_max_p
+            types[to_scalar_idx(state, ring_id, particle_id)] = ring_id
         end
     end
+    types
+end
+
+function get_types(::EntityTypes, state::RingsState)
+    types = Vector{Int}(undef, length(state.pos))
+    update_types_to_ring_id!(types, state)
+
+    num_types = maximum(axes(state.rings_pos, 2))
+    PaletteTypes(num_types=num_types, types=types)
 end
 
 function get_graph_data(cfg::GraphCfg, state::RingsState)

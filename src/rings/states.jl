@@ -26,6 +26,8 @@ abstract type RingsIds <: mv_states.AbstractParticleIds end
     num_p_active::Int
 end
 
+mv_states.is_variable_number(rings_ids::VarRingsIds) = true
+
 function mv_states.get_ids(rings_ids::VarRingsIds)
     ids = @view rings_ids.p_ids[1:rings_ids.num_p_active]
     return ids
@@ -63,6 +65,7 @@ end
 
 mv_states.get_ids(rings_ids::FixRingsIds) = rings_ids.p_ids
 mv_states.get_num(rings_ids::FixRingsIds) = length(rings_ids.p_ids)
+mv_states.is_variable_number(rings_ids::FixRingsIds) = false
 
 get_rings_ids(rings_ids::FixRingsIds) = rings_ids.ids
 get_rings_num(rings_ids::FixRingsIds) = length(rings_ids.ids)
@@ -136,8 +139,8 @@ ring_num_particles(state::RingsState, ring_id) = ring_num_particles(state.num_pa
 
 @inline has_types_func(state::RingsState) = !(state.types === nothing)
 
-@inline is_variable_number(state::RingsState{U, Nothing}) where U = false
-@inline is_variable_number(state::RingsState{U, RingsIds}) where U = true
+# @inline is_variable_number(state::RingsState{U, Nothing}) where U = false
+# @inline is_variable_number(state::RingsState{U, RingsIds}) where U = true
 
 @inline num_max_particles(state::RingsState) = size(state.rings_pos, 1)
 

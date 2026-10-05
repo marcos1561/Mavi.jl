@@ -58,7 +58,7 @@ function main(test=false)
 
     anim_cfg = AnimationCfg(
         num_steps_per_frame=15,
-        graph_cfg=CircleGraphCfg(colors_map=:viridis),
+        graph_cfg=CircleGraphCfg(painter_cfg=:viridis),
     )
 
     if !test
