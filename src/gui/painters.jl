@@ -61,6 +61,7 @@ end
 always_update_types(types_mode::EntityTypes) = false
 
 function get_types(types_mode::EntityTypes, state)
+    state = get_particles_state(state)
     types = collect(1:length(state.pos)) .+ types_mode.gap
     PaletteTypes(num_types=types[end], types=types)
 end
@@ -111,21 +112,52 @@ update_types!(types_mode::DynamicTypes, painter::Painter, system) = update_types
 
 
 abstract type ScalarUpdater end
-struct NoUpdate <: ScalarUpdater end
+struct NoUpdateScalar <: ScalarUpdater end
 
-update_scalar!(updater::NoUpdate, buffer, system) = false
+update_scalar!(updater::NoUpdateScalar, buffer, system) = false
 update_scalar!(updater::Function, buffer, system) = updater(buffer, system)
 
-@kwdef struct FakeContinuosTypes{N, U} <: TypesMode
-    num_colors::Int=256
-    gap::Int=0
-    normalizer::N=identity
-    updater::U=NoUpdate()
+struct FakeContinuosTypes{N, U} <: TypesMode
+    num_colors::Int
+    gap::Int
+    normalizer::N
+    updater::U
+    init_values::Union{Nothing, Vector}
+end
+function FakeContinuosTypes(;
+    num_colors=256,
+    gap=0,
+    normalizer=identity,
+    updater=nothing,
+    init_values=nothing,
+)
+    actual_updater = isnothing(updater) ? NoUpdateScalar() : updater
+    FakeContinuosTypes(
+        num_colors, gap, normalizer, actual_updater, init_values
+    )
+end
+
+function update_types_from_scalar!(types_mode::FakeContinuosTypes, types)
+    buffer = types.extra
+    for (idx, s) in enumerate(buffer)
+        x = types_mode.normalizer(s)
+        types[idx] = round(Int, (types_mode.num_colors - 1) * x + 1) + types_mode.gap
+    end
 end
 
 function get_types(types_mode::FakeContinuosTypes, state)
     types = get_types(types_mode.num_colors + types_mode.gap, state)
-    types = with_extra(types, fill(0.0, length(types)))
+    
+    init_values = types_mode.init_values
+    if init_values !== nothing
+        length(init_values) != length(types) && 
+            throw(ArgumentError("`length(FakeContinuosTypes.init_values)` must be equal to the number of particles in the system.")) 
+    else
+        init_values = fill(0.0, length(types))
+    end    
+    types = with_extra(types, init_values)
+    update_types_from_scalar!(types_mode, types)
+    return types
 end
 function update_types!(types_mode::FakeContinuosTypes, types::PaletteTypes, system)
     buffer = types.extra
@@ -176,7 +208,6 @@ get_palette(palette_mode, state, dynamic_cfg, types, system) = get_palette(palet
 function get_palette(palette_mode::Vector, types) 
     palette = []
     for c in palette_mode
-        @show c
         push!(palette, RGBf(GLMakie.to_color(c)))
     end
     return palette

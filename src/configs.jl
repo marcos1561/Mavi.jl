@@ -642,6 +642,15 @@ struct Sequencial <: DeviceMode end
     num_cols::Int
     num_rows::Int
 end
+
+function ChunksCfg(geometry_cfg::GeometryCfg, dynamic_cfg::DynamicCfg, tol=0.1)
+    bbox = get_bounding_box(geometry_cfg)
+    max_size = maximum_interaction_distance(dynamic_cfg) * (1 + tol)
+    num_x_chunks = floor(Int, bbox.length / max_size)
+    num_y_chunks = floor(Int, bbox.height / max_size)
+    ChunksCfg(num_x_chunks, num_y_chunks)
+end
+
 function get_chunks_cfg_from_cell_size(cell_size, rect_cfg::RectangleCfg)
     num_cells = floor.(Int, rect_cfg.size ./ cell_size)
     return ChunksCfg(num_cells...)

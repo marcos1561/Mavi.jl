@@ -96,13 +96,14 @@ function System(;state::State{ND, T}, space_cfg, dynamic_cfg, int_cfg,
         num_forces_slices = Threads.nthreads()
     end
 
-    num_p = length(state.pos)
+    positions = get_particles_pos(state)
+    num_p = length(positions)
     forces = SVector{num_forces_slices, Vector{SVector{ND, T}}}([
         Vector{SVector{ND, T}}(undef, num_p) for _ in 1:num_forces_slices
     ])
 
     if isnothing(chunks)
-        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state) 
+        chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, positions, dynamic_cfg, state) 
     end
 
     if !isnothing(chunks)

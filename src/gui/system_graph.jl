@@ -43,20 +43,20 @@ function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:
     end
 end
 
-function drawn_borders(ax, geometry_cfg::LinesCfg; color=:black)
+function drawn_borders(ax, geometry_cfg::LinesCfg; color=:black, line_kwargs=(), kwargs...)
     for line in geometry_cfg.lines
         p1, p2 = line.p1, line.p2
-        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color)
+        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color; line_kwargs...)
     end
 end
 
-function drawn_borders(ax, geometry_cfg::CircleCfg)
-    arc!(ax, geometry_cfg.center, geometry_cfg.radius, -π, π, color=:black)
+function drawn_borders(ax, geometry_cfg::CircleCfg; arc_kwargs=(), kwargs...)
+    arc!(ax, geometry_cfg.center, geometry_cfg.radius, -π, π, color=:black; arc_kwargs...)
 end
 
-function drawn_borders(ax, geometry_cfg::ManyGeometries)
+function drawn_borders(ax, geometry_cfg::ManyGeometries; kwargs...)
     for g in geometry_cfg.list
-        drawn_borders(ax, g)
+        drawn_borders(ax, g; kwargs...)
     end
 end
 
@@ -209,8 +209,9 @@ Data used by Graph.
     OBS: pos is a reference to system.state.pos
 """
 function get_graph_data(graph_cfg::GraphCfg, state::State)
-    num_p = length(state.pos)
-    return (pos=state.pos, types=Vector(1:num_p))
+    positions = get_particles_pos(state)
+    num_p = length(positions)
+    return (pos=positions, types=Vector(1:num_p))
 end
 
 @inline update_graph_data(graph, system::System) = update_graph_data(graph, get_particles_state(system.state))

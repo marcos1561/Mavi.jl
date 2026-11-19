@@ -149,7 +149,7 @@ get_ids_obj(state) = state.part_ids
 
 is_variable_number(state) = is_variable_number(get_ids_obj(state))
 
-update_ids!(state) = update_part_ids!(state.part_ids)
+update_ids!(state) = update_part_ids!(get_ids_obj(state))
 
 get_particles_ids(state) = get_ids(get_ids_obj(state))
 get_entities_ids(state) = get_particles_ids(state)
