@@ -46,7 +46,7 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
 
     max_dist = 2 * Configs.particle_radius(interaction_cfg)
     neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
-    neigh_update!(system.info.r_neigh, i, j, dist, max_dist)
+    neigh_update!(system.info.r_neigh, ri, rj, dist, max_dist)
 
     f = calc_interaction_force(i, j, ri, rj, dr, dist, interaction_cfg, system)
     debug_pairwise_force!(system.debug_info, f, ri, rj, i, j)
@@ -131,7 +131,7 @@ function update_continuos_pos!(system, wall_type::PeriodicWalls)
     pos = system.state.pos
     Threads.@threads for ring_id in get_rings_ids(system.state)
         # continuos_pos[:, 1, ring_id] = system.state.rings_pos[:, 1, ring_id]
-        continuos_pos[:, ring_id] .= system.state.rings_pos[:, ring_id]
+        continuos_pos[1, ring_id] = system.state.rings_pos[1, ring_id]
         for i in 2:ring_num_particles(system.state, ring_id) 
             i_idx = to_scalar_idx(system.state, ring_id, i)
             last_idx = to_scalar_idx(system.state, ring_id, i-1)
@@ -436,12 +436,13 @@ function check_invasions!(system, chunks::Chunks)
 end
 
 function check_invasions!(system, chunks::Nothing)
+    empty!(system.info.invasions.list)
     rings_ids = get_rings_ids(system.state)
     num_rings = length(rings_ids)
-
-    for r1_id in 1:num_rings
-        for r2_id in (r1_id+1):num_rings
-            find_invasions!(system, r1_id, r2_id)
+    for idx1 in 1:num_rings
+        r1_id = rings_ids[idx1]
+        for idx2 in (idx1+1):num_rings
+            find_invasions!(system, r1_id, rings_ids[idx2])
         end
     end
 end
@@ -460,18 +461,18 @@ end
 update_invasions!(system) = update_invasions!(system, system.int_cfg.extra.invasions_cfg)
 
 function system_initialization(::RingsSys, system)
+    update_continuos_pos!(system, system.space_cfg.wall_type)
     update_cms!(system)
     update_sources!(system, system.info.sources)
     
     update_ids!(system)
     
     update_chunks_all!(system)
-    update_continuos_pos!(system, system.space_cfg.wall_type)
+    # update_continuos_pos!(system, system.space_cfg.wall_type)
     update_invasions!(system)
 
     cleaning!(system)
     forces!(system)
-    calc_walls_forces!(system)
     neigh_sum_buffers(system.info.p_neigh)
     neigh_sum_buffers(system.info.r_neigh)
 

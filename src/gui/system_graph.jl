@@ -285,7 +285,7 @@ function update_graph(comp::GraphComp, system)
 end
 
 get_graph_cfg(cfg) = cfg
-get_graph_cfg(cfg::G) where {G<:GraphCompCfg} = MainGraphCfg(cfg)
+get_graph_cfg(cfg::Union{G, Vector{G}}) where {G<:GraphCompCfg} = MainGraphCfg(cfg)
 get_graph_cfg(cfg::Union{Vector, Tuple}) = ManyGraphsCfg(Tuple(cfg))
 
 
@@ -387,15 +387,12 @@ end
 struct CircleGraphCfg{S<:Union{StrokeCfg, Nothing}, P<:PainterCfg} <: GraphCompCfg
     circle_radius::Float64
     stroke_cfg::S
-    circle_rel::Int
     painter_cfg::P
-    # colors_map::C
-    # update_data::F
-    # rng::AbstractRNG
 end
 
 """
-Drawn particles as circles.
+Draw particles with native circle markers, sized in data coordinates. Positions
+and diameters are updated in reusable buffers without rebuilding polygon meshes.
 
 # Arguments
 - `circle_radius`:  
@@ -403,35 +400,24 @@ Drawn particles as circles.
     using system dynamic configurations. 
 
 - `stroke_cfg`:  
-    Stroke circle configurations.
+    Circle outline configuration. Use `nothing` to disable outlines.
 
-- `colors_map`:  
-    Mapping for types to colors. It can be:
-    - :random  
-        Random colors for each type
-    - A colormap name as symbol  
-        Random colors from the given colormap.
-    - Vector of colors for each type.
-
-- `update_data`:  
-    Function to update the particles types. Defaults to no update.
+- `painter_cfg`:
+    A `PalettePainterCfg`, palette name (such as `:random` or `:viridis`), or
+    vector of colors. Defaults to random colors per entity.
 
 - `rng`:  
-    RNG object. Default to the global RNG.
+    RNG used when constructing a palette. Defaults to the default RNG.
 """
-function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), circle_rel=20, 
+function CircleGraphCfg(;circle_radius=-1.0, stroke_cfg=StrokeCfg(), 
     painter_cfg=nothing, rng=nothing
     )
     painter_cfg = PalettePainterCfg(painter_cfg, rng=rng)
-    CircleGraphCfg(circle_radius, stroke_cfg, circle_rel, painter_cfg)
+    CircleGraphCfg(circle_radius, stroke_cfg, painter_cfg)
 end
 
-struct CircleGraph{PosObs, PainterT, PlotP} <: GraphComp
-    # types::Vector{Int}
-    # colors::Vector{C}
-    # cmap::Vector{C}
-    # obs_list::O
-    cfg::CircleGraphCfg
+struct CircleGraph{Cfg<:CircleGraphCfg, PosObs, PainterT, PlotP} <: GraphComp
+    cfg::Cfg
     pos_obs::PosObs
     painter::PainterT
     plot::PlotP
@@ -441,65 +427,54 @@ end
 function get_graph(ax, pos_obs, system, cfg::CircleGraphCfg)
     num_total_particles = length(get_particles_state(system.state).pos)
 
-    # TODO: Make cfg.circle_radius work with dispatch system
     if cfg.circle_radius == -1
         radius = Vector{Float64}(undef, num_total_particles)
     else
-        if typeof(cfg.circle_radius) <: Number
-            radius = fill(Float64(cfg.circle_radius), num_total_particles) 
-        elseif length(cfg.circle_radius) != num_total_particles
-            throw(ArgumentError(
-                "Length of `cfg.circle_radius` ($(length(cfg.circle_radius))) should be " *
-                "the same as number of particles ($(num_total_particles))"
-            ))
-        else
-            radius = cfg.circle_radius
-        end
+        radius = fill(cfg.circle_radius, num_total_particles)
     end
 
-    
-    # num_types = get_comp_num_types(cfg, system)
-    # types = get_graph_data(cfg, system)
-    # cmap = get_color_map(cfg.colors_map, num_types, rng=cfg.rng)
-    # colors = Vector{eltype(cmap)}(undef, num_total_particles)
     painter = get_painter(cfg.painter_cfg, system)
+    points = sizehint!(Point2f[], num_total_particles)
+    diameters = sizehint!(Float32[], num_total_particles)
 
-    if isnothing(cfg.stroke_cfg)
-        circles_plot = poly!(ax, [Circle(Point2f(0, 0), 1)])
-    else
-        circles_plot = poly!(ax,
-            [Circle(Point2f(0, 0), 1)],
-            strokecolor=cfg.stroke_cfg.color,
-            strokewidth=cfg.stroke_cfg.width,
-        )
-    end
+    stroke = cfg.stroke_cfg
+    stroke = isnothing(stroke) ? StrokeCfg(:transparent, 0.0) : stroke
 
-    # comp = CircleGraph(types, colors, radius, cmap, circles_plot, (), pos_obs, cfg)
+    circles_plot = scatter!(ax, points;
+        marker=Circle,
+        markerspace=:data,
+        markersize=diameters,
+        # Keep the circles in the xy plane, including on a 3D axis.
+        rotation=0.0,
+        transform_marker=true,
+        color=@view(painter.colors[1:0]),
+        strokecolor=stroke.color,
+        strokewidth=stroke.width,
+    )
+
     comp = CircleGraph(cfg, pos_obs, painter, circles_plot, radius)
     update_graph(comp, system)
     return comp
 end
 
 function update_graph(comp::CircleGraph, system)
-    # update_list = get_comp_update_data(comp)(comp, system)
-    # notify_comp_observables(comp, update_list)
-    # colors = get_colors!(comp.colors, comp.types, comp.cmap, particles_ids)
-
     particles_ids = get_particles_ids(system)
+    num_particles = length(particles_ids)
     
     update_painter!(comp.painter, system)
-    colors = @view comp.painter.colors[1:length(particles_ids)]
+    colors = @view comp.painter.colors[1:num_particles]
     
     if comp.cfg.circle_radius == -1
         radius = get_radius!(comp.radius, system.dynamic_cfg, get_particles_state(system.state), particles_ids)
     else
-        radius = comp.radius[1:length(particles_ids)]
+        radius = @view comp.radius[1:num_particles]
     end
 
     pos = comp.pos_obs[]
-    
-    circles = [Circle(Point2f(p), r) for (p, r) in zip(pos, radius)]
-    Makie.update!(comp.plot, circles; color=colors)
+
+    # Update together so positions, sizes and colors agree when particles appear
+    # or disappear. Makie.update! also propagates mutations of reused arrays.
+    Makie.update!(comp.plot, pos; markersize=2 .* radius, color=colors)
 end
 
 @kwdef struct NumsGraphCfg <: GraphCompCfg 

@@ -1,6 +1,6 @@
 module NeighborsMod
 
-export NeighborsCfg, HystericNeighborsCfg, Neighbors, ParticleNeighbors 
+export NeighborsCfg, HystericNeighborsCfg, Neighbors, RepeatableNeighbors, ParticleNeighbors
 export get_neigh, get_neigh_list, get_neigh_count, neigh_sum_buffers, neigh_clean!, neigh_update!
 
 import Mavi
@@ -41,6 +41,27 @@ get_slide_idx(::Mavi.Configs.Sequencial) = 1
 get_slide_idx(::Mavi.Configs.Threaded) = Mavi.Integration.get_thread_index()
 
 """
+    RepeatableNeighbors(neighbors::Neighbors)
+    RepeatableNeighbors(; kwargs...)
+
+Accept repeated observations of undirected pairs and expose unique neighbors
+after `neigh_sum_buffers`. Self-pairs are ignored. Each worker records pairs in
+its own set; reduction unions those sets before building lists and counts.
+Call `neigh_clean!` before recording a new step. Lists grow when necessary.
+Keyword arguments are forwarded to `Neighbors`.
+"""
+mutable struct RepeatableNeighbors{N<:Neighbors} <: AbstractNeighbors
+    neighbors::N
+    pair_buffers::Vector{Set{Tuple{Int, Int}}}
+    unique_pairs::Set{Tuple{Int, Int}}
+end
+function RepeatableNeighbors(neighbors::Neighbors)
+    buffers = [Set{Tuple{Int, Int}}() for _ in axes(neighbors.count, 2)]
+    RepeatableNeighbors(neighbors, buffers, Set{Tuple{Int, Int}}())
+end
+RepeatableNeighbors(; kwargs...) = RepeatableNeighbors(Neighbors(; kwargs...))
+
+"""
 - type:  
     How neighbors are calculated.
     - `:rings` - Only particles from other rings are considered. Particles in 
@@ -67,7 +88,7 @@ HystericNeighbors(cfg, neighbors, num_entities) = HystericNeighbors(cfg, neighbo
 
 function get_neigh(neigh) end
 get_neigh(neigh::Neighbors) = neigh
-get_neigh(neigh::Union{ParticleNeighbors, HystericNeighbors}) = neigh.neighbors
+get_neigh(neigh::Union{ParticleNeighbors, HystericNeighbors, RepeatableNeighbors}) = neigh.neighbors
 
 function get_neigh_list(neighbors, id) 
     neigh = get_neigh(neighbors)
@@ -79,6 +100,15 @@ function neigh_clean!(neighbors) end
 
 function neigh_clean!(neighbors::AbstractNeighbors)
     get_neigh(neighbors).count .= 0 
+end
+
+function neigh_clean!(neighbors::RepeatableNeighbors)
+    neighbors.neighbors.count .= 0
+    for pairs in neighbors.pair_buffers
+        empty!(pairs)
+    end
+    empty!(neighbors.unique_pairs)
+    return nothing
 end
 
 function neigh_sum_buffers(neighbors) end
@@ -108,6 +138,45 @@ end
 
 neigh_sum_buffers(neighbors::AbstractNeighbors) = neigh_sum_buffers(get_neigh(neighbors))
 
+function neigh_sum_buffers(neighbors::RepeatableNeighbors)
+    pairs = neighbors.unique_pairs
+    empty!(pairs)
+    for buffer in neighbors.pair_buffers
+        union!(pairs, buffer)
+    end
+
+    inner = neighbors.neighbors
+    inner.count .= 0
+    for (i, j) in pairs
+        inner.count[i, 1] += 1
+        inner.count[j, 1] += 1
+    end
+
+    # Dynamically changes the size of the neighbors list buffer 
+    # if !isnothing(inner.list)
+    #     required = maximum(@view(inner.count[:, 1]); init=0)
+    #     if required > size(inner.list, 1)
+    #         capacity = max(required, 2 * size(inner.list, 1))
+    #         list = fill(-1, capacity, size(inner.list, 2), size(inner.list, 3))
+    #         inner = Neighbors(list, inner.count, inner.cfg, inner.device)
+    #         neighbors.neighbors = inner
+    #     end
+
+    #     inner.count .= 0
+    #     for (i, j) in pairs
+    #         count_i = inner.count[i, 1] += 1
+    #         count_j = inner.count[j, 1] += 1
+    #         inner.list[count_i, i, 1] = j
+    #         inner.list[count_j, j, 1] = i
+    #     end
+    #     for i in axes(inner.count, 1)
+    #         sort!(@view inner.list[1:inner.count[i, 1], i, 1])
+    #     end
+    # end
+    
+    return nothing
+end
+
 function neigh_update_data!(neighbors::Neighbors{Nothing, D}, i, j) where D
     count = neighbors.count
     idx = get_slide_idx(neighbors.device)
@@ -133,6 +202,15 @@ function neigh_update!(neighbors::Neighbors, i, j, dist, max_dist)
     if dist < max_dist * neighbors.cfg.tol
         neigh_update_data!(neighbors, i, j)    
     end
+end
+
+function neigh_update!(neighbors::RepeatableNeighbors, i, j, dist, max_dist)
+    inner = neighbors.neighbors
+    if i != j && dist < max_dist * inner.cfg.tol
+        idx = get_slide_idx(inner.device)
+        push!(neighbors.pair_buffers[idx], minmax(i, j))
+    end
+    return nothing
 end
 
 function neigh_update!(neighbors::HystericNeighbors, i, j, dist, max_dist)

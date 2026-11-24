@@ -1,3 +1,5 @@
+using Mavi
+
 module Progress
     using Printf
 
@@ -93,4 +95,25 @@ module Progress
     end
 
     show_finish(prog) = final_text(prog, prog.formatter)
+end
+
+function measure_step!(system; n=1000, n_before=3)
+    step! = Mavi.Integration.get_step_function(system)
+
+    # Aquecimento: evita incluir a compilação na medição
+    for _ in 1:n_before
+        step!(system)
+    end
+
+    GC.gc()
+
+    tempo = @elapsed begin
+        for _ in 1:n
+            step!(system)
+        end
+    end
+
+    elt = 1000 * tempo / n
+    println("<Δt> = $(elt) ms")
+    return elt  # ms por passo
 end

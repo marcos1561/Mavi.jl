@@ -6,7 +6,7 @@ export update_area_empty!, process_sink_source!
 
 using StaticArrays, StructTypes
 
-import Mavi.Configs: GeometryCfg, RectangleCfg, check_intersection, is_inside
+import Mavi.Configs: GeometryCfg, RectangleCfg, is_inside
 import Mavi.Rings: ring_num_particles
 import Mavi.States: get_ids
 
@@ -56,64 +56,28 @@ struct ChunksChecker{P, C} <: Checker
     ids::Vector{Vector{CartesianIndex{2}}}
 end
 function ChunksChecker(pos, chunks, bbox_vec::Vector{G}) where G <: RectangleCfg 
-    global_bbox = sum(bbox_vec)
-    # global_bbox = RectangleCfg(
-    #     length=global_bbox.length + cfg.pad*2,
-    #     height=global_bbox.height + cfg.pad*2,
-    #     bottom_left=global_bbox.bottom_left - SVector(cfg.pad, cfg.pad),
-    # )
     bbox_ids = [CartesianIndex{2}[] for _ in 1:length(bbox_vec)]
-
-    up = SVector(0, 1)
     geo = chunks.space_cfg.geometry_cfg
-    chunk_tl = geo.bottom_left + up * geo.height
+    grid_top = geo.bottom_left[2] + geo.height
 
-    found_start = false
-    start_x_id, end_x_id = 0, 0
-    for i in 1:chunks.num_cols
-        x1 = chunk_tl[1] + (i-1) * chunks.chunk_length
-        x2 = x1 + chunks.chunk_length
-        if !found_start && x1 <= global_bbox.bottom_left[1] <= x2
-            found_start = true
-            start_x_id = i
+    for (bbox, ids) in zip(bbox_vec, bbox_ids)
+        bbox_min = bbox.bottom_left
+        bbox_max = bbox.bottom_left + bbox.size
+
+        # The padded source box may extend outside the grid. Select overlapping
+        # rows and columns from valid indices, including boxes touching an edge.
+        rows = findall(1:chunks.num_rows) do row
+            y2 = grid_top - (row - 1) * chunks.chunk_height
+            y1 = y2 - chunks.chunk_height
+            y1 <= bbox_max[2] && bbox_min[2] <= y2
         end
-
-        if found_start && x1 >= global_bbox.bottom_left[1] + global_bbox.length
-            end_x_id = i - 1
-            break
+        cols = findall(1:chunks.num_cols) do col
+            x1 = geo.bottom_left[1] + (col - 1) * chunks.chunk_length
+            x2 = x1 + chunks.chunk_length
+            x1 <= bbox_max[1] && bbox_min[1] <= x2
         end
-    end
-
-    found_start = false
-    start_y_id, end_y_id = 0, 0       
-    for i in 1:chunks.num_rows
-        y2 = chunk_tl[2] - (i-1) * chunks.chunk_height
-        y1 = y2 - chunks.chunk_height
-        if !found_start && y1 <= global_bbox.bottom_left[2] + global_bbox.height  <= y2
-            found_start = true
-            start_y_id = i
-        end
-
-        if found_start && y2 <= global_bbox.bottom_left[2]
-            end_y_id = i - 1
-            break
-        end
-    end
-
-    for col in start_x_id:end_x_id
-        for row in start_y_id:end_y_id
-            rect = get_chunk_rect(chunks, row, col) 
-            # RectangleCfg(
-            #     length=chunks.chunk_length,
-            #     height=chunks.chunk_height,
-            #     bottom_left=chunk_tl - col*up + (row-1)*right,
-            # )
-
-            for (bbox, chunks_ids) in zip(bbox_vec, bbox_ids)
-                if check_intersection(rect, bbox)
-                    push!(chunks_ids, CartesianIndex(row, col))
-                end
-            end
+        for col in cols, row in rows
+            push!(ids, CartesianIndex(row, col))
         end
     end
 
@@ -155,7 +119,7 @@ function Source(cfg::SourceCfg{T, S}, chunks_checker_args=nothing, pos_checker_a
     bbox_pad_vec::Vector{RectangleCfg{2, T}} = []
     for i in 1:cfg.size[1]
         for j in 1:cfg.size[2]
-            bl_i = bl + ((i-1)*bbox_length + i*cfg.offset[1]) * right  + ((j-1)*bbox_height + j*cfg.offset[2]) * up        
+            bl_i = bl + ((i-1)*bbox_length + (i-1)*cfg.offset[1]) * right  + ((j-1)*bbox_height + (j-1)*cfg.offset[2]) * up        
             bbox = RectangleCfg(
                 length=bbox_length, 
                 height=bbox_height, 
@@ -238,6 +202,7 @@ function process_source!(source, state, system=nothing)
         if !isnothing(system) && !isnothing(ring_id)
             num_p = ring_num_particles(system, ring_id)
             system.info.cms[ring_id] = sum(state.rings_pos[1:num_p, ring_id]) / num_p
+            system.info.continuos_pos[1:num_p, ring_id] .= state.rings_pos[1:num_p, ring_id]
         end
     end
 end

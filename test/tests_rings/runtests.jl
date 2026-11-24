@@ -1,7 +1,23 @@
 include("tests_general.jl")
 include("tests_serder.jl")
+include("tests_sources.jl")
+include("tests_neighbors.jl")
+include("tests_states.jl")
 
 @testset "Rings" begin
+    @testset "Valid particle pairs" begin
+        RingStateTests.check_valid_pairs()
+    end
+
+    @testset "Repeatable neighbors" begin
+        NeighborTests.check_repeatable_neighbors()
+        NeighborTests.check_ring_neighbors()
+    end
+
+    @testset "Source boundary chunks" begin
+        SourceTests.check_boundary_chunks()
+    end
+
     @test TestRings.check_chunks(:normal) < 1e-4
     @test TestRings.check_chunks(:source) < 1e-4
     @test TestRings.check_chunks(:types) < 1e-4
@@ -34,6 +50,8 @@ include("tests_serder.jl")
     ) == true
 
     @testset "Serder" begin
+        SerderTests.check_source_components()
+
         @test SerderTests.serder_rings(:normal) === nothing
         @test SerderTests.serder_rings(:source) === nothing
         @test SerderTests.serder_rings(:types) === nothing

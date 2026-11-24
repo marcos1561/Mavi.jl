@@ -1,5 +1,6 @@
 using Test
 
+include("tests_visualization.jl")
 include("tests_examples.jl")
 include("tests_experiments.jl")
 @testset "Mavi Core" begin

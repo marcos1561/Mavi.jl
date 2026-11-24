@@ -198,7 +198,7 @@ function add_ring!(state, pos, pol)
             state.pol[i] = pol
             rings_ids.mask[i] = true
             rings_ids.uids[i] = maximum(rings_ids.uids) + 1
-            rings_ids.num_active += 1
+            # rings_ids.num_active += 1
             return i
         end
     end
@@ -209,7 +209,7 @@ end
 function remove_ring!(state, ring_id)
     rings_ids = state.rings_ids
     rings_ids.mask[ring_id] = false
-    rings_ids.num_active -= 1
+    # rings_ids.num_active -= 1
 end
 
 function calc_active_ids!(active, state) end 
@@ -244,7 +244,7 @@ mv_states.get_entities_ids(state::RingsState) = get_rings_ids(state.rings_ids)
 # mv_states.get_particles_pos(state) = get_entities_pos(state, state.part_ids)
 # mv_states.get_num_total_particles(state::RingsState) = mv_states.get_num(state.rings_ids)
 
-mv_states.get_num_total_entities(state::RingsState) = get_rings_num(state)
+mv_states.get_num_total_entities(state::RingsState) = get_rings_num(state.rings_ids)
 
 function mv_states.get_entities_pos(state::RingsState) 
     @error "To get rings center positions use the method `get_entities_pos(state, system)`." 

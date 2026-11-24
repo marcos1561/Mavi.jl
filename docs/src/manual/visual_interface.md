@@ -45,6 +45,24 @@ anim_cfg = AnimationCfg(
 animate(system, anim_cfg)
 ```
 
+## Rendering particles as circles
+
+`CircleGraphCfg()` uses native circle markers with sizes in simulation coordinates (it is the default graphing configuration).
+It reuses position and diameter buffers each frame, avoiding polygon mesh generation
+for every particle. Particle radii are inferred from the system by default, and
+colors are controlled by `painter_cfg`.
+
+```julia
+graph_cfg = CircleGraphCfg(
+    painter_cfg=:viridis,
+    stroke_cfg=nothing, # Omit particle outlines
+    # circle_radius=0.5, # Optionally override all particle radii
+)
+animate(system, AnimationCfg(graph_cfg=graph_cfg))
+```
+
+Outlines remain enabled by default.
+
 ## Extending the Information Panel
 It is possible to inject custom information into the information panel. This is done by setting the `custom_items` field of `DefaultInfoUICfg`, which in turn is a field of `AnimationCfg`. `custom_items` is a function that should return the additional information to be displayed in the information panel. For more details about its signature, see the documentation in [`info_ui.jl`](https://github.com/marcos1561/Mavi.jl/blob/main/src/gui/info_ui.jl).
 

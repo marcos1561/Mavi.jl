@@ -67,11 +67,14 @@ function Mavi.Systems.particles_radius(dynamic_cfg::RingsCfg, state)
     return p_radius
 end
 
-function Mavi.Systems.is_valid_pair(state::RingsState, i, j)
+function Mavi.Systems.is_valid_pair(state::RingsState, dynamic_cfg::RingsCfg, i, j)
     num_max = num_max_particles(state)
     for idx in (i, j)
+        if !checkbounds(Bool, state.pos, idx)
+            return false
+        end
         p_id, ring_id = get_particle_ring_id(idx, num_max)
-        if !isnothing(state.active) && !state.active.mask[ring_id]
+        if state.rings_ids isa States.VarRingsIds && !state.rings_ids.mask[ring_id]
             return false
         end
 
@@ -116,7 +119,7 @@ end
 include("sources.jl")
 using .Sources
 
-struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{Neighbors, Nothing}, RC<:Union{Chunks, Nothing}, S, U}
+struct RingsInfo{T, PN<:Union{ParticleNeighbors, Nothing}, RN<:Union{RepeatableNeighbors, Nothing}, RC<:Union{Chunks, Nothing}, S, U}
     continuos_pos::Matrix{SVector{2, T}}
     areas::Vector{T}
     cms::Vector{SVector{2, T}}
@@ -133,7 +136,7 @@ function RingsInfo(; dynamic_cfg, space_cfg, state::RingsState, int_cfg,
     if !isnothing(r_neighbors_cfg) 
         num_max_neighbors = r_neighbors_cfg.only_count == false ? 15 : nothing 
 
-        r_neighbors = Neighbors(
+        r_neighbors = RepeatableNeighbors(
             num_entities=size(state.rings_pos, 2),
             num_max_neighbors=num_max_neighbors,
             device=int_cfg.device,
@@ -239,6 +242,14 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         end
     end
 
+    if dynamic_cfg.num_particles == -1
+        dynamic_cfg = RingsCfg(dynamic_cfg, state.num_particles)
+    end
+
+    if dynamic_cfg.num_particles != state.num_particles
+        error("`dynamic_cfg.num_particles` is not equal to `state.num_particles`!")
+    end
+
     chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, RingsChunksInfo(state, States.get_particles_ids))
     # chunks = get_chunks(int_cfg.chunks_cfg, space_cfg, state.pos, dynamic_cfg, state)
 
@@ -254,14 +265,6 @@ function RingsSystem(;state, space_cfg, dynamic_cfg, int_cfg, p_neighbors_cfg=no
         user_data=user_data,
     )
     
-    if dynamic_cfg.num_particles == -1
-        dynamic_cfg = RingsCfg(dynamic_cfg, state.num_particles)
-    end
-
-    if dynamic_cfg.num_particles != state.num_particles
-        error("`dynamic_cfg.num_particles` is not equal to `state.num_particles`!")
-    end
-
     system = Mavi.System(
         state=state, 
         space_cfg=space_cfg, 
@@ -286,7 +289,7 @@ end
 function Systems.system_base_setup(::RingsSys, system)
     Integration.update_continuos_pos!(system, system.space_cfg.wall_type)
      if !isnothing(system.int_cfg.extra.invasions_cfg)
-        info.invasions.last_check = system.time_info.num_steps
+        system.info.invasions.last_check = system.time_info.num_steps
     end
     Integration.system_initialization(system)
 end

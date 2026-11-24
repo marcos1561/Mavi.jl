@@ -49,7 +49,7 @@ function rectangular_grid(;
     for col_id in 1:num_cols
         for row_id in 1:num_rows
             center_x = pad_x/2 + (col_id-1) * (max_ring_length + pad_x) + max_ring_length/2
-            center_y = pad_y/2 + (row_id-1) * (max_ring_length + pad_x) + max_ring_length/2
+            center_y = pad_y/2 + (row_id-1) * (max_ring_length + pad_y) + max_ring_length/2
             
             ring_type = types[idx]
             num_p = num_particles[ring_type]

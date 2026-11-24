@@ -122,7 +122,7 @@ load_component(T::Type{Nothing}, _) = nothing
 function load_component(T::Type{Nothing}, data::JSON3.Array, path)
     data_loaded = []
     for load_info in data
-        push!(data_loaded, load_component(get_saved_type(load_info), get_saved_data(load_info)), path)
+        push!(data_loaded, load_component(get_saved_type(load_info), get_saved_data(load_info), path))
     end
     return Tuple(data_loaded)
 end

@@ -6,6 +6,7 @@ import Mavi.MaviSerder: MaviSerder, get_obj_save_data_json, load_dic_configs
 
 using Mavi.Rings
 using Mavi.Rings: RingsInfo, RingsSys
+using Mavi.Rings.NeighborsMod: get_neigh
 
 # ==
 # Matrix of InteractionCfg
@@ -29,7 +30,7 @@ using Mavi.Rings: RingsInfo, RingsSys
 function MaviSerder.get_obj_save_data(info::RingsInfo)
     r_neigh_cfg = nothing
     if !isnothing(info.r_neigh)
-        r_neigh_cfg = info.r_neigh.cfg
+        r_neigh_cfg = get_neigh(info.r_neigh).cfg
     end
     # serialize(joinpath(info_root, "r_neighbors_cfg.bin"), info.r_neigh.cfg)
     
