@@ -1,6 +1,6 @@
 module Rings
 
-export RingsSystem, RingsState, RingsSys, ActiveState, Configs, InitStates, Integration
+export RingsSystem, RingsState, RingsSys, ActiveState
 export get_num_particles, get_num_total_particles
 export get_continuos_pos, ring_points
 export NeighborsCfg, Invasion
@@ -296,6 +296,30 @@ end
 
 Mavi.Systems.get_entity_pos(state::RingsState, system, id) = system.info.cms[id]
 Mavi.Systems.get_entities_pos(state::RingsState, system) = system.info.cms
+
+"""
+    Mavi.Systems.get_entity_vel(dynamic_cfg::RingsCfg, state::RingsState, system, id)
+
+Return the instantaneous center-of-mass velocity of a ring using the current
+polarization and particle forces: `vo * polarization + mobility * mean(force)`.
+"""
+@inline function Mavi.Systems.get_entity_vel(dynamic_cfg::RingsCfg, state::RingsState, system, id)
+    ring_type = Mavi.States.get_entity_type(state, id)
+    vo = Configs.get_ring_prop_by_name(dynamic_cfg, :vo, ring_type)
+    mobility = Configs.get_ring_prop_by_name(dynamic_cfg, :mobility, ring_type)
+    sin_theta, cos_theta = sincos(state.pol[id])
+
+    forces = Systems.get_forces(system)
+    particle_ids = get_ring_particles_indices(state, id)
+    @boundscheck checkbounds(forces, particle_ids)
+    total_force = zero(eltype(forces))
+    @inbounds @simd for particle_id in particle_ids
+        total_force += forces[particle_id]
+    end
+
+    num_particles = eltype(total_force)(length(particle_ids))
+    return vo * SVector(cos_theta, sin_theta) + (mobility / num_particles) * total_force
+end
 
 function Mavi.Configs.get_potential_cfg(ring_id1, ring_id2, state::RingsState, potential_finder::Mavi.Configs.PotentialMatrix)
     potential_finder.matrix[state.types[ring_id1], state.types[ring_id2]]

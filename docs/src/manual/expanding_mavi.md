@@ -66,3 +66,25 @@ end
 !!! note
 
     See more about how `Mavi` deals with wall collisions in the blog post [Mavi's Space System](@ref).
+
+## How to save/load systems with types from another package
+When saved systems contain types from another package, register that package's
+root module before loading:
+
+```julia
+import Mavi, MySimulation
+Mavi.MaviSerder.register_type_module!(MySimulation)
+system = Mavi.load_system("saved_system")
+```
+
+A package can register itself automatically at runtime:
+
+```julia
+function __init__()
+    Mavi.MaviSerder.register_type_module!(@__MODULE__)
+end
+```
+
+The package containing this function must import `Mavi`. Registration makes its
+module available when resolving saved types, including nested type parameters
+and custom system types, without adding it as a dependency of Mavi.

@@ -7,6 +7,7 @@ export get_bounding_box, check_intersection, signed_pos, is_inside, volume
 export RigidWalls, PeriodicWalls, SlipperyWalls, ManyWalls
 export ForceWalls, PotentialWalls, process_dist
 export get_main_wall, get_main_geometry
+export wrap_position
 export get_space_data, SpaceData
 
 export HarmTruncCfg, LenJonesCfg, SzaboCfg, RunTumbleCfg
@@ -129,6 +130,17 @@ end
 
 struct ManyGeometries{G <: Tuple} <: GeometryCfg
     list::G
+end
+
+"""
+    is_inside(point, geometry::ManyGeometries; pad=0)
+
+Return whether `point` is inside the union of the component geometries.
+Forward `pad` to each component and stop at the first match. An empty union
+contains no points.
+"""
+@inline function is_inside(point, geometry::ManyGeometries; pad=0)
+    return any(g -> is_inside(point, g; pad=pad), geometry.list)
 end
 
 struct RectangleCfg{N, T<:Number} <: GeometryCfg
@@ -455,6 +467,29 @@ get_main_wall(space_cfg::SpaceCfg) = get_main_wall(space_cfg.wall_type)
 get_main_geometry(geometry_cfg::GeometryCfg) = geometry_cfg
 get_main_geometry(geometry_cfg::ManyGeometries) = geometry_cfg.list[1]
 get_main_geometry(space_cfg::SpaceCfg) = get_main_geometry(space_cfg.geometry_cfg)
+
+"""
+    wrap_position(pos, space_cfg::SpaceCfg)
+
+Return a position wrapped into the periodic domain without modifying `pos`.
+Periodic rectangles use the half-open interval from `bottom_left` to
+`bottom_left + size` in each dimension. Combined spaces use their main wall and
+geometry. Positions in other spaces are returned unchanged.
+"""
+wrap_position(pos, space_cfg::SpaceCfg) = pos
+
+function wrap_position(pos, space_cfg::SpaceCfg{PeriodicWalls, G}) where G <: RectangleCfg
+    geometry_cfg = space_cfg.geometry_cfg
+    return geometry_cfg.bottom_left + mod.(pos - geometry_cfg.bottom_left, geometry_cfg.size)
+end
+
+function wrap_position(pos, space_cfg::SpaceCfg{W, G}) where {W <: ManyWalls, G <: ManyGeometries}
+    main_space_cfg = SpaceCfg(
+        wall_type=get_main_wall(space_cfg),
+        geometry_cfg=get_main_geometry(space_cfg),
+    )
+    return wrap_position(pos, main_space_cfg)
+end
 
 # ==
 # Dynamic Configurations 

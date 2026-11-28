@@ -181,7 +181,7 @@ function get_particle_vel(dynamic_cfg::SzaboCfg, state::SelfPropelledState, syst
 end
 
 get_entity_vel(dynamic_cfg, state, system, id) = get_particle_vel(dynamic_cfg, state, system, id)
-get_entity_vel(system, id) = get_entity_vel(system.dynamic_cfg, system.state, system, id)
+@inline get_entity_vel(system, id) = get_entity_vel(system.dynamic_cfg, system.state, system, id)
 
 
 States.get_particles_pos(system::System) = get_particles_pos(system.state)

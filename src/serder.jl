@@ -2,6 +2,7 @@ module MaviSerder
 
 export save_system, save_system_configs, save_component_serial, save_component_json, get_obj_save_data_json
 export load_system, load_dic_configs, load_component, load_component_serial, load_component_json, load_configs, load_system_configs, load_state
+export register_type_module!
 
 using Serialization, JSON3, Random, StructTypes
 using StaticArrays
@@ -47,7 +48,7 @@ get_obj_save_data(obj) = obj
 # get_obj_save_data(obj::Dict) = Dict(k => get_obj_save_data_json(v) for (k, v) in obj)
 
 "Returns data to be saved inside `obj` in the `json` format."
-get_obj_save_data_json(obj, path=nothing) = (type=string(typeof(obj)), data=get_obj_save_data(obj, path))
+get_obj_save_data_json(obj, path=nothing) = (type=sprint(show, typeof(obj); context=:module => nothing), data=get_obj_save_data(obj, path))
 get_obj_save_data_json(obj::Tuple, path=nothing) = [get_obj_save_data_json(x, path) for x in obj]
 
 function save_component_json(obj, root, name)
@@ -99,7 +100,45 @@ end
 # Deserialization
 # ==
 
-get_saved_type(load_info) = eval(Meta.parse(string(load_info[:type])))
+const REGISTERED_TYPE_MODULES = Dict{Symbol, Module}()
+
+"""
+    register_type_module!(mod::Module)
+
+Make `mod` available by its name when resolving saved component types and system
+types. Register the root module of a package that defines custom configurations
+or user data before loading a saved system. Packages can register themselves in
+their `__init__` function:
+
+```julia
+function __init__()
+    Mavi.MaviSerder.register_type_module!(@__MODULE__)
+end
+```
+
+Registering the same module again is allowed. A different module with the same
+name raises an `ArgumentError`. Registration does not import the module or add
+global bindings to `MaviSerder`.
+"""
+function register_type_module!(mod::Module)
+    name = nameof(mod)
+    if haskey(REGISTERED_TYPE_MODULES, name) && REGISTERED_TYPE_MODULES[name] !== mod
+        throw(ArgumentError("a different module is already registered as $name"))
+    end
+    if isdefined(@__MODULE__, name) && getfield(@__MODULE__, name) !== mod
+        throw(ArgumentError("$name already refers to a different binding in MaviSerder"))
+    end
+    REGISTERED_TYPE_MODULES[name] = mod
+    return mod
+end
+
+resolve_type_modules(x) = x
+resolve_type_modules(name::Symbol) = haskey(REGISTERED_TYPE_MODULES, name) ? QuoteNode(REGISTERED_TYPE_MODULES[name]) : name
+resolve_type_modules(expr::Expr) = Expr(expr.head, map(resolve_type_modules, expr.args)...)
+
+eval_saved_expression(value) = eval(resolve_type_modules(Meta.parse(string(value))))
+
+get_saved_type(load_info) = eval_saved_expression(load_info[:type])
 get_saved_type(load_info::JSON3.Array) = Nothing
 
 get_saved_data(load_info) = load_info[:data]
@@ -167,7 +206,7 @@ function load_system_configs(path; ignore_info=false)
     if ignore_info
         delete!(configs, :info)
     end
-    sys_type = eval(Meta.parse(configs[:sys_type]))
+    sys_type = eval_saved_expression(configs[:sys_type])
     configs = load_dic_configs(configs, path)
     configs[:sys_type] = sys_type
 
@@ -198,7 +237,7 @@ function load_system(configs_path::String, state_path::String, time_info_path=no
     configs = JSON3.read(configs_path)
     configs = convert(Dict{Symbol, Any}, configs)
     configs[:state] = get_load_info_serial(state_path)
-    sys_type = eval(Meta.parse(configs[:sys_type]))
+    sys_type = eval_saved_expression(configs[:sys_type])
     # sys_type = deserialize(joinpath(root, "sys_type.bin"))
     
     if !isnothing(time_info_path)

@@ -44,7 +44,8 @@ function calc_interaction(i, j, dynamic_cfg::RingsCfg, system::System)
     dr = calc_diff(pos[i], pos[j], system.space_cfg)
     dist = sqrt(sum(dr.^2))
 
-    max_dist = 2 * Configs.particle_radius(interaction_cfg)
+    # max_dist = 2 * Configs.particle_radius(interaction_cfg)
+    max_dist = Configs.maximum_interaction_distance(interaction_cfg)
     neigh_update!(system.info.p_neigh, i, j, ri, rj, dist, max_dist)
     neigh_update!(system.info.r_neigh, ri, rj, dist, max_dist)
 

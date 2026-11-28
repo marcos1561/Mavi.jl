@@ -12,6 +12,7 @@ import Mavi.Visualization.SystemGraphs: ColorSchemes
 
 using Mavi.Rings
 using Mavi.Rings.Configs 
+using Mavi.Rings.InitStates 
 using Mavi.Visualization
 using Mavi.Configs: get_bounding_box
 

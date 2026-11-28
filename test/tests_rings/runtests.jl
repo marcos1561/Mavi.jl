@@ -9,6 +9,10 @@ include("tests_states.jl")
         RingStateTests.check_valid_pairs()
     end
 
+    @testset "Entity velocities" begin
+        RingStateTests.check_entity_velocities()
+    end
+
     @testset "Repeatable neighbors" begin
         NeighborTests.check_repeatable_neighbors()
         NeighborTests.check_ring_neighbors()

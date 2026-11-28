@@ -8,6 +8,7 @@ skip_entity(masker::Mavi.Configs.GeometryCfg, cm_i, entity_id, system) = !Mavi.C
 # ==
 
 abstract type FieldQuantityCfg end
+MaviSerder.StructTypes.StructType(::Type{T}) where T <: FieldQuantityCfg = MaviSerder.StructTypes.Struct()
 
 function get_quantity_state(q_cfg, max_num_entities, num_collects, NumT, system)
     shape = get_quantity_shape(q_cfg, system)
@@ -104,8 +105,11 @@ end
 function get_collector(col_cfg::FieldQuantitiesCfg, exp_cfg::ExperimentCfg, system::System, state=nothing)
     if isnothing(state)
         q_states = []
-        sampler = get_sampler(col_cfg.sampler)
-        num_collects = get_num_collects(sampler.cfg, exp_cfg.tf)
+
+        ti = system.time_info.time
+        current_i = get_first_collect_index(col_cfg.sampler, ti)
+        sampler = get_sampler(col_cfg.sampler; current_i=current_i)
+        num_collects = get_num_collects(sampler.cfg, exp_cfg.tf, ti)
 
         NumT = eltype(system.state.pos[1])
         for q_cfg in col_cfg.cfgs
@@ -115,7 +119,10 @@ function get_collector(col_cfg::FieldQuantitiesCfg, exp_cfg::ExperimentCfg, syst
         end
         ids = Array{Int, 2}(undef, col_cfg.max_num_entities, num_collects)
         
-        state = FieldQuantitiesState(sampler, Tuple(q_states), ids, Int[], NumT[], 0, num_collects)
+        NumT = typeof(system.time_info.time)
+        state = FieldQuantitiesState(
+            sampler, Tuple(q_states), ids, Int[], Bool[], NumT[], 0, num_collects,
+        )
     end
 
     FieldQuantitiesCol(col_cfg, state)
@@ -127,6 +134,8 @@ mutable struct FieldQuantitiesState{S, QS, T}  <: ColState
     ids::Matrix{Int}
     # valid_entities_ids::ValidEntitiesIds
     num_entities::Vector{Int}
+    # One flag per collected sample, true when matching entities did not fit.
+    overflow::Vector{Bool}
     times::Vector{T}
     current_id::Int
     num_collects::Int
@@ -148,31 +157,45 @@ function collect(col::FieldQuantitiesCol, system; force_collect=false)
         update_sampler(state.sampler, time_info)
     end
 
+    space_cfg = system.space_cfg
+    main_space_cfg = Mavi.Configs.SpaceCfg(
+        wall_type = Mavi.Configs.get_main_wall(space_cfg),
+        geometry_cfg = Mavi.Configs.get_main_geometry(space_cfg),
+    )
+
     if collect_flag
         state.current_id += 1
         num_valid = 0
+        has_overflow = false
         ids = @view state.ids[:, state.current_id]
         max_num_entities = col.cfg.max_num_entities
         for entity_id in Mavi.States.get_entities_ids(system)
             cm_i = Mavi.States.get_entity_pos(system, entity_id)
+            cm_i = Mavi.Configs.wrap_position(cm_i, main_space_cfg)
             if skip_entity(col.cfg.masker, cm_i, entity_id, system)
                 continue
             end
             
-            num_valid += 1
-            ids[num_valid] = entity_id
-
             if num_valid >= max_num_entities
+                has_overflow = true
                 break
             end
+
+            num_valid += 1
+            ids[num_valid] = entity_id
         end
 
         push!(state.times, time_info.time)
         push!(state.num_entities, num_valid)
+        push!(state.overflow, has_overflow)
     end
 
     current_id = state.current_id
-    valid_entities_ids = @view state.ids[1:state.num_entities[current_id], current_id]
+    valid_entities_ids = if current_id == 0
+        Int[]
+    else
+        @view state.ids[1:state.num_entities[current_id], current_id]
+    end
     for (q_cfg, q_state) in zip(col.cfg.cfgs, col.state.quantities_states)
         collect_quantity(q_cfg, q_state, state, valid_entities_ids, collect_flag, system)
     end

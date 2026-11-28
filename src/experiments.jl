@@ -9,6 +9,7 @@ export load_data
 
 using Serialization, JSON3, Setfield, DataStructures, Dates
 using Base.Threads
+import StructTypes
 
 import Mavi
 using Mavi.Systems
@@ -44,8 +45,9 @@ function final_collect(col::Collector, system) end
 save_data(col::Collector, path) = serialize(joinpath(path, COL_FILENAME), col)
 
 function load_data(path)
-    T_string = string(deserialize(joinpath(path, COL_CFG_TYPE_FILENAME)))
-    T = eval(Meta.parse(T_string))
+    # T_string = string(deserialize(joinpath(path, COL_CFG_TYPE_FILENAME)))
+    # T = eval(Meta.parse(T_string))
+    T = MaviSerder.eval_saved_expression(deserialize(joinpath(path, COL_CFG_TYPE_FILENAME)))
     load_data(T, path)
 end
 load_data(::Type{C}, path) where C <: ColCfg = deserialize(joinpath(path, COL_FILENAME))
@@ -56,7 +58,8 @@ create_data_path(::Collector, path) = mkpath(path)
 
 function save_col_cfg_type(col::Collector, path)
     col_cfg = col.cfg
-    COL_CFG_T_string = string(typeof(col_cfg))
+    # COL_CFG_T_string = string(typeof(col_cfg))
+    COL_CFG_T_string = MaviSerder.get_obj_save_data_json(col_cfg).type
     serialize(joinpath(path, COL_CFG_TYPE_FILENAME), COL_CFG_T_string)
 end
 
@@ -624,6 +627,10 @@ end
 @kwdef struct ManyColsCfg{C<:NamedTuple} <: ColCfg
     cfgs::C
 end
+# Preserve the JSON object shape for an empty collector configuration.
+StructTypes.StructType(::Type{ManyColsCfg{NamedTuple{(), Tuple{}}}}) = StructTypes.CustomStruct()
+StructTypes.lower(cfg::ManyColsCfg{NamedTuple{(), Tuple{}}}) = (; cfgs=cfg.cfgs)
+StructTypes.construct(::Type{ManyColsCfg{NamedTuple{(), Tuple{}}}}, ::AbstractDict) = ManyColsCfg((;))
 
 struct ManyColsState{S<:NamedTuple} <: ColState
     states::S

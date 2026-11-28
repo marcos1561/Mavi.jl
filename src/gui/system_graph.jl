@@ -22,36 +22,32 @@ using Mavi.Errors
 include("./painters.jl")
 
 "Drawn the borders of `geometry_cfg`."
-function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black)
-    l, h = geometry_cfg.length, geometry_cfg.height
-    x, y = geometry_cfg.bottom_left
-    # lines!(ax, [x, y], [x+l, y], color=:black)
-    # lines!(ax, [x+l, y], [x+l, y+h], color=:black)
-    # lines!(ax, [x+l, y+h], [x, y+h], color=:black)
-    # lines!(ax, [y+h, x], [x, y], color=:black)
-    
-    lines!(ax, [x, x+l], [y, y], color=color)
-    lines!(ax, [x+l, x+l], [y+h, y], color=color)
-    lines!(ax, [x+l, x], [y+h, y+h], color=color)
-    lines!(ax, [x, x], [y+h, y], color=color)
+function drawn_borders(ax, geometry_cfg::RectangleCfg; adjust_lims=true, color=:black, kwargs...)
+    region = geometry_cfg
+    x0, y0 = region.bottom_left.x, region.bottom_left.y
+    x1, y1 = x0 + region.length, y0 + region.height
+    lines!(ax, Point2f[
+        (x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0),
+    ]; color=color, kwargs...)
 
     if adjust_lims
+        l, h = geometry_cfg.length, geometry_cfg.height
         dx = l*0.1
         dy = h*0.1
-        xlims!(ax, x - dx, x + l + dx)
-        ylims!(ax, y - dy, y + h + dy)
+        xlims!(ax, x0 - dx, x0 + l + dx)
+        ylims!(ax, y0 - dy, y0 + h + dy)
     end
 end
 
-function drawn_borders(ax, geometry_cfg::LinesCfg; color=:black, line_kwargs=(), kwargs...)
+function drawn_borders(ax, geometry_cfg::LinesCfg; color=:black, kwargs...)
     for line in geometry_cfg.lines
         p1, p2 = line.p1, line.p2
-        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color; line_kwargs...)
+        lines!(ax, [p1.x, p2.x], [p1.y, p2.y], color=color; kwargs...)
     end
 end
 
-function drawn_borders(ax, geometry_cfg::CircleCfg; arc_kwargs=(), kwargs...)
-    arc!(ax, geometry_cfg.center, geometry_cfg.radius, -π, π, color=:black; arc_kwargs...)
+function drawn_borders(ax, geometry_cfg::CircleCfg; color=:black, kwargs...)
+    arc!(ax, geometry_cfg.center, geometry_cfg.radius, -π, π, color=color; kwargs...)
 end
 
 function drawn_borders(ax, geometry_cfg::ManyGeometries; kwargs...)

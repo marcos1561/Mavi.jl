@@ -1,5 +1,7 @@
 using Test
 
+include("tests_serder.jl")
+
 include("tests_visualization.jl")
 include("tests_examples.jl")
 include("tests_experiments.jl")
